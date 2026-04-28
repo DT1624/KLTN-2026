@@ -1,4 +1,4 @@
-module governance::credential {
+module governance::vc_registry {
 
     use std::signer;
     use std::vector;
@@ -6,7 +6,7 @@ module governance::credential {
     use aptos_std::smart_table::SmartTable;
     use aptos_framework::event;
     use aptos_framework::timestamp;
-    use governance::identity;
+    use governance::did_registry;
     use governance::authority;
     use governance::errors;
 
@@ -66,7 +66,7 @@ module governance::credential {
     #[event]
     struct VCStatusChangedEvent has drop, store {
         id: u64,
-        issuer_addr: address,
+        holder_addr: address,
         new_status: u8,
         reason: vector<u8>,
         changed_by: address,
@@ -106,10 +106,10 @@ module governance::credential {
         authority::assert_is_active_issuer(issuer_addr, vc_type);
 
         // Step 2: derive issuer_did from address (not from input to prevents impersonation)
-        let issuer_did = identity::get_active_did_string(issuer_addr);
+        let issuer_did = did_registry::get_active_did_string(issuer_addr);
 
         // Step 3: verify holder DID - assert this did active, can receive VC.
-        let holder_did = identity::get_active_did_string(holder_addr);
+        let holder_did = did_registry::get_active_did_string(holder_addr);
 
         // Step 4: hash integrity (32 bytes)
         assert!(
@@ -246,7 +246,7 @@ module governance::credential {
         );
         let record = *smart_table::borrow(&vc_registry.vcs, vc_id);
         assert!(
-            record.expires_at == 0 && timestamp::now_seconds() < record.expires_at,
+            record.expires_at == 0 || timestamp::now_seconds() < record.expires_at,
             errors::vc_already_expired()
         );
         record
@@ -304,6 +304,90 @@ module governance::credential {
         borrow_vc_registry().vc_count
     }
 
+    #[test_only]
+    fun build_vc_issued_event(
+        id: u64,
+        issuer_addr: address,
+        issuer_did: vector<u8>,
+        holder_addr: address,
+        holder_did: vector<u8>,
+        vc_id_hash: vector<u8>,
+        content_cid: vector<u8>,
+        vc_type: u64,
+        issued_at: u64,
+        expires_at: u64,
+    ): VCIssuedEvent {
+        VCIssuedEvent { 
+            id, 
+            issuer_addr, 
+            issuer_did, 
+            holder_addr, 
+            holder_did, 
+            vc_id_hash, 
+            content_cid, 
+            vc_type, 
+            issued_at, 
+            expires_at 
+        }
+    }
+
+    #[test_only]
+    public fun assert_vc_issued_event_emitted(
+        id: u64,
+        issuer_addr: address,
+        issuer_did: vector<u8>,
+        holder_addr: address,
+        holder_did: vector<u8>,
+        vc_id_hash: vector<u8>,
+        content_cid: vector<u8>,
+        vc_type: u64,
+        issued_at: u64,
+        expires_at: u64,
+    ) {
+        let event = build_vc_issued_event(id, issuer_addr, issuer_did, holder_addr, holder_did, vc_id_hash, content_cid, vc_type, issued_at, expires_at);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    fun build_vc_status_changed_event(
+        id: u64,
+        holder_addr: address,
+        new_status: u8,
+        reason: vector<u8>,
+        changed_by: address,
+        at: u64,
+    ): VCStatusChangedEvent {
+        VCStatusChangedEvent { 
+            id, 
+            holder_addr, 
+            new_status, 
+            reason, 
+            changed_by, 
+            at 
+        }
+    }
+
+    #[test_only]
+    public fun assert_vc_status_changed_event_emitted(
+        id: u64,
+        holder_addr: address,
+        new_status: u8,
+        reason: vector<u8>,
+        changed_by: address,
+        at: u64,
+    ) {
+        let event = build_vc_status_changed_event(id, holder_addr, new_status, reason, changed_by, at);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    public fun get_vc_details_by_id(vc_id: u64): (u64, address, address, vector<u8>, vector<u8>, vector<u8>, u64, u8, u64, u64, u64, vector<u8>) acquires VCRegistry {
+        let vc_registry = borrow_vc_registry();
+        assert!(smart_table::contains(&vc_registry.vcs, vc_id), errors::invalid_id());
+        let record = *smart_table::borrow(&vc_registry.vcs, vc_id);
+        (record.id, record.issuer_addr, record.holder_addr, record.vc_id_hash, record.content_cid, record.content_hash, record.vc_type, record.status, record.issued_at, record.expires_at, record.revoked_at, record.status_reason)
+    }
+
     // ========== Internal helpers ==========
 
     // Useds to set status VC to revoked, active to suspended; suspended to active
@@ -355,7 +439,7 @@ module governance::credential {
         event::emit(
             VCStatusChangedEvent {
                 id: vc_id,
-                issuer_addr: record.issuer_addr,
+                holder_addr: record.holder_addr,
                 new_status,
                 reason,
                 changed_by: caller,
@@ -414,7 +498,7 @@ module governance::credential {
         event::emit(
             VCStatusChangedEvent {
                 id: vc_id,
-                issuer_addr: record.issuer_addr,
+                holder_addr: record.holder_addr,
                 new_status,
                 reason,
                 changed_by: caller,
@@ -443,4 +527,8 @@ module governance::credential {
         borrow_global_mut<VCRegistry>(@governance)
     }
 
+    #[test_only]
+    public fun initialize_for_test(root: &signer) {
+        init_module(root);
+    }
 }

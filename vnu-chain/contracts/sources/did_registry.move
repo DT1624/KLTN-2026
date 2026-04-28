@@ -1,6 +1,5 @@
-module governance::identity {
+module governance::did_registry {
 
-    use std::option;
     use std::signer;
     use std::vector;
     use aptos_std::smart_table;
@@ -10,7 +9,7 @@ module governance::identity {
     use governance::errors;
 
     friend governance::authority;
-    friend governance::credential;
+    friend governance::vc_registry;
 
     // ========== Constants ==========
 
@@ -24,22 +23,16 @@ module governance::identity {
     struct DIDRecord has copy, drop, store {
         id: u64,
         owner: address,
+        // e.g: did:vnu:0x24545147abcde
         did_string: vector<u8>,
+        // cid from pin did document in IPFS
         document_cid: vector<u8>,
+        // SHA3-256(DID Document JSON) (256 bits = 32 bytes = 64 hex characters)
         document_hash: vector<u8>,
         status: u8,
         created_at: u64,
         updated_at: u64,
         version: u64,
-    }
-
-    struct DIDView has copy, drop {
-        did: vector<u8>,
-        owner: address,
-        cid: vector<u8>,
-        hash: vector<u8>,
-        status: u8,
-        created_at: u64,
     }
 
     struct DIDRegistry has key {
@@ -99,15 +92,15 @@ module governance::identity {
     // Anyone can register a unique DID
     // did_string must be unique, document_cid is IPFS CID of DID Document
     // hash is SHA3-256 of that document (32 bytes)
-    public entry fun registry_did(
+    public entry fun register_did(
         owner: &signer,
         did_string: vector<u8>,
         document_cid: vector<u8>,
-        hash: vector<u8>,
+        document_hash: vector<u8>,
     ) acquires DIDRegistry {
         let owner_addr = signer::address_of(owner);
         assert!(
-            vector::length(&hash) == 32,
+            vector::length(&document_hash) == 32,
             errors::hash_wrong_length()
         );
 
@@ -129,7 +122,7 @@ module governance::identity {
             owner: owner_addr,
             did_string,
             document_cid,
-            document_hash: hash,
+            document_hash,
             status: DID_STATUS_ACTIVE,
             created_at: now,
             updated_at: now,
@@ -160,16 +153,11 @@ module governance::identity {
         expected_version: u64,
     ) acquires DIDRegistry {
         let owner_addr = signer::address_of(owner);
-        assert!(
-            vector::length(&new_document_hash) == 32,
-            errors::hash_wrong_length()
-        );
         let did_registry = borrow_mut_did_registry();
         assert!(
             smart_table::contains(&did_registry.owner_to_id, owner_addr),
             errors::owner_not_exists()
         );
-
         let id = *smart_table::borrow(&did_registry.owner_to_id, owner_addr);
         assert!(
             smart_table::contains(&did_registry.dids, id),
@@ -183,6 +171,10 @@ module governance::identity {
         assert!(
             record.version == expected_version,
             errors::stable_did_version()
+        );
+        assert!(
+            vector::length(&new_document_hash) == 32,
+            errors::hash_wrong_length()
         );
         let now = timestamp::now_seconds();
         record.document_cid = new_document_cid;
@@ -208,6 +200,7 @@ module governance::identity {
         owner: &signer,
     ) acquires DIDRegistry {
         let owner_addr = signer::address_of(owner);
+        assert_owner_active(owner_addr);
         internal_set_did_status(owner_addr, DID_STATUS_SUSPENDED, owner_addr, constants::REASON_TYPE_OTHER());
     }
 
@@ -296,51 +289,35 @@ module governance::identity {
     // === View Functions ===
 
     #[view]
-    public fun resolve_did(did_string: vector<u8>): option::Option<DIDView> acquires DIDRegistry {
+    public fun resolve_did(did_string: vector<u8>): (vector<u8>, vector<u8>, vector<u8>, u8, u64) acquires DIDRegistry {
         let did_registry = borrow_did_registry();
-        if (!smart_table::contains(&did_registry.did_string_to_id, did_string)) {
-            return option::none<DIDView>()
-        };
+        assert!(
+            smart_table::contains(&did_registry.did_string_to_id, did_string),
+            errors::did_not_found()
+        );
         let id = *smart_table::borrow(&did_registry.did_string_to_id, did_string);
-
-        if (!smart_table::contains(&did_registry.dids, id)) {
-            return option::none<DIDView>()
-        };
+        assert!(
+            smart_table::contains(&did_registry.dids, id),
+            errors::invalid_cid()
+        );
         let record = smart_table::borrow(&did_registry.dids, id);
-        option::some(
-            DIDView {
-                did: record.did_string,
-                owner: record.owner,
-                cid: record.document_cid,
-                hash: record.document_hash,
-                status: record.status,
-                created_at: record.created_at
-            }
-        )
+        (record.did_string, record.document_cid, record.document_hash, record.status, record.version)
     }
 
     #[view]
-    public fun resolve_did_by_owner(owner: address): option::Option<DIDView> acquires DIDRegistry {
+    public fun resolve_did_by_owner(owner: address): (vector<u8>, vector<u8>, vector<u8>, u8, u64) acquires DIDRegistry {
         let did_registry = borrow_did_registry();
-        if (!smart_table::contains(&did_registry.owner_to_id, owner)) {
-            return option::none<DIDView>()
-        };
+        assert!(
+            smart_table::contains(&did_registry.owner_to_id, owner),
+            errors::owner_not_exists()
+        );
         let id = *smart_table::borrow(&did_registry.owner_to_id, owner);
-
-        if (!smart_table::contains(&did_registry.dids, id)) {
-            return option::none<DIDView>()
-        };
+        assert!(
+            smart_table::contains(&did_registry.dids, id),
+            errors::invalid_cid()
+        );
         let record = smart_table::borrow(&did_registry.dids, id);
-        option::some(
-            DIDView {
-                did: record.did_string,
-                owner: record.owner,
-                cid: record.document_cid,
-                hash: record.document_hash,
-                status: record.status,
-                created_at: record.created_at
-            }
-        )
+        (record.did_string, record.document_cid, record.document_hash, record.status, record.version)
     }
 
     #[view]
@@ -362,6 +339,68 @@ module governance::identity {
         borrow_did_registry().did_count
     }
 
+    #[test_only]
+    fun build_did_registered_event(id: u64, owner: address, did_string: vector<u8>, document_cid: vector<u8>, at: u64): DIDRegisteredEvent {
+        DIDRegisteredEvent { 
+            id, 
+            owner, 
+            did_string, 
+            document_cid, 
+            at 
+        }
+    }
+
+    #[test_only]
+    public fun assert_did_registered_event_emitted(id: u64, owner: address, did_string: vector<u8>, document_cid: vector<u8>, at: u64) {
+        let event = build_did_registered_event(id, owner, did_string, document_cid, at);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    fun build_did_document_updated_event(id: u64, owner: address, new_document_cid: vector<u8>, new_version: u64, at: u64): DIDDocumentUpdatedEvent {
+        DIDDocumentUpdatedEvent { 
+            id, 
+            owner, 
+            new_document_cid, 
+            new_version, 
+            at 
+        }
+    }
+
+    #[test_only]
+    public fun assert_did_document_updated_event_emitted(id: u64, owner: address, new_document_cid: vector<u8>, new_version: u64, at: u64) {
+        let event = build_did_document_updated_event(id, owner, new_document_cid, new_version, at);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    fun build_did_status_changed_event(id: u64, owner: address, changed_by: address, new_status: u8, reason: vector<u8>, at: u64): DIDStatusChangedEvent {
+        DIDStatusChangedEvent { 
+            id, 
+            owner, 
+            changed_by, 
+            new_status, 
+            reason, 
+            at 
+        }
+    }
+
+    #[test_only]
+    public fun assert_did_status_changed_event_emitted(id: u64, owner: address, changed_by: address, new_status: u8, reason: vector<u8>, at: u64) {
+        let event = build_did_status_changed_event(id, owner, changed_by, new_status, reason, at);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    public fun get_did_details_by_owner(owner: address): (u64, address, vector<u8>, vector<u8>, vector<u8>, u8, u64, u64, u64) acquires DIDRegistry {
+        let did_registry = borrow_did_registry();
+        assert!(smart_table::contains(&did_registry.owner_to_id, owner), errors::owner_not_exists());
+        let id = *smart_table::borrow(&did_registry.owner_to_id, owner);
+        assert!(smart_table::contains(&did_registry.dids, id), errors::invalid_cid());
+        let record = *smart_table::borrow(&did_registry.dids, id);
+        (record.id, record.owner, record.did_string, record.document_cid, record.document_hash, record.status, record.created_at, record.updated_at, record.version)
+    }
+
     // === Internal helpers ===
 
     fun internal_set_did_status(
@@ -370,14 +409,13 @@ module governance::identity {
         changed_by: address,
         reason: vector<u8>,
     ) acquires DIDRegistry {
-        assert_owner_active(target_owner);
         let did_registry = borrow_mut_did_registry();
         let id = *smart_table::borrow(&did_registry.owner_to_id, target_owner);
         assert!(
             smart_table::contains(&did_registry.dids, id),
             errors::invalid_id()
         );
-        let record = *smart_table::borrow_mut(&mut did_registry.dids, id);
+        let record = smart_table::borrow_mut(&mut did_registry.dids, id);
         assert!(
             record.status != DID_STATUS_REVOKED,
             errors::did_already_revoked()
@@ -421,7 +459,7 @@ module governance::identity {
     }
 
     #[test_only]
-    public fun initialize(root: &signer) {
+    public fun initialize_for_test(root: &signer) {
         init_module(root);
     }
 }

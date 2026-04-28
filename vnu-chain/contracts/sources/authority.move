@@ -1,27 +1,25 @@
 module governance::authority {
 
-    use std::option;
     use std::signer;
     use std::vector;
     use aptos_std::smart_table;
     use aptos_framework::event;
     use aptos_framework::timestamp;
-    use governance::identity;
+    use governance::did_registry;
     use governance::constants;
     use governance::errors;
 
-    friend governance::credential;
+    friend governance::vc_registry;
 
     // ========== Constants ==========
 
     // Issuer status
     const ISSUER_STATUS_ACTIVE:     u8 = 1;
-    const ISSUER_STATUS_SUSPENDED:  u8 = 2;
-    const ISSUER_STATUS_REVOKED:    u8 = 3;
+    const ISSUER_STATUS_REVOKED:    u8 = 2;
+    const ISSUER_STATUS_SUSPENDED:  u8 = 3;
 
-    const ADMIN_STATUS_ACTIVE:      u8 = 11;
-    const ADMIN_STATUS_REVOKED:     u8 = 12;
-
+    const ADMIN_STATUS_ACTIVE:      u8 = 1;
+    const ADMIN_STATUS_REVOKED:     u8 = 2;
 
     // ========== Structs ==========
 
@@ -123,7 +121,7 @@ module governance::authority {
             errors::not_root_admin()
         );
         // ensure admin had did
-        identity::assert_owner_active(admin);
+        did_registry::assert_owner_active(admin);
         assert!(
             !smart_table::contains(&authority.admins, admin),
             errors::admin_already_exists()
@@ -150,7 +148,7 @@ module governance::authority {
             errors::invalid_id()
         );
         smart_table::add(&mut authority.roles, id, admin_record);
-        smart_table::add(&mut authority.issuers, admin, id);
+        smart_table::add(&mut authority.admins, admin, id);
         authority.admin_count = authority.admin_count + 1;
 
         event::emit(
@@ -181,7 +179,7 @@ module governance::authority {
 
         let id = *smart_table::borrow(&authority.admins, admin);
         assert!(
-            !smart_table::contains(&authority.roles, id),
+            smart_table::contains(&authority.roles, id),
             errors::invalid_id()
         );
         let admin_record = smart_table::borrow_mut(&mut authority.roles, id);
@@ -217,7 +215,7 @@ module governance::authority {
         assert_is_active_admin(admin_addr);
 
         let authority = borrow_mut_authority();
-        identity::assert_owner_active(issuer);
+        did_registry::assert_owner_active(issuer);
         assert!(
             !smart_table::contains(&authority.issuers, issuer),
             errors::issuer_already_exists()
@@ -307,13 +305,13 @@ module governance::authority {
     /// Admin-level forced suspend did
     public entry fun admin_suspend_did(
         admin: &signer,
-        target_onwer: address,
+        target_owner: address,
         reason: vector<u8>,
     ) acquires Authority {
         let admin_addr = signer::address_of(admin);
         assert_is_active_admin(admin_addr);
 
-        identity::admin_suspend_did(admin_addr, target_onwer, reason);
+        did_registry::admin_suspend_did(admin_addr, target_owner, reason);
     }
 
     /// only admin-level can reactivate did
@@ -325,7 +323,7 @@ module governance::authority {
         let admin_addr = signer::address_of(admin);
         assert_is_active_admin(admin_addr);
 
-        identity::admin_reactivate_did(admin_addr, target_onwer, reason);
+        did_registry::admin_reactivate_did(admin_addr, target_onwer, reason);
     }
 
     /// Admin-level forced revocation (fraud, court order, etc.)
@@ -337,7 +335,7 @@ module governance::authority {
         let admin_addr = signer::address_of(admin);
         assert_is_active_admin(admin_addr);
 
-        identity::admin_revoke_did(admin_addr, target_onwer, reason);
+        did_registry::admin_revoke_did(admin_addr, target_onwer, reason);
     }
 
     // === Friends functions - can called by identity and credential ===
@@ -345,8 +343,12 @@ module governance::authority {
     public(friend) fun assert_is_active_admin(
         admin: address
     ) acquires Authority {
-        identity::assert_owner_active(admin);
         let authority = borrow_authority();
+        if (admin == authority.root_admin) {
+            return
+        };
+
+        did_registry::assert_owner_active(admin);
         if (smart_table::contains(&authority.admins, admin)) {
             let id = *smart_table::borrow(&authority.admins, admin);
             assert!(
@@ -358,8 +360,9 @@ module governance::authority {
                 record.status == ADMIN_STATUS_ACTIVE,
                 errors::admin_not_active()
             );
+        } else {
+            assert!(admin == authority.root_admin, errors::admin_not_active());
         };
-        assert!(admin == authority.root_admin, errors::admin_not_active());
     }
 
     // Aborts if issuer is not an active, non-expired issuer
@@ -368,7 +371,7 @@ module governance::authority {
         issuer: address,
         vc_type: u64
     ) acquires Authority {
-        identity::assert_owner_active(issuer);
+        did_registry::assert_owner_active(issuer);
         let authority = borrow_authority();
         assert!(
             smart_table::contains(&authority.issuers, issuer),
@@ -391,10 +394,6 @@ module governance::authority {
         );
     }
 
-    public(friend) fun get_root_admin(): address acquires Authority {
-        borrow_authority().root_admin
-    }
-
     // === View functions ===
 
     #[view]
@@ -413,20 +412,42 @@ module governance::authority {
     }
 
     #[view]
-    public fun is_admin(addr: address): bool acquires Authority {
+    public fun is_active_admin(addr: address): bool acquires Authority {
         let authority = borrow_authority();
-        addr == authority.root_admin || smart_table::contains(&authority.admins, addr)
+        if (addr == authority.root_admin) {
+            return true
+        };
+        if (!smart_table::contains(&authority.admins, addr)) {
+            return false
+        };
+        let id = *smart_table::borrow(&authority.admins, addr);
+        if (!smart_table::contains(&authority.roles, id)) {
+            return false
+        };
+        let record = smart_table::borrow(&authority.roles, id);
+        record.status == ADMIN_STATUS_ACTIVE
+    }
+
+    // return (approved_by, vc_type_mask delegation_vc_cid, delegation_vc_hash, exxpires_at, status)
+    #[view]
+    public fun get_info(addr: address): (address, u64, vector<u8>, vector<u8>, u64, u8) acquires Authority {
+        let authority = borrow_authority();
+        assert!(
+            smart_table::contains(&authority.issuers, addr) || smart_table::contains(&authority.admins, addr),
+            errors::owner_not_exists()
+        );
+        let id = if (smart_table::contains(&authority.issuers, addr)) {
+            *smart_table::borrow(&authority.issuers, addr)
+        } else {
+            *smart_table::borrow(&authority.admins, addr)
+        };
+        let record = *smart_table::borrow(&authority.roles, id);
+        return (record.approved_by, record.vc_type_mask, record.delegation_vc_cid, record.delegation_vc_hash, record.expires_at, record.status)
     }
 
     #[view]
-    public fun get_isser_info(issuer: address): option::Option<RoleRecord> acquires Authority {
-        let authority = borrow_authority();
-        if (!smart_table::contains(&authority.issuers, issuer)) {
-            return option::none<RoleRecord>()
-        };
-        let id = *smart_table::borrow(&authority.issuers, issuer);
-        let record = *smart_table::borrow(&authority.roles, id);
-        return option::some(record)
+    public fun get_root_admin(): address acquires Authority {
+        borrow_authority().root_admin
     }
 
     #[view]
@@ -495,7 +516,133 @@ module governance::authority {
     }
 
     #[test_only]
-    public fun initialize(root: &signer) {
+    public fun initialize_for_test(root: &signer) {
         init_module(root);
+    }
+
+    #[test_only]
+    fun build_admin_granted_event(to: address, by: address, at: u64): AdminGrantedEvent {
+        AdminGrantedEvent { 
+            to, 
+            by, 
+            at 
+        }
+    }
+
+    #[test_only]
+    public fun assert_admin_granted_event_emitted(to: address, by: address, at: u64) {
+        let event = build_admin_granted_event(to, by, at);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    fun build_admin_revoked_event(to: address, by: address, reason: vector<u8>, at: u64): AdminRevokedEvent {
+        AdminRevokedEvent { 
+            to, 
+            by, 
+            reason, 
+            at 
+        }
+    }
+
+    #[test_only]
+    public fun assert_admin_revoked_event_emitted(to: address, by: address, reason: vector<u8>, at: u64) {
+        let event = build_admin_revoked_event(to, by, reason, at);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    fun build_issuer_approved_event(
+        issuer: address,
+        by: address,
+        vc_type_mask: u64,
+        delegation_vc_cid: vector<u8>,
+        at: u64,
+        expires_at: u64,
+    ): IssuerApprovedEvent {
+        IssuerApprovedEvent { 
+            issuer, 
+            by, 
+            vc_type_mask, 
+            delegation_vc_cid, 
+            at, 
+            expires_at 
+        }
+    }
+
+    #[test_only]
+    public fun assert_issuer_approved_event_emitted(
+        issuer: address,
+        by: address,
+        vc_type_mask: u64,
+        delegation_vc_cid: vector<u8>,
+        at: u64,
+        expires_at: u64,
+    ) {
+        let event = build_issuer_approved_event(issuer, by, vc_type_mask, delegation_vc_cid, at, expires_at);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    fun build_issuer_status_changed_event(
+        issuer: address,
+        by: address,
+        new_status: u8,
+        reason: vector<u8>,
+        at: u64,
+    ): IssuerStatusChangedEvent {
+        IssuerStatusChangedEvent { 
+            issuer, 
+            by, 
+            new_status, 
+            reason, 
+            at 
+        }
+    }
+
+    #[test_only]
+    public fun assert_issuer_status_changed_event_emitted(
+        issuer: address,
+        by: address,
+        new_status: u8,
+        reason: vector<u8>,
+        at: u64,
+    ) {
+        let event = build_issuer_status_changed_event(issuer, by, new_status, reason, at);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    fun build_issuer_revoked_event(issuer: address, by: address, at: u64, reason: vector<u8>): IssuerRevokedEvent {
+        IssuerRevokedEvent { 
+            issuer, 
+            by, 
+            at, 
+            reason 
+        }
+    }
+
+    #[test_only]
+    public fun assert_issuer_revoked_event_emitted(issuer: address, by: address, at: u64, reason: vector<u8>) {
+        let event = build_issuer_revoked_event(issuer, by, at, reason);
+        assert!(event::was_event_emitted(&event), 42);
+    }
+
+    #[test_only]
+    public fun get_admin_details(addr: address): (address, address, u64, u64, u64, vector<u8>, vector<u8>, u64, u8, vector<u8>, u64) acquires Authority {
+        let authority = borrow_authority();
+        assert!(smart_table::contains(&authority.admins, addr), errors::not_admin());
+        let id = *smart_table::borrow(&authority.admins, addr);
+        let record = *smart_table::borrow(&authority.roles, id);
+        (record.owner, record.approved_by, record.approved_at, record.version, record.vc_type_mask, record.delegation_vc_cid, record.delegation_vc_hash, record.expires_at, record.status, record.status_reason, record.status_updated_at)
+    }
+
+    #[test_only]
+    public fun get_issuer_details(addr: address): (address, address, u64, u64, u64, vector<u8>, vector<u8>, u64, u8, vector<u8>, u64) acquires Authority {
+        let authority = borrow_authority();
+        assert!(smart_table::contains(&authority.issuers, addr), errors::issuer_not_found());
+        let id = *smart_table::borrow(&authority.issuers, addr);
+        let record = *smart_table::borrow(&authority.roles, id);
+        (record.owner, record.approved_by, record.approved_at, record.version, record.vc_type_mask, record.delegation_vc_cid, record.delegation_vc_hash, record.expires_at, record.status, record.status_reason, record.status_updated_at)
     }
 }
