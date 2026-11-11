@@ -1,0 +1,15 @@
+% Abstract in English (condensed edition)
+\mychapter{ABSTRACT}
+
+{\fsize{12}
+\textbf{Abstract:} This thesis proposes a digital identity architecture and a trust governance framework for digital academic credentials in multi-institution higher education, using Vietnam National University, Hanoi as a case study. The problem is not a shortage of tools for detecting forged credentials but an architectural property of the current model: verification information resides with the issuer rather than in the credential, so the cost of verification grows with the number of verifications and verification becomes the exception.
+
+Building on Self-Sovereign Identity, the work adopts W3C Decentralized Identifiers, Verifiable Credentials and a digital wallet, combined with hybrid on-chain and off-chain storage. The central contribution addresses what cryptography cannot answer: whether the organisation signing a credential is authorised to issue it. The authority chain, including issuance scope as a bitmask, delegation validity periods, constrained multi-level delegation and revocation rules, is enforced by smart contracts so that authority state becomes public data. Verification comprises seven steps, including a comparison of credential content against the hash anchored at issuance.
+
+The prototype consists of three Move modules published on the Movement testnet, two independent implementations of the indexing layer and a non-custodial browser wallet. Six experiments show that unlocking the wallet with 600,000 PBKDF2 iterations takes about 85\,ms; the unsalted on-chain content hash cannot be inverted by an observer holding only chain data, yet an attacker who knows the credential identifier recovers grade and graduation year in about 16\,ms; a missing index makes verification time grow linearly with data size, and adding it yields a two-orders-of-magnitude improvement at $10^5$ records; pinning the load generator to separate cores reduces measurement dispersion only on compute-heavy routes; and in on-chain mode one verification costs about $(k+3)$ sequential fullnode round trips of roughly 330\,ms each.
+
+Two design principles with scope beyond credentials are derived: revocation must carry weaker preconditions than issuance, and an irreversible operation must have its precondition proven by an action of the affected party. Limitations are stated explicitly: the architecture reduces but does not eliminate exposure of personal data and does not guarantee erasure; each issuer signs with a single key; and the conclusions concern technical feasibility, not usability.
+
+\vspace{0.5cm}
+\textit{\textbf{Keywords:}} \textit{Trust Governance, Digital Credentials, Decentralized Identity, Self-Sovereign Identity, Trust Registry, Smart Contract.}
+}

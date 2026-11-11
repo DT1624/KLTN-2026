@@ -1,0 +1,23 @@
+% SINH TỰ ĐỘNG bởi scripts/bench-plot.mjs — đừng sửa tay.
+% Nguồn dữ liệu: .bench/samplesize.json
+\begin{table}[H]
+\centering
+\caption{Hệ số biến thiên của p95 theo số mẫu, tính trên 12 lượt đo độc lập (đơn vị \%)}
+\label{tab:bench-samplesize}
+\renewcommand{\arraystretch}{1.2}
+\footnotesize
+\begin{tabular}{|c|l|r|r|r|r|r|r|r|}
+\hline
+\multirow{2}{*}{\textbf{Cài đặt}} & \multirow{2}{*}{\textbf{Tuyến}} & \multicolumn{7}{c|}{\textbf{Số yêu cầu mỗi lượt đo}} \\
+\cline{3-9}
+ & & \textbf{60} & \textbf{120} & \textbf{250} & \textbf{500} & \textbf{1000} & \textbf{2000} & \textbf{4000} \\
+\hline
+TS & \texttt{/health} & 133.0 & 80.9 & 75.4 & 46.5 & 21.3 & 52.3 & 32.8 \\
+GO & \texttt{/health} & 179.2 & 129.4 & 107.8 & 77.9 & 71.7 & 67.9 & 25.8 \\
+TS & \texttt{/did/resolve} & 122.1 & 81.9 & 31.2 & 18.9 & 35.4 & 29.9 & 66.4 \\
+GO & \texttt{/did/resolve} & 142.0 & 89.4 & 111.8 & 87.5 & 78.7 & 84.5 & 39.6 \\
+TS & \texttt{/auth/me} & 74.5 & 28.5 & 99.2 & 125.5 & 66.5 & 20.9 & 54.6 \\
+GO & \texttt{/auth/me} & 120.5 & 54.6 & 43.2 & 53.9 & 46.8 & 54.1 & 28.8 \\
+\hline
+\end{tabular}
+\end{table}

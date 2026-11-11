@@ -1,0 +1,80 @@
+\begin{longtable}{|p{3.4cm}|p{10.3cm}|}
+\caption{Đặc tả kịch bản cấp phát chứng thực}
+\label{tab:vc-issuance-scenario} \\
+
+\hline
+\textbf{Mục} & \textbf{Nội dung} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mục} & \textbf{Nội dung} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Mã kịch bản & KB3 \\
+\hline
+
+Tác nhân chính & Bên phát hành \\
+\hline
+
+Thành phần tham gia &
+Ví của bên phát hành, lớp lưu trữ ngoài chuỗi, mô-đun \cbox{vc\_registry}, mô-đun \cbox{authority}, tầng chỉ mục \\
+\hline
+
+Mục đích &
+Tạo một chứng thực văn bằng, ký bằng khóa riêng của bên phát hành, và neo giá trị băm của nó lên chuỗi \\
+\hline
+
+Điều kiện tiên quyết &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Bên phát hành có bản ghi thẩm quyền đang hoạt động và chưa hết hạn
+    \item Loại văn bằng cần cấp nằm trong phạm vi được phép
+    \item Cả bên phát hành và chủ thể đều có định danh đang hoạt động
+\end{itemize} \\
+\hline
+
+Luồng thực hiện chính &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item Bên phát hành nhập dữ liệu văn bằng và định danh của chủ thể
+    \item Giao diện dựng chứng thực theo mô hình dữ liệu W3C, với các thuộc tính riêng trong không gian tên của hệ thống
+    \item Tính giá trị băm của nội dung chứng thực và giá trị băm của định danh chứng thực
+    \item Ví ký nội dung chứng thực trên bản tuần tự hóa tất định
+    \item Nội dung được ghim lên lớp lưu trữ ngoài chuỗi, nhận về định danh nội dung
+    \item Ví ký giao dịch gọi \cbox{issue\_vc} với bảy tham số, trong đó có thời hạn
+    \item Hợp đồng kiểm thẩm quyền, kiểm trạng thái định danh hai bên, kiểm độ dài các giá trị băm và định dạng định danh nội dung, rồi ghi bản ghi
+    \item Giao diện đọc số hiệu chứng thực từ sự kiện trong phản hồi giao dịch
+    \item Tầng chỉ mục xác minh giao dịch rồi ghi bản ghi kèm số hiệu thật
+\end{enumerate} \\
+\hline
+
+Luồng ngoại lệ &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Bên phát hành không có thẩm quyền $\rightarrow$ hợp đồng từ chối với mã lỗi bên phát hành không hoạt động
+    \item Loại văn bằng ngoài phạm vi $\rightarrow$ từ chối với mã lỗi loại văn bằng không được phép
+    \item Thẩm quyền đã hết hạn $\rightarrow$ từ chối với mã lỗi thẩm quyền đã hết hạn
+    \item Định danh của chủ thể không hoạt động $\rightarrow$ từ chối
+    \item Thời hạn chứng thực đặt vào quá khứ $\rightarrow$ từ chối, vì cấp một chứng thực đã hết hạn là vô nghĩa
+    \item Giá trị băm của định danh chứng thực đã tồn tại $\rightarrow$ từ chối, chống cấp trùng
+\end{itemize} \\
+\hline
+
+Kết quả sau cùng &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Bản ghi chứng thực tồn tại trên chuỗi với trạng thái đang hoạt động
+    \item Số hiệu chứng thực trong chỉ mục là số hiệu thật do hợp đồng cấp, đọc từ sự kiện
+    \item Bộ đếm tổng đã cấp và bộ đếm số đang hiệu lực đều tăng
+\end{itemize} \\
+\hline
+
+Tính chất được kiểm chứng &
+F6, F12, N3, N4 --- và các hành vi T1, T2, T3, T9 trong mô hình đe dọa \\
+\hline
+
+\end{longtable}

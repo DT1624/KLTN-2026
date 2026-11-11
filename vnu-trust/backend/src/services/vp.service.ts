@@ -1,0 +1,291 @@
+import { randomBytes } from "node:crypto";
+import { query, queryOne, withTx } from "../db/pool.js";
+import { notFound, badRequest, gone, forbidden } from "../utils/errors.js";
+import { fetchJSON, sha3_256Hex, canonicalize } from "./ipfs.service.js";
+import { effectiveStatus, getByVcId, vcTypeLabel } from "./vc.service.js";
+import { isActiveIssuer, verifyVcIntegrity } from "../chain/registry.js";
+import { verifyEd25519 } from "../utils/ed25519.js";
+import { record } from "./audit.service.js";
+import { resolve as resolveDid } from "./did.service.js";
+import { getByDid } from "./entity.service.js";
+import type { PresentationRow, ShareTokenRow, EntityRow, CredentialRow } from "../types/index.js";
+
+const MIN_TTL = 60;
+const MAX_TTL = 7 * 24 * 3600;
+
+export interface CreateVpInput {
+  holder: EntityRow;
+  vpId: string;
+  verifierDid: string | null;
+  vcIds: string[];
+  ipfsCid: string;
+  vpHash: string;
+  proofValue: string;
+  challenge: string | null;
+  ttlSeconds: number;
+}
+
+/**
+ * Lưu VP và sinh liên kết chia sẻ dùng một lần trong cùng một giao dịch CSDL
+ * — trước đây hai bước này tách rời nên có thể tạo VP mồ côi khi bước sau lỗi.
+ */
+export async function createPresentation(
+  input: CreateVpInput,
+): Promise<{ vp: PresentationRow; share: ShareTokenRow }> {
+  if (input.ttlSeconds < MIN_TTL || input.ttlSeconds > MAX_TTL) {
+    throw badRequest(`Thời hạn chia sẻ phải trong khoảng ${MIN_TTL}..${MAX_TTL} giây`);
+  }
+  if (input.vcIds.length === 0) throw badRequest("VP phải chứa ít nhất một VC");
+
+  // Mọi VC đưa vào VP phải thuộc về chính holder và còn hiệu lực.
+  for (const vcId of input.vcIds) {
+    const vc = await getByVcId(vcId);
+    if (!vc) throw notFound(`Không tìm thấy VC ${vcId}`);
+    if (vc.holder_did !== input.holder.did) {
+      throw forbidden(`VC ${vcId} không thuộc về bạn`);
+    }
+    const eff = await effectiveStatus(vc);
+    if (eff.status !== "active") {
+      throw badRequest(`VC ${vcId} đang ở trạng thái "${eff.status}", không thể đưa vào VP`);
+    }
+  }
+
+  const token = randomBytes(24).toString("base64url");
+  const expiresAt = new Date(Date.now() + input.ttlSeconds * 1000);
+
+  return withTx(async (c) => {
+    const vpRes = await c.query<PresentationRow>(
+      `INSERT INTO presentations
+         (vp_id, holder_did, verifier_did, vc_ids, ipfs_cid, vp_hash, proof_value, challenge)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [
+        input.vpId, input.holder.did, input.verifierDid, input.vcIds,
+        input.ipfsCid, input.vpHash, input.proofValue, input.challenge,
+      ],
+    );
+    const shareRes = await c.query<ShareTokenRow>(
+      `INSERT INTO share_tokens (token, vp_id, holder_did, ipfs_cid, expires_at)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [token, input.vpId, input.holder.did, input.ipfsCid, expiresAt],
+    );
+    return { vp: vpRes.rows[0]!, share: shareRes.rows[0]! };
+  }).then(async (out) => {
+    await record(input.holder.address, "share.create", input.vpId, { vcIds: input.vcIds, ttlSeconds: input.ttlSeconds });
+    return out;
+  });
+}
+
+export async function listByHolder(holderDid: string): Promise<PresentationRow[]> {
+  return query<PresentationRow>(
+    "SELECT * FROM presentations WHERE holder_did = $1 ORDER BY created_at DESC",
+    [holderDid],
+  );
+}
+
+export async function getByVpId(vpId: string): Promise<PresentationRow | null> {
+  return queryOne<PresentationRow>("SELECT * FROM presentations WHERE vp_id = $1", [vpId]);
+}
+
+/** Mở liên kết chia sẻ (bên xác minh quét QR). Tăng bộ đếm lượt xem. */
+export async function openShareToken(token: string) {
+  const row = await queryOne<ShareTokenRow>("SELECT * FROM share_tokens WHERE token = $1", [token]);
+  if (!row) throw notFound("Liên kết chia sẻ không tồn tại");
+  if (row.revoked_at) throw gone("Liên kết đã bị chủ sở hữu thu hồi");
+  if (row.expires_at.getTime() <= Date.now()) throw gone("Liên kết đã hết hạn");
+
+  await query("UPDATE share_tokens SET view_count = view_count + 1 WHERE token = $1", [token]);
+
+  const vp = await getByVpId(row.vp_id);
+  return {
+    vpId: row.vp_id,
+    holderDid: row.holder_did,
+    ipfsCid: row.ipfs_cid,
+    expiresAt: row.expires_at.toISOString(),
+    viewCount: row.view_count + 1,
+    vcIds: vp?.vc_ids ?? [],
+  };
+}
+
+export async function revokeShareToken(token: string, holderDid: string, actor: string): Promise<void> {
+  const row = await queryOne<ShareTokenRow>("SELECT * FROM share_tokens WHERE token = $1", [token]);
+  if (!row) throw notFound("Liên kết chia sẻ không tồn tại");
+  if (row.holder_did !== holderDid) throw forbidden("Liên kết này không thuộc về bạn");
+  await query("UPDATE share_tokens SET revoked_at = now() WHERE token = $1 AND revoked_at IS NULL", [
+    token,
+  ]);
+  await record(actor, "share.revoke", row.vp_id);
+}
+
+export async function listShareTokens(holderDid: string): Promise<ShareTokenRow[]> {
+  return query<ShareTokenRow>(
+    "SELECT * FROM share_tokens WHERE holder_did = $1 ORDER BY created_at DESC",
+    [holderDid],
+  );
+}
+
+// ============ Xác minh ============
+
+export interface CheckResult {
+  name: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface VerificationReport {
+  vpId: string;
+  holderDid: string;
+  overallValid: boolean;
+  checks: CheckResult[];
+  credentials: Array<{ vcId: string; status: string; issuerDid: string; typeLabel: string }>;
+  verifiedAt: string;
+}
+
+/**
+ * Xác minh đầy đủ một VP. Bảy bước kiểm tra độc lập, mỗi bước trả về
+ * kết quả riêng để giao diện hiển thị rõ ràng chỗ nào hỏng, thay vì
+ * chỉ một chữ "không hợp lệ".
+ */
+export async function verifyPresentation(token: string): Promise<VerificationReport> {
+  const share = await openShareToken(token);
+  const checks: CheckResult[] = [];
+
+  // 1. Lấy được VP từ IPFS
+  let vpDoc: Record<string, unknown> | null = null;
+  try {
+    vpDoc = (await fetchJSON(share.ipfsCid)) as Record<string, unknown>;
+    checks.push({ name: "Tải VP từ IPFS", passed: true, detail: `CID ${share.ipfsCid}` });
+  } catch (e) {
+    checks.push({ name: "Tải VP từ IPFS", passed: false, detail: (e as Error).message });
+  }
+
+  const vpRow = await getByVpId(share.vpId);
+
+  // 2. Toàn vẹn nội dung VP
+  if (vpDoc && vpRow) {
+    const h = sha3_256Hex(vpDoc);
+    checks.push({
+      name: "Toàn vẹn nội dung VP",
+      passed: h === vpRow.vp_hash,
+      detail: h === vpRow.vp_hash ? "Hash khớp" : `Hash lệch: ${h} ≠ ${vpRow.vp_hash}`,
+    });
+  }
+
+  // 3. Chữ ký của holder trên VP
+  if (vpDoc && vpRow) {
+    const holder = await getByDid(vpRow.holder_did);
+    let sigOk = false;
+    let detail = "Không tìm thấy khoá công khai của holder";
+    if (holder) {
+      const { proof: _proof, ...unsigned } = vpDoc;
+      sigOk = verifyEd25519(holder.public_key_hex, canonicalize(unsigned), vpRow.proof_value);
+      detail = sigOk ? "Chữ ký hợp lệ" : "Chữ ký không khớp khoá công khai của holder";
+    }
+    checks.push({ name: "Chữ ký của người trình bày", passed: sigOk, detail });
+  }
+
+  // 4. DID của holder còn hoạt động
+  if (vpRow) {
+    try {
+      const d = await resolveDid(vpRow.holder_did);
+      checks.push({
+        name: "DID người trình bày còn hiệu lực",
+        passed: d.status === "active",
+        detail: `Trạng thái "${d.status}" (nguồn: ${d.source})`,
+      });
+    } catch (e) {
+      checks.push({ name: "DID người trình bày còn hiệu lực", passed: false, detail: (e as Error).message });
+    }
+  }
+
+  // 5. Từng VC còn hiệu lực (đối chiếu chuỗi)
+  const credentials: VerificationReport["credentials"] = [];
+  let allVcValid = vpRow !== null && vpRow.vc_ids.length > 0;
+  // Giữ lại hàng đã đọc để bước 5b dùng lại: đọc hai lần cùng một VC là nhân
+  // đôi số truy vấn CSDL cho mỗi văn bằng trong bản trình bày.
+  const fetched: { vcId: string; row: CredentialRow | null }[] = [];
+  for (const vcId of vpRow?.vc_ids ?? []) {
+    const vc = await getByVcId(vcId);
+    fetched.push({ vcId, row: vc });
+    if (!vc) {
+      allVcValid = false;
+      credentials.push({ vcId, status: "không tìm thấy", issuerDid: "-", typeLabel: "-" });
+      continue;
+    }
+    const eff = await effectiveStatus(vc);
+    if (eff.status !== "active") allVcValid = false;
+    credentials.push({
+      vcId,
+      status: eff.status,
+      issuerDid: vc.issuer_did,
+      typeLabel: vcTypeLabel(vc.vc_type),
+    });
+  }
+  checks.push({
+    name: "Tất cả chứng chỉ còn hiệu lực",
+    passed: allVcValid,
+    detail: `${credentials.filter((c) => c.status === "active").length}/${credentials.length} còn hiệu lực`,
+  });
+
+  // 5b. Nội dung văn bằng vẫn khớp bản đã neo trên chuỗi.
+  //
+  // Bước 5 mới chỉ hỏi "văn bằng này còn hiệu lực không". Nó KHÔNG phát hiện
+  // được việc nội dung bị sửa sau khi cấp: đổi điểm trong vc_json rồi ghim lại
+  // IPFS thì trạng thái vẫn "active". Ở đây ta băm lại chính nội dung đang giữ
+  // rồi hỏi chuỗi xem có đúng hash đã neo không.
+  let allIntact = credentials.length > 0;
+  let intactCount = 0;
+  // Các VC độc lập với nhau nên hỏi chuỗi song song: tuần tự thì một bản trình
+  // bày 5 văn bằng phải chờ 5 vòng mạng nối tiếp.
+  const intactResults = await Promise.all(
+    fetched.map(async ({ row }) => {
+      if (!row || row.on_chain_vc_id === null) return false;
+      return verifyVcIntegrity(row.on_chain_vc_id, sha3_256Hex(row.vc_json));
+    }),
+  );
+  for (const ok of intactResults) {
+    if (ok) intactCount++;
+    else allIntact = false;
+  }
+  checks.push({
+    name: "Nội dung văn bằng khớp bản neo trên chuỗi",
+    passed: allIntact,
+    detail: `${intactCount}/${credentials.length} khớp hash đã neo`,
+  });
+
+  // 6. Issuer của từng VC còn được tin cậy trên chuỗi
+  const rows = fetched.map((f) => f.row).filter((r): r is CredentialRow => r !== null);
+  const trusted = await Promise.all(rows.map((r) => isActiveIssuer(r.issuer_address)));
+  const allIssuersTrusted = rows.length > 0 && rows.length === credentials.length && trusted.every(Boolean);
+  checks.push({
+    name: "Đơn vị cấp còn được tin cậy",
+    passed: allIssuersTrusted,
+    detail: allIssuersTrusted ? "Tất cả issuer đang hoạt động trên chuỗi" : "Có issuer đã bị thu hồi/tạm ngưng",
+  });
+
+  return {
+    vpId: share.vpId,
+    holderDid: share.holderDid,
+    overallValid: checks.every((c) => c.passed),
+    checks,
+    credentials,
+    verifiedAt: new Date().toISOString(),
+  };
+}
+
+export async function saveVerification(
+  vpId: string,
+  verifierAddress: string,
+  report: VerificationReport,
+): Promise<void> {
+  await query(
+    "INSERT INTO verifications (vp_id, verifier_address, overall_valid, report) VALUES ($1,$2,$3,$4)",
+    [vpId, verifierAddress, report.overallValid, report],
+  );
+}
+
+export async function verificationHistory(verifierAddress: string, limit = 50) {
+  return query(
+    "SELECT * FROM verifications WHERE verifier_address = $1 ORDER BY created_at DESC LIMIT $2",
+    [verifierAddress, limit],
+  );
+}

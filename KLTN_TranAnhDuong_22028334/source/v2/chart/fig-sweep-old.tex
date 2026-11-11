@@ -1,0 +1,73 @@
+% SINH TỰ ĐỘNG bởi scripts/bench-plot.mjs — đừng sửa tay.
+% Nguồn dữ liệu: .bench/sweep2.json
+% 5 lượt mỗi điểm, n = max(1000, 40c), 265.200 yêu cầu, đo 2026-10-13T14:47:20.310Z
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    name=plotA,
+    width=0.95\textwidth, height=5.0cm,
+    xlabel={}, ylabel={Thông lượng (yc/giây)},
+    xmode=log, log basis x=2, xtick={1,2,4,8,16,32,64}, xticklabels={1,2,4,8,16,32,64},
+    ymin=0, enlarge y limits={upper,value=0.34},
+    grid=both, grid style={gray!18},
+    legend style={font=\tiny, at={(0.02,0.98)}, anchor=north west, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40, legend columns=3},
+    label style={font=\small}, tick label style={font=\footnotesize},
+    title={(a) Thông lượng --- đường là trung vị của 5 lượt, vùng tô là khoảng nhỏ nhất--lớn nhất},
+    title style={font=\small},
+]
+    \addplot[draw=none, fill=blue!70!black, fill opacity=0.10, forget plot] coordinates {(1,2080.23) (2,3995.50) (4,4565.43) (8,5199.47) (16,4118.32) (32,4926.28) (64,3784.21) (64,2153.01) (32,2565.37) (16,1881.34) (8,1803.57) (4,2198.69) (2,2671.97) (1,1335.17)} \closedcycle;
+    \addplot[draw=none, fill=blue!70!black, fill opacity=0.10, forget plot] coordinates {(1,3463.61) (2,3341.76) (4,3789.80) (8,4864.36) (16,5603.53) (32,6943.67) (64,5117.99) (64,491.17) (32,2236.57) (16,1698.18) (8,2736.30) (4,2424.54) (2,1974.63) (1,1544.42)} \closedcycle;
+    \addplot[draw=none, fill=red!70!black, fill opacity=0.10, forget plot] coordinates {(1,997.10) (2,1924.33) (4,2403.84) (8,2242.03) (16,782.79) (32,2199.99) (64,2232.42) (64,961.09) (32,901.14) (16,353.02) (8,510.31) (4,859.60) (2,760.04) (1,303.27)} \closedcycle;
+    \addplot[draw=none, fill=red!70!black, fill opacity=0.10, forget plot] coordinates {(1,991.21) (2,2377.12) (4,3285.60) (8,5013.67) (16,1516.74) (32,1970.33) (64,2308.92) (64,780.59) (32,235.26) (16,179.82) (8,793.94) (4,2350.66) (2,1721.89) (1,526.48)} \closedcycle;
+    \addplot[draw=none, fill=green!55!black, fill opacity=0.10, forget plot] coordinates {(1,430.05) (2,872.81) (4,538.63) (8,855.20) (16,506.73) (32,511.56) (64,447.06) (64,167.78) (32,110.15) (16,157.76) (8,395.39) (4,230.06) (2,621.44) (1,191.06)} \closedcycle;
+    \addplot[draw=none, fill=green!55!black, fill opacity=0.10, forget plot] coordinates {(1,437.25) (2,871.05) (4,1552.42) (8,1928.36) (16,2214.88) (32,2059.41) (64,2009.65) (64,1487.42) (32,1663.09) (16,1353.88) (8,1552.61) (4,1300.96) (2,479.96) (1,225.85)} \closedcycle;
+    \addplot[color=blue!70!black,mark=*,mark size=1.5pt,thick] coordinates {(1,1600) (2,3013) (4,4078) (8,3438) (16,3413) (32,3758) (64,3190)};
+    \addlegendentry{/health --- TS}
+    \addplot[dashed,color=blue!70!black,mark=square*,mark size=1.5pt,thick] coordinates {(1,2157) (2,2617) (4,2720) (8,4075) (16,4376) (32,4797) (64,3669)};
+    \addlegendentry{/health --- GO}
+    \addplot[color=red!70!black,mark=*,mark size=1.5pt,thick] coordinates {(1,916) (2,1181) (4,2217) (8,1529) (16,522) (32,1736) (64,1970)};
+    \addlegendentry{/did/resolve --- TS}
+    \addplot[dashed,color=red!70!black,mark=square*,mark size=1.5pt,thick] coordinates {(1,917) (2,1871) (4,2925) (8,3509) (16,755) (32,713) (64,1853)};
+    \addlegendentry{/did/resolve --- GO}
+    \addplot[color=green!55!black,mark=*,mark size=1.5pt,thick] coordinates {(1,360) (2,721) (4,365) (8,491) (16,419) (32,360) (64,278)};
+    \addlegendentry{/auth/me --- TS}
+    \addplot[dashed,color=green!55!black,mark=square*,mark size=1.5pt,thick] coordinates {(1,334) (2,778) (4,1406) (8,1817) (16,2184) (32,1868) (64,1621)};
+    \addlegendentry{/auth/me --- GO}
+\end{axis}
+\begin{axis}[
+    at={(plotA.below south west)}, anchor=above north west, yshift=-0.9cm,
+    width=0.95\textwidth, height=5.0cm,
+    xlabel={Số yêu cầu đồng thời (thang logarit)}, ylabel={Độ trễ p95 (ms)},
+    xmode=log, log basis x=2, xtick={1,2,4,8,16,32,64}, xticklabels={1,2,4,8,16,32,64},
+    ymode=log,
+    grid=both, grid style={gray!18},
+    legend style={font=\tiny, at={(0.02,0.98)}, anchor=north west, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40, legend columns=3},
+    label style={font=\small}, tick label style={font=\footnotesize},
+    title={(b) Độ trễ p95 --- đường gạch đỏ là ngưỡng 500 ms của yêu cầu N11},
+    title style={font=\small},
+    extra y ticks={500}, extra y tick labels={}, extra y tick style={grid=major, grid style={red!55, densely dashed, thick}},
+]
+    \addplot[draw=none, fill=blue!70!black, fill opacity=0.10, forget plot] coordinates {(1,1.66) (2,1.62) (4,4.18) (8,15.43) (16,23.39) (32,37.14) (64,76.47) (64,39.80) (32,14.41) (16,7.62) (8,3.19) (4,1.90) (2,1.12) (1,0.61)} \closedcycle;
+    \addplot[draw=none, fill=blue!70!black, fill opacity=0.10, forget plot] coordinates {(1,0.97) (2,2.28) (4,3.92) (8,6.82) (16,22.43) (32,41.38) (64,894.94) (64,35.62) (32,7.11) (16,4.92) (8,2.54) (4,1.77) (2,0.96) (1,0.38)} \closedcycle;
+    \addplot[draw=none, fill=red!70!black, fill opacity=0.10, forget plot] coordinates {(1,10.97) (2,7.18) (4,14.41) (8,61.21) (16,166.82) (32,145.07) (64,172.34) (64,50.19) (32,20.95) (16,46.21) (8,6.98) (4,2.87) (2,1.50) (1,1.47)} \closedcycle;
+    \addplot[draw=none, fill=red!70!black, fill opacity=0.10, forget plot] coordinates {(1,4.65) (2,1.87) (4,3.33) (8,33.96) (16,539.07) (32,303.03) (64,303.28) (64,45.31) (32,28.35) (16,17.06) (8,2.58) (4,1.95) (2,1.17) (1,1.47)} \closedcycle;
+    \addplot[draw=none, fill=green!55!black, fill opacity=0.10, forget plot] coordinates {(1,12.36) (2,6.28) (4,44.11) (8,53.36) (16,281.18) (32,673.55) (64,1114.64) (64,294.47) (32,132.97) (16,79.59) (8,20.23) (4,17.77) (2,3.37) (1,4.41)} \closedcycle;
+    \addplot[draw=none, fill=green!55!black, fill opacity=0.10, forget plot] coordinates {(1,10.34) (2,8.87) (4,4.86) (8,12.85) (16,31.07) (32,41.84) (64,94.46) (64,55.63) (32,22.38) (16,10.86) (8,6.87) (4,3.69) (2,3.29) (1,3.23)} \closedcycle;
+    \addplot[color=blue!70!black,mark=*,mark size=1.5pt,thick] coordinates {(1,0.95) (2,1.35) (4,2.10) (8,4.55) (16,9.46) (32,19.44) (64,52.58)};
+    \addlegendentry{/health --- TS}
+    \addplot[dashed,color=blue!70!black,mark=square*,mark size=1.5pt,thick] coordinates {(1,0.57) (2,1.49) (4,2.29) (8,3.55) (16,5.95) (32,15.52) (64,39.33)};
+    \addlegendentry{/health --- GO}
+    \addplot[color=red!70!black,mark=*,mark size=1.5pt,thick] coordinates {(1,1.96) (2,4.19) (4,4.12) (8,10.90) (16,131.59) (32,37.30) (64,68.35)};
+    \addlegendentry{/did/resolve --- TS}
+    \addplot[dashed,color=red!70!black,mark=square*,mark size=1.5pt,thick] coordinates {(1,1.50) (2,1.54) (4,2.44) (8,3.78) (16,52.14) (32,141.17) (64,82.25)};
+    \addlegendentry{/did/resolve --- GO}
+    \addplot[color=green!55!black,mark=*,mark size=1.5pt,thick] coordinates {(1,5.66) (2,4.71) (4,23.65) (8,38.11) (16,91.01) (32,218.86) (64,422.09)};
+    \addlegendentry{/auth/me --- TS}
+    \addplot[dashed,color=green!55!black,mark=square*,mark size=1.5pt,thick] coordinates {(1,5.66) (2,4.04) (4,4.31) (8,7.41) (16,11.92) (32,31.37) (64,77.18)};
+    \addlegendentry{/auth/me --- GO}
+\end{axis}
+\end{tikzpicture}
+\caption{Đợt đo trước: hành vi của hệ thống khi tăng số yêu cầu đồng thời từ 1 đến 64. Đường liền là cài đặt TypeScript, đường gạch là cài đặt Go. Vùng tô nhạt là khoảng giữa lượt nhỏ nhất và lượt lớn nhất trong 5 lượt đo của cùng một điểm. Dữ liệu từ đợt đo của bản báo cáo trước, 265.200 yêu cầu.}
+\label{fig:bench-sweep}
+\end{figure}

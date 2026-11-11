@@ -1,0 +1,20 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/isolation.json
+\begin{table}[H]
+\centering
+\caption{Kết quả đo lặp lại 10 lượt, mỗi lượt 1000 yêu cầu ở 8 yêu cầu đồng thời}
+\label{tab:v2-isolation}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|l|r|r|r|r|r|r|}
+\hline
+& \multicolumn{3}{c|}{\textbf{Dùng chung CPU}} & \multicolumn{3}{c|}{\textbf{Ghim CPU}} \\ \cline{2-7}
+\textbf{Cấu hình} & \textbf{p95 (ms)} & \textbf{CV (\%)} & \textbf{yc/s} & \textbf{p95 (ms)} & \textbf{CV (\%)} & \textbf{yc/s} \\ \hline
+TS /did/resolve & 4{,}42 & 45{,}0 & 3275 & 6{,}74 & 41{,}9 & 2597 \\ \hline
+TS /auth/me & 7{,}27 & 19{,}0 & 1602 & 8{,}91 & 29{,}3 & 1429 \\ \hline
+TS xác minh $k{=}1$ & 16{,}52 & 25{,}3 & 792 & 17{,}36 & 12{,}7 & 671 \\ \hline
+Go /did/resolve & 2{,}15 & 23{,}6 & 6342 & 2{,}28 & 31{,}1 & 6774 \\ \hline
+Go /auth/me & 3{,}93 & 6{,}2 & 2808 & 4{,}15 & 6{,}5 & 2774 \\ \hline
+Go xác minh $k{=}1$ & 9{,}35 & 63{,}4 & 1517 & 10{,}79 & 25{,}8 & 1267 \\ \hline
+\end{tabular}
+\end{table}

@@ -1,0 +1,65 @@
+\begin{longtable}{|c|p{4.1cm}|p{8.3cm}|}
+\caption{Mười vấn đề phát hiện trong đợt rà soát an toàn hợp đồng và cách xử lý}
+\label{tab:contract-audit} \\
+
+\hline
+\textbf{Mã} & \textbf{Vấn đề} & \textbf{Cách xử lý} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mã} & \textbf{Vấn đề} & \textbf{Cách xử lý} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+V1 & Chuyển quyền gốc một bước, không kiểm tra được địa chỉ đích có người kiểm soát
+& Thay bằng cơ chế hai bước: đề cử rồi ký nhận, kèm thao tác hủy đề cử. Hàm chuyển một bước bị xóa. Hàm khởi tạo tự lấy người xuất bản làm quản trị viên gốc khi không được truyền tham số
+\\ \hline
+
+V2 & Mọi bên phát hành đều bị đòi giá trị băm chứng thực ủy quyền, kể cả bên không có quan hệ ủy quyền nào
+& Phép kiểm độ dài giá trị băm chuyển vào trong nhánh điều kiện; chỉ bắt buộc khi thực sự có quan hệ ủy quyền. Giá trị rỗng được chấp nhận, nhưng giá trị sai độ dài vẫn bị từ chối
+\\ \hline
+
+V3 & Không có cơ chế ủy quyền nhiều cấp
+& Bên phát hành có bit ủy quyền phê duyệt được bên phát hành cấp dưới, với ba ràng buộc: phạm vi là tập con, thời hạn không vượt thời hạn cha, bit ủy quyền không truyền tiếp
+\\ \hline
+
+V4 & Quản trị viên và bên phát hành bị thu hồi không thể được cấp lại
+& Cho phép cấp lại; bản ghi mới có số phiên bản tăng thêm một, bản ghi cũ giữ nguyên trong tập bản ghi làm dấu vết kiểm toán
+\\ \hline
+
+V5 & Định danh bị thu hồi khóa địa chỉ vĩnh viễn, nên lộ khóa riêng đồng nghĩa mất địa chỉ
+& Cho phép đăng ký định danh mới sau khi định danh cũ đã bị thu hồi; định danh cũ vẫn tra cứu ra trạng thái đã thu hồi
+\\ \hline
+
+V6 & Định danh nội dung không được kiểm tra độ dài, dù trong mã có chú thích nói rằng có kiểm
+& Bổ sung phép kiểm ở cả ba thao tác: đăng ký định danh, cập nhật tài liệu định danh và cấp phát chứng thực
+\\ \hline
+
+V7 & Không phân biệt được chủ thể tự đình chỉ định danh với bị quản trị viên đình chỉ
+& Bổ sung các thao tác tự đình chỉ và tự kích hoạt lại, cùng một trường ghi lại ai đã đặt trạng thái đình chỉ: tự khóa thì tự mở, bị quản trị viên khóa thì phải quản trị viên mở
+\\ \hline
+
+V8 & Thu hồi chứng thực đòi hỏi thẩm quyền còn hiệu lực, nên đơn vị hết hạn ủy quyền không thu hồi được văn bằng mình đã cấp
+& Thu hồi chỉ cần quyền sở hữu và định danh còn hoạt động; bỏ phép kiểm thẩm quyền còn hiệu lực
+\\ \hline
+
+V9 & Tham số thời hạn của chứng thực bị ghi cứng bằng giá trị không, khiến toàn bộ nhánh xử lý hết hạn là mã chết
+& Thời hạn trở thành tham số thật, với giá trị không tương ứng vĩnh viễn; hàm tra cứu chứng thực không còn dừng đột ngột mà trả về bản ghi kèm trạng thái đã tính
+\\ \hline
+
+V10 & Các hàm truy vấn liệt kê toàn bộ danh sách sẽ vỡ âm thầm khi vượt giới hạn chi phí tính toán
+& Bổ sung các hàm truy vấn phân trang; các hàm liệt kê toàn bộ dừng rõ ràng khi vượt ngưỡng an toàn thay vì vỡ âm thầm
+\\ \hline
+
+V11 & Nhóm vấn đề nhỏ: mã lỗi không khớp loại vi phạm, nhánh mã không bao giờ thực thi, bộ sinh số hiệu vai trò có thể trùng, một địa chỉ giữ đồng thời hai vai trò xung đột, bộ đếm không phân biệt tổng đã cấp và số đang hiệu lực
+& Xử lý từng mục: đúng mã lỗi, bỏ nhánh chết, tách bộ sinh số hiệu riêng chỉ tăng, chặn xung đột vai trò, bổ sung nhóm bộ đếm số chứng thực đang hiệu lực
+\\ \hline
+
+\end{longtable}

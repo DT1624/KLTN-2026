@@ -1,0 +1,86 @@
+\begin{longtable}{|p{3.4cm}|p{10.3cm}|}
+\caption{Đặc tả kịch bản thu hồi chứng thực}
+\label{tab:vc-revocation-scenario} \\
+
+\hline
+\textbf{Mục} & \textbf{Nội dung} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mục} & \textbf{Nội dung} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Mã kịch bản & KB6 \\
+\hline
+
+Tác nhân chính & Bên phát hành (thu hồi, đình chỉ) hoặc quản trị viên (thu hồi, kích hoạt lại) \\
+\hline
+
+Thành phần tham gia &
+Ví của người thực hiện, mô-đun \cbox{vc\_registry}, tầng chỉ mục, dịch vụ xác minh \\
+\hline
+
+Mục đích &
+Cập nhật trạng thái của một chứng thực để các lần xác minh sau đó từ chối nó, dù chữ ký vẫn hợp lệ về mặt toán học \\
+\hline
+
+Điều kiện tiên quyết &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Chứng thực tồn tại trên chuỗi
+    \item Với thao tác của bên phát hành: người thực hiện đúng là bên đã cấp chứng thực đó, và định danh của họ còn hoạt động. \textbf{Không} yêu cầu thẩm quyền còn hiệu lực
+    \item Với thao tác của quản trị viên: người thực hiện là quản trị viên gốc hoặc quản trị viên đang hoạt động
+\end{itemize} \\
+\hline
+
+Phân biệt bốn thao tác &
+\begin{itemize}[leftmargin=*, nosep]
+    \item \textbf{Đình chỉ} (bên phát hành): trạng thái tạm thời, có thể đảo ngược --- nhưng chỉ quản trị viên đảo ngược được
+    \item \textbf{Kích hoạt lại} (chỉ quản trị viên): đưa chứng thực từ tạm đình chỉ về đang hoạt động
+    \item \textbf{Thu hồi} (bên phát hành): tuyên bố vĩnh viễn, không thể đảo ngược
+    \item \textbf{Thu hồi} (quản trị viên): dùng khi cần cưỡng chế, chẳng hạn khi bên phát hành không còn hoạt động
+\end{itemize} \\
+\hline
+
+Luồng thực hiện chính &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item Người thực hiện chọn chứng thực trong bảng danh sách và chọn thao tác
+    \item Giao diện đọc số hiệu chứng thực trên chuỗi từ chỉ mục --- số này không do người dùng gõ tay, để tránh gõ nhầm một chữ số và xử lý nhầm văn bằng của người khác
+    \item Ví ký giao dịch gọi hàm tương ứng kèm lý do
+    \item Hợp đồng kiểm điều kiện, cập nhật trạng thái, giảm bộ đếm số đang hiệu lực, rồi phát sự kiện
+    \item Tầng chỉ mục xác minh giao dịch, cập nhật trạng thái trong chỉ mục và ghi nhật ký
+\end{enumerate} \\
+\hline
+
+Hai trường hợp đặc biệt được hỗ trợ &
+\begin{itemize}[leftmargin=*, nosep]
+    \item \textbf{Đơn vị đã hết hạn ủy quyền vẫn thu hồi được} chứng thực mình đã cấp. Đây là kịch bản quan trọng nhất của nguyên tắc bất đối xứng: phát hiện gian lận thường xảy ra sau khi chu kỳ ủy quyền đã kết thúc
+    \item \textbf{Chứng thực đã hết hạn vẫn thu hồi được}, vì hết hạn và thu hồi mang hai thông điệp khác nhau: hết hạn nói chứng thực không còn giá trị từ một thời điểm, thu hồi nói nó chưa bao giờ đáng tin
+\end{itemize} \\
+\hline
+
+Luồng ngoại lệ &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Người thực hiện không phải bên đã cấp $\rightarrow$ từ chối với mã lỗi không phải bên cấp
+    \item Bên phát hành cố kích hoạt lại chứng thực $\rightarrow$ từ chối, thao tác này chỉ thuộc quản trị viên
+    \item Thu hồi một chứng thực đã bị thu hồi $\rightarrow$ từ chối
+    \item Định danh của bên thực hiện đã bị thu hồi $\rightarrow$ từ chối
+\end{itemize} \\
+\hline
+
+Kết quả sau cùng &
+Trạng thái mới tra cứu được trên chuỗi; bước thứ năm của quy trình xác minh từ chối chứng thực từ thời điểm này; bộ đếm số đang hiệu lực giảm \\
+\hline
+
+Tính chất được kiểm chứng &
+F11, F12, N2 --- và các hành vi T13 trong mô hình đe dọa \\
+\hline
+
+\end{longtable}

@@ -1,0 +1,19 @@
+\begin{table}[H]
+\centering
+\caption{Thành phần và phiên bản của hệ thống thử nghiệm}
+\label{tab:v2-env}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{3.6cm}|p{2.5cm}|p{7.2cm}|}
+\hline
+\textbf{Thành phần} & \textbf{Phiên bản} & \textbf{Vai trò} \\ \hline
+Mạng thử nghiệm Movement & Mã chuỗi 250 & Nguồn sự thật: định danh, thẩm quyền, trạng thái chứng thực \\ \hline
+Aptos CLI (biên dịch Move) & 7.11 & Biên dịch, kiểm thử và xuất bản ba mô-đun \\ \hline
+TypeScript, Express, \texttt{pg}, \texttt{zod} & 5.7 / 4.21 / 8.13 / 3.24 & Cài đặt thứ nhất của tầng chỉ mục \\ \hline
+Go, \texttt{pgx}, \texttt{x/crypto} & 1.23 / 5.7 / 0.31 & Cài đặt thứ hai, thư viện HTTP chuẩn \\ \hline
+PostgreSQL & 16 & Chỉ mục dùng chung, nhật ký kiểm toán, kho IPFS mô phỏng \\ \hline
+React, Vite, Tailwind & 18.3 / 6.0 / 3.4 & Giao diện theo vai trò \\ \hline
+\texttt{@noble/curves}, \texttt{@noble/hashes}, \texttt{@scure/bip39} & 1.9 / 1.8 / 1.6 & Ed25519, SHA3-256, BIP-39 phía máy khách, thay bộ công cụ của nền tảng \\ \hline
+Web Cryptography API, IndexedDB & Theo trình duyệt & PBKDF2, AES-256-GCM, lưu bản mã kho khoá \\ \hline
+\end{tabular}
+\end{table}

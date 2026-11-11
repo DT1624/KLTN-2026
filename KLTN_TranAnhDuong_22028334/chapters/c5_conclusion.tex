@@ -1,0 +1,221 @@
+% Chương 5: Kết luận và hướng phát triển
+\chapter{KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN}
+
+\section{Đối chiếu kết quả với câu hỏi nghiên cứu}
+
+Chương này đối chiếu kết quả thu được với ba câu hỏi nghiên cứu đã đặt ra tại Mục 1.3.1. Việc đối chiếu được thực hiện theo nguyên tắc đã nêu trong phần phương pháp: phân tách rõ những gì kết quả chứng minh được và những gì chưa, thay vì phát biểu một kết luận chung.
+
+Báo cáo sử dụng năm hệ ký hiệu song song --- câu hỏi nghiên cứu, khoảng trống, yêu cầu hệ thống, kịch bản sử dụng và mức đóng góp --- nên trước khi đối chiếu, Bảng \ref{tab:traceability} hợp nhất chúng thành các đường truy vết. Bảng này cũng là công cụ để kiểm tra một tính chất mà bản thân báo cáo cần có: mỗi yêu cầu được đặt ra đều dẫn tới một mục thiết kế và một bằng chứng cụ thể, và không yêu cầu nào được nêu rồi bỏ lửng.
+
+\input{source/table/traceability}
+
+
+\noindent \textbf{Câu hỏi thứ nhất} đặt vấn đề về kiến trúc cho phép xác minh văn bằng độc lập với cơ sở cấp phát.
+
+Kiến trúc đề xuất ở Chương 3 giải quyết câu hỏi này bằng cách phân chia dữ liệu theo nguyên tắc: những gì cần tính bất biến và khả năng đọc không cần cấp phép thì đặt lên chuỗi, còn nội dung đầy đủ thì lưu ngoài chuỗi. Quy trình xác minh bảy bước ở Mục 3.6 kiểm chứng đồng thời ba thuộc tính tin cậy đã xác định ở Mục 2.1.2, và hoàn tất không cần tương tác với bên phát hành. Kết quả thực nghiệm xác nhận điều này: quy trình xác minh chạy thành công khi dịch vụ của bên phát hành không hoạt động, và các tuyến xác minh đều nằm trong ngưỡng hiệu năng đặt ra.
+
+Một kết quả cụ thể hơn đáng được nêu. Bước thứ sáu --- đối chiếu nội dung chứng thực với giá trị băm đã neo trên chuỗi --- được chứng minh là cần thiết chứ không phải một phép kiểm thừa, bằng một bộ kiểm cho thấy quy trình thiếu bước đó sẽ chấp nhận một chứng thực đã bị sửa nội dung sau khi cấp. Đây là một loại tấn công mà mọi phép kiểm dựa trên trạng thái đều bỏ sót, bởi trạng thái của bản ghi vẫn là đang hoạt động.
+
+\noindent \textbf{Câu hỏi thứ hai} đặt vấn đề về khung quản trị biểu diễn được chuỗi thẩm quyền trong hệ sinh thái nhiều cơ sở.
+
+Khung quản trị ở Mục 3.4 trả lời câu hỏi này với bốn thành phần. Phạm vi cấp phát được biểu diễn bằng mặt nạ bit thay vì ở dạng nhị phân {``}được tin cậy hoặc không{''}, nhờ đó các phép kiểm về phạm vi và về quan hệ tập con đều có chi phí không đổi. Thời hạn ủy quyền là một trường thật mà hợp đồng tự đối chiếu với dấu thời gian của chuỗi. Ủy quyền nhiều cấp được hỗ trợ với ba ràng buộc do hợp đồng thi hành. Và toàn bộ trạng thái thẩm quyền là dữ liệu công khai trên chuỗi, nên tra cứu được mà không cần quan hệ trước với tổ chức nào.
+
+Điểm khác biệt so với các hệ thống đã khảo sát nằm ở \emph{nơi đặt sổ đăng ký tin cậy}. Như đã phân tích ở Mục 2.8, khi sổ đăng ký là một cơ sở dữ liệu do một tổ chức vận hành, bên xác minh lại phải tin vào tổ chức đó --- nghĩa là sự phụ thuộc vào trung gian được chuyển từ tầng chứng thực lên tầng quản trị chứ không bị loại bỏ. Đặt sổ đăng ký thành trạng thái của một hợp đồng trên chuỗi công khai xử lý đúng vấn đề này.
+
+\noindent \textbf{Câu hỏi thứ ba} đặt vấn đề về tính khả thi kỹ thuật.
+
+Kết quả ở Chương 4 cho câu trả lời khẳng định về tính đúng đắn chức năng, và một câu trả lời \emph{một phần} về hiệu năng.
+
+Về tính đúng đắn: logic phân quyền được kiểm chứng bằng 126 phép kiểm, trong đó 83 phép dựng một thao tác vi phạm và khẳng định nó bị từ chối với đúng mã lỗi dự kiến. Toàn bộ mười lăm hành vi trong mô hình đe dọa đều bị chặn, và thông điệp từ chối khớp đúng nguyên nhân thật. Hệ thống không sinh lỗi chức năng nào trên 905.160 yêu cầu của phép đo tải.
+
+Về hiệu năng, câu trả lời phải được chia làm hai. Ở mức tải vừa phải --- đến 8 yêu cầu đồng thời --- trung vị độ trễ phân vị 95 của mọi tuyến đọc thấp hơn ngưỡng đặt ra một đến hai bậc. Nhưng yêu cầu N11 nói về mọi mức tải, và ở các mức đồng thời cao, bốn trong 42 điểm đo có ít nhất một lượt vượt ngưỡng, với giá trị lớn nhất 1114,6\,ms. Dữ liệu không đủ để phân biệt giữa hai khả năng --- hành vi thật của hệ thống, hay hiện tượng do bộ sinh tải cạnh tranh tài nguyên với hệ thống trên cùng một máy. Vì vậy kết luận đúng mức là: \textbf{yêu cầu N11 không kiểm chứng được trên cách thiết lập đo hiện tại} (Mục 4.9.6).
+
+Đáng chú ý là chính quá trình đo lại đã làm lộ một vấn đề về phương pháp của bản thảo trước, và điều này thuộc về câu trả lời cho câu hỏi thứ ba hơn là một ghi chú bên lề. Bản thảo đầu báo cáo một bảng p95 thu từ một lượt đo mỗi tuyến với 120 yêu cầu. Thí nghiệm độ lặp lại ở Mục 4.9.2 cho thấy ở số mẫu đó, độ lệch chuẩn của p95 xấp xỉ bằng chính giá trị trung bình của nó --- hệ số biến thiên 44,9 đến 205,4\%. Những con số đó không phải đặc tính của hệ thống mà là mẫu ngẫu nhiên, nên đã bị loại khỏi báo cáo.
+
+Giới hạn quan trọng nhất của câu trả lời này đã được nêu tại Mục 4.10.2 và cần được nhắc lại ở đây: gói hợp đồng đang nằm trên mạng thử nghiệm là bản xuất bản \emph{trước} đợt sửa mười vấn đề rà soát. Các kết luận về logic phân quyền vì vậy được chứng minh trên mã nguồn và bộ kiểm thử, không trên trạng thái đang vận hành.
+
+\section{Đóng góp của nghiên cứu và mức độ của từng đóng góp}
+
+Mục 1.6 đã nêu bốn mức đóng góp trước khi trình bày kết quả. Phần này đối chiếu lại: với bằng chứng thu được ở Chương 4, mỗi đóng góp đứng ở đâu so với mức đã tuyên bố.
+
+\input{source/table/contribution-levels}
+
+\subsection{Mức 1 --- Đóng góp mới: giữ nguyên}
+
+Mô hình ủy quyền nhiều cấp với ba ràng buộc được hợp đồng thi hành --- phạm vi là tập con, thời hạn không vượt thời hạn bên ủy quyền, quyền ủy quyền không truyền tiếp --- có phép kiểm cho từng ràng buộc, và mỗi phép kiểm khẳng định mã lỗi cụ thể. Đóng góp này đứng vững ở mức đã tuyên bố, với giới hạn đã nêu tại Mục 1.6: {``}mới{''} nghĩa là không tìm thấy trong tài liệu đã khảo sát, không phải một khẳng định về tính mới tuyệt đối.
+
+Hai nguyên tắc thiết kế cũng giữ nguyên mức, và điều đáng chú ý là cách chúng được tìm ra. Cả hai không xuất phát từ việc đọc tài liệu mà từ việc dựng kịch bản làm hệ thống thất bại: nguyên tắc bất đối xứng xuất hiện khi dựng kịch bản một đơn vị hết hạn ủy quyền phát hiện gian lận trong văn bằng mình đã cấp; nguyên tắc hai bước xuất hiện khi hỏi {``}nếu địa chỉ đích bị gõ sai thì sao{''}. Phạm vi phát biểu của cả hai rộng hơn bài toán văn bằng, và đó là phần có giá trị lâu dài hơn so với bản thân hệ thống.
+
+\subsection{Mức 2 --- Đóng góp tích hợp: giữ nguyên, với một kết quả mạnh hơn dự kiến}
+
+Việc gắn kết lớp chứng thực với lớp quản trị trên cùng một hạ tầng hoạt động như thiết kế: một lần truy vấn trả về cả trạng thái chứng thực và giá trị băm của nội dung, nên phục vụ được đồng thời hai bước của quy trình xác minh.
+
+Một kết quả mạnh hơn dự kiến nằm ở bước đối chiếu nội dung với giá trị băm đã neo. Ban đầu bước này được thêm vào như một phép kiểm bổ sung. Khi viết bộ kiểm cho nó, hóa ra nó phát hiện được một lớp tấn công mà toàn bộ các bước còn lại bỏ sót, và quan trọng hơn, nó làm lộ ra rằng hàm thực hiện phép đối chiếu đã tồn tại trong mã nguồn từ đầu nhưng \emph{không tuyến nào gọi tới} --- một ví dụ cụ thể của cái bẫy mà Mục 5.5 bàn tới.
+
+\subsection{Mức 3 --- Đóng góp kiểm chứng: hạ mức cho một phần}
+
+Bộ chứng cứ phủ định cho logic phân quyền giữ nguyên mức. Tỷ lệ 83 trên 126 phép kiểm là phép kiểm trường hợp vi phạm, và mỗi phép khẳng định mã lỗi cụ thể --- điều kiện mà Mục 4.8.3 cho thấy là cần thiết, vì một phép kiểm không khẳng định mã lỗi có thể cho kết quả đạt vì một phép kiểm định dạng nào đó đã chặn trước.
+
+Phần về \emph{phương pháp kiểm chứng tính tương đương giữa hai cài đặt} cần được \textbf{hạ mức} so với cách trình bày ở Mục 1.6. Lý do nằm trong chính kết quả: như Mục 4.11.1 nêu, bộ đối chiếu đạt 59 trên 59 phép trong thời gian dài dù có một tuyến chỉ tồn tại ở một cài đặt, vì không phép nào chạm tới tuyến đó. Phương pháp này vì vậy chỉ chứng minh được tính tương đương \emph{trên tập hành vi được đối chiếu} --- một kết luận yếu hơn đáng kể so với {``}hai cài đặt tương đương{''}. Phần đáng kể còn lại là ba loại sai lệch mà nó phát hiện được, nhưng ngay cả ba loại đó cũng được tìm ra một cách tình cờ chứ không theo một phương pháp hệ thống.
+
+\subsection{Mức 4 --- Đóng góp bối cảnh: giữ nguyên}
+
+Việc xác định lớp còn thiếu trong bức tranh hạ tầng số của Việt Nam và đưa ra một thiết kế cho lớp đó giữ nguyên mức đã tuyên bố. Cần nói rõ phạm vi: đây là đóng góp ở mức phân tích và thiết kế, không phải ở mức triển khai --- hệ thống chưa được tích hợp với bất kỳ hạ tầng quốc gia nào.
+
+\subsection{Những gì không phải đóng góp: bổ sung sau khi có kết quả}
+
+Năm giới hạn đã nêu tại Mục 1.6 đều đứng vững. Kết quả ở Chương 4 bổ sung thêm hai giới hạn mà lúc đặt mục tiêu chưa thấy rõ:
+
+\begin{itemize}
+    \item \textbf{Không phải một kết luận về trạng thái đang vận hành.} Vì gói hợp đồng trên mạng thử nghiệm là bản xuất bản trước đợt sửa, các kết luận về logic phân quyền đúng với mã nguồn chứ không với hệ thống đang chạy. Khoảng cách này chỉ đóng lại sau khi xuất bản lại gói.
+    \item \textbf{Không phải một phát biểu về hiệu năng của đường ghi.} Phép đo chỉ bao phủ các tuyến đọc, vì độ trễ của đường ghi bị chi phối bởi thời gian xác nhận của mạng chứ không bởi mã của hệ thống (Mục 4.9.1).
+\end{itemize}
+
+\section{Hạn chế của nghiên cứu}
+
+\noindent \textbf{Niềm tin gốc không thể phi tập trung hoàn toàn}
+
+Hệ thống sử dụng một nguồn niềm tin gốc duy nhất, nên toàn bộ chuỗi thẩm quyền được xây từ một thực thể trung tâm. Như đã phân tích ở Mục 3.4.1, đây không phải một khuyết điểm có thể khắc phục bằng kỹ thuật: thẩm quyền của nguồn niềm tin gốc đến từ sự công nhận pháp lý và thể chế bên ngoài hệ thống, và không cơ chế mật mã nào thay thế được điều đó.
+
+Điều kỹ thuật có thể làm là giảm rủi ro của việc tập trung bằng cách phân tán quyền quản trị giữa nhiều tổ chức. Hướng này đặt ra các vấn đề về trách nhiệm pháp lý và cơ chế đồng thuận giữa các bên tham gia, nằm ngoài phạm vi đề tài.
+
+Cách phát biểu đúng về vị trí của hệ thống trên trục tự chủ cũng cần được làm rõ, vì đây là chỗ dễ bị đọc quá mức. Khảo sát hệ thống của Ambati và cộng sự kết luận rằng tự chủ trong thực tế là một \emph{phổ} chứ không phải thuộc tính nhị phân, rằng không hệ thống nào đang vận hành đạt mức tự chủ đầy đủ trên mọi chiều, và rằng các hệ thống do nhà nước bảo đảm được mô tả chính xác hơn là {``}hướng người dùng{''} thay vì {``}tự chủ hoàn toàn{''} --- bởi nhà nước cần giữ khả năng thu hồi \cite{Ambati2026}. Hệ thống trong nghiên cứu này ở đúng vị trí đó: người học kiểm soát hoàn toàn khóa và dữ liệu của mình, nhưng cơ quan quản trị giữ quyền quyết định ai được cấp phát. Đây là một lựa chọn có chủ đích chứ không phải một thiếu sót, vì trong lĩnh vực văn bằng, một hệ thống không có ai thu hồi được thẩm quyền thì không dùng được. Nhưng nó có nghĩa là mô hình không nên được mô tả là tự chủ hoàn toàn.
+
+\noindent \textbf{Gánh nặng quản lý khóa của mô hình không lưu ký}
+
+Mô hình ví không lưu ký được chọn vì lý do đã nêu ở Mục 3.8: mô hình lưu ký làm thay đổi tính chất an toàn mà hệ thống cung cấp, không chỉ làm giảm tính tự chủ về nguyên tắc. Giá phải trả là thực tế: nếu người dùng mất cả cụm từ ghi nhớ và thiết bị, không có cơ chế khôi phục nào.
+
+Ngoài ra, việc lưu khóa trong trình duyệt có mức an toàn thấp hơn các giải pháp phần cứng chuyên dụng. Như đã nêu ở Mục 2.4.3, các biện pháp bảo vệ hiện tại bảo vệ khóa ở trạng thái nghỉ nhưng không bảo vệ khóa trong lúc ví đang mở.
+
+Quan trọng không kém: nghiên cứu chưa có đánh giá nào với người dùng thật về việc liệu họ có thực hiện đúng quy trình sao lưu và bảo vệ khóa. Đây là hạn chế mà khảo sát hệ thống trong lĩnh vực xác nhận là vấn đề chung chứ không riêng của nghiên cứu này: Ambati và cộng sự ghi nhận rằng khôi phục khóa là bài toán chưa được giải quyết nghiêm trọng nhất của định danh tự chủ, rằng cụm từ ghi nhớ là phương thức sao lưu chủ đạo trong khi các nghiên cứu cho thấy người dùng gặp khó khăn khi lưu giữ chúng an toàn, và rằng chỉ 2 trong 47 công trình được phân tích có nghiên cứu người dùng \cite{Ambati2026}. Các hướng khôi phục thay thế như khôi phục qua mạng xã hội cũng đưa vào những giả định tin cậy mới của riêng chúng, nên không phải một giải pháp thuần túy kỹ thuật.
+
+Hệ quả đối với cách đọc kết quả: khóa luận kết luận về tính khả thi kỹ thuật, không về tính khả dụng. Hai câu hỏi này không suy ra được từ nhau \cite{SSI_Adoption2025}, và các mối đe dọa cụ thể đối với tính hợp lệ của từng loại kết luận được phân tích tại Mục 4.11.
+
+\noindent \textbf{Các điểm chưa tuân thủ đầy đủ chuẩn}
+
+Bốn điểm chưa tuân thủ đã được nêu tường minh ở Mục 4.3.3 và cần được tổng hợp lại:
+
+\begin{itemize}
+    \item Phương thức định danh \cbox{did:vnu} chưa được đăng ký trong sổ đăng ký phương thức của W3C, nên các hệ thống bên ngoài chưa phân giải tự động được nếu không triển khai bộ phân giải tương ứng.
+    \item Phép chuẩn hóa dữ liệu dùng chuẩn hóa JSON thay vì chuẩn hóa tập dữ liệu RDF \cite{W3C_RDFC2024}, nên một bên xác minh theo chuẩn cần mã kiểm tra riêng.
+    \item Bằng chứng được lưu tách rời thay vì nhúng trong tài liệu chứng thực, khác với cấu trúc mà bên xác minh theo chuẩn mong đợi.
+    \item Cơ chế trạng thái theo từng bản ghi không tương thích với cơ chế danh sách bit của chuẩn \cite{W3C_BitstringStatusList2025}, nên vừa mất quyền riêng tư theo nhóm vừa khiến chi phí thu hồi tăng tuyến tính.
+\end{itemize}
+
+Ngoài ra bản thử nghiệm dùng ngữ cảnh của mô hình dữ liệu chứng thực phiên bản 1.1 thay vì phiên bản 2.0.
+
+\noindent \textbf{Nội dung chứng thực chưa được mã hóa}
+
+Trong thiết kế đầy đủ, nội dung chứng thực cần được mã hóa bằng khóa công khai của chủ thể trước khi ghim lên lớp lưu trữ ngoài chuỗi, bởi lớp lưu trữ này là công khai. Bản thử nghiệm ghim nội dung ở dạng không mã hóa, nên mô hình an toàn thực tế dựa trên việc định danh nội dung không được công bố --- một dạng bảo mật dựa trên sự khó đoán, không phải bảo mật bằng mật mã. Đây là hạn chế đáng kể về quyền riêng tư và là nội dung cần xử lý trước bất kỳ triển khai thực tế nào.
+
+\noindent \textbf{Giới hạn của phạm vi đánh giá}
+
+Hạn chế nghiêm trọng nhất về phép đo là môi trường: bộ sinh tải, hai tiến trình dịch vụ và cơ sở dữ liệu cùng chạy trên một máy khoảng 3,9\,GB bộ nhớ. Hệ quả đã được lượng hoá ở Mục 4.9.3: hệ số biến thiên của độ trễ phân vị 95 là 128,6\% ở 60 mẫu mỗi lượt và vẫn còn 41,3\% ở 4000 mẫu. Tăng số mẫu giảm được nhiễu nhưng không loại bỏ được, vì nguồn nhiễu không nằm ở số mẫu mà ở chính cách thiết lập thí nghiệm. Kết quả là \textbf{độ trễ phần đuôi không đo được một cách đáng tin cậy trên cách thiết lập này}, và để kiểm chứng yêu cầu N11 cần một môi trường mà bộ sinh tải chạy trên máy riêng.
+
+Điều này cũng cho thấy giới hạn của một hạng mục đánh giá mà bản thảo trước coi là đã hoàn thành. Những gì còn lại sau khi loại các số đo không bền: hệ thống không sinh lỗi chức năng nào trên 905.160 yêu cầu, và trung vị độ trễ ở mức tải vừa phải thấp hơn ngưỡng nhiều bậc. Hai kết luận đó bền, nhưng chúng hẹp hơn một bảng số liệu p95 theo từng tuyến.
+
+Ngoài ra, các phép đo chạy với dữ liệu ở quy mô vài trăm bản ghi, nên không cho phép kết luận về hành vi ở quy mô sản xuất. Đặc biệt, các hàm truy vấn liệt kê toàn bộ danh sách trên chuỗi sẽ thất bại khi số bản ghi vượt ngưỡng an toàn; các hàm truy vấn phân trang đã được bổ sung nhưng chưa tuyến nào sử dụng.
+
+Mô hình đe dọa cũng có phạm vi giới hạn đã nêu ở Mục 3.7.1: nó không giả định kẻ tấn công chiếm được khóa riêng của người dùng khác hoặc thực thi được mã trong trình duyệt của họ. Hai loại tấn công này có hệ quả nghiêm trọng và không được giảm nhẹ bởi thiết kế hiện tại.
+
+\noindent \textbf{Khoảng cách giữa nguyên tắc kiến trúc và tính khả dụng}
+
+Hạn chế cuối cùng mang tính tổng hợp. Mô hình không lưu ký đúng về nguyên tắc nhưng khó dùng; cơ chế trạng thái theo từng bản ghi đơn giản để vận hành nhưng kém hiệu quả về chi phí và quyền riêng tư; mạng công khai cho phép kiểm chứng tính xác minh độc lập nhưng không phù hợp cho triển khai thật. Trong cả ba trường hợp, một kiến trúc đúng về mặt nguyên tắc chưa đồng nghĩa với một hệ thống dùng được trong thực tế. Khoảng cách này cần được giải quyết ở tầng sản phẩm và tầng quản trị, không chỉ ở tầng kiến trúc.
+
+\section{Hướng phát triển}
+
+\noindent \textbf{Xuất bản lại gói hợp đồng}
+
+Đây là công việc có ưu tiên cao nhất và là điều kiện để các kết quả về logic phân quyền được chứng minh trên trạng thái đang vận hành chứ không chỉ trên mã nguồn. Toàn bộ công cụ cần thiết đã được chuẩn bị, và hàm khởi tạo đã được sửa để tự lấy người xuất bản làm quản trị viên gốc, nên vấn đề đã gây lỗi ban đầu không lặp lại. Việc này kéo theo một quyết định thuộc về người vận hành: vì hàm khởi tạo chỉ chạy một lần, xuất bản ở địa chỉ mới là cách duy nhất để đặt lại quản trị viên gốc, và dữ liệu đã ghi ở địa chỉ cũ sẽ bị bỏ lại.
+
+\noindent \textbf{Chuyển sang mô hình quản trị nhiều tổ chức}
+
+Hướng phát triển quan trọng nhất về mặt kiến trúc là chuyển từ một nguồn niềm tin gốc duy nhất sang mô hình liên hợp, trong đó sổ đăng ký tin cậy được quản trị bởi nhiều tổ chức. Các cơ chế khả thi gồm chữ ký đa bên, chữ ký ngưỡng, hoặc biểu quyết trên chuỗi cho các thao tác quản trị quan trọng. Nhờ nguyên tắc phân tách lớp ở Mục 3.2, việc chuyển đổi này chỉ ảnh hưởng tới lớp quản trị.
+
+Một hướng bổ trợ là áp dụng giao thức truy vấn sổ đăng ký tin cậy đã được chuẩn hóa \cite{ToIP_TRQP2026}, để sổ đăng ký của hệ thống truy vấn được bằng giao thức chung và công nhận được lẫn nhau với các sổ đăng ký khác. Đáng chú ý là phiên bản hiện tại của đặc tả này còn hoãn phần truy vấn về ủy quyền nhiều cấp, nên mô hình ủy quyền ở Mục 3.4.3 có thể là một đóng góp cho quá trình chuẩn hóa đó.
+
+\noindent \textbf{Tích hợp với hạ tầng số quốc gia}
+
+Hệ thống có thể được tích hợp với các nền tảng hạ tầng số quốc gia đang hình thành: nền tảng blockchain quốc gia cùng giải pháp định danh phi tập trung đi kèm \cite{NDAChain2025}, và hệ thống định danh điện tử công dân. Hướng tích hợp thứ hai có giá trị cụ thể với bài toán của đề tài: nó cung cấp một nguồn danh tính gốc đã được cơ quan nhà nước xác thực, giải quyết được bước liên kết giữa một định danh phi tập trung và một con người thật --- bước mà hệ thống hiện tại phải giả định đã hoàn tất. Thông tư 10/2026/TT-BGDĐT \cite{TT10_2026} đã tạo cơ sở pháp lý cho hướng này khi quy định việc tra cứu trên nền tảng định danh điện tử có thể thay thế bản sao từ sổ gốc.
+
+\noindent \textbf{Hoàn thiện khả năng tương thích chuẩn}
+
+Bốn điểm chưa tuân thủ ở Mục 5.3 đều có hướng xử lý xác định: đăng ký phương thức định danh vào sổ đăng ký của W3C; chuyển sang phép chuẩn hóa tập dữ liệu RDF; chuyển bằng chứng vào trong tài liệu chứng thực theo một cơ chế bảo đảm chuẩn \cite{W3C_VCDataIntegrity2025}; và chuyển cơ chế trạng thái sang danh sách bit \cite{W3C_BitstringStatusList2025}. Việc cuối cùng mang lại hai lợi ích đồng thời: giảm chi phí thu hồi và khôi phục quyền riêng tư theo nhóm vốn bị mất trong thiết kế hiện tại.
+
+\noindent \textbf{Giảm rủi ro tập trung ở khóa của bên phát hành}
+
+Hạn chế đã nêu tại Mục 3.7.1 --- mỗi bên phát hành ký bằng một khóa duy nhất, nên khóa bị lộ là cấp được chứng thực hợp lệ trong toàn bộ phạm vi thẩm quyền --- có hướng xử lý xác định: yêu cầu nhiều chữ ký hoặc chữ ký ngưỡng cho thao tác cấp phát. Thay đổi này nằm trong lớp chứng thực nên không ảnh hưởng tới khung quản trị, và nó phù hợp với thực tiễn hành chính, nơi việc cấp một văn bằng vốn đã cần nhiều cấp phê duyệt. Đây là hạn chế có mức ưu tiên cao hơn so với các hướng còn lại, bởi nó là lớp tấn công mà hai phân tích an toàn trong lĩnh vực đều chỉ ra \cite{Baldi2019, Zonneveld2026}.
+
+\noindent \textbf{Xử lý bài toán quyền xóa dữ liệu}
+
+Mục 3.5.1 đã nêu rằng kiến trúc hiện tại giảm mức phơi nhiễm nhưng không bảo đảm quyền xóa, vì giá trị băm không muối trên chuỗi vẫn là dữ liệu cá nhân theo cách giải thích hiện hành \cite{EDPB2025}. Hai hướng xử lý: thay giá trị băm bằng một cam kết có khóa, với khóa lưu ngoài chuỗi và tiêu hủy được khi có yêu cầu xóa --- cách này giữ được khả năng đối chiếu cho bên có khóa và vô hiệu hóa máy xác nhận cho bên không có; hoặc chuyển sang chuỗi được cấp phép nơi vai trò bên kiểm soát dữ liệu xác định được. Hướng thứ hai đồng thời là hướng mà cơ quan bảo vệ dữ liệu khuyến nghị, nên nó hội tụ với hướng phát triển về quản trị nhiều tổ chức nêu ở trên.
+
+\noindent \textbf{Tăng cường bảo vệ quyền riêng tư}
+
+Hai nội dung cần xử lý theo thứ tự ưu tiên. Trước hết là mã hóa nội dung chứng thực trước khi ghim --- một yêu cầu cơ bản mà bản thử nghiệm chưa đáp ứng. Sau đó là bổ sung khả năng tiết lộ chọn lọc ở mức thuộc tính, qua chuẩn chữ ký có cấu trúc hỗ trợ việc này \cite{RFC9901} hoặc qua lược đồ chữ ký cho phép dẫn xuất bằng chứng \cite{Looker_BBS2025}. Cần lưu ý ràng buộc đã nêu ở Mục 2.4.4: hai năng lực này đòi hỏi thay đổi ở phía bên phát hành \emph{ngay từ thời điểm ký}, nên không thể bổ sung sau cho các chứng thực đã cấp. Đây là lý do nội dung này cần được xử lý trước khi hệ thống phát hành chứng thực ở quy mô lớn.
+
+\noindent \textbf{Cải thiện tính khả dụng của mô hình không lưu ký}
+
+Hai hướng khả thi là khôi phục qua mạng xã hội và chữ ký ngưỡng, cho phép khôi phục quyền truy cập mà không đặt khóa vào tay một bên trung gian duy nhất. Hướng này cần đi kèm nghiên cứu về trải nghiệm người dùng với nhóm người dùng thật, bởi hạn chế đã nêu ở Mục 5.3 là một hạn chế về hành vi chứ không về kỹ thuật.
+
+\noindent \textbf{Mở rộng phạm vi loại chứng thực}
+
+Mô hình có thể mở rộng ra ngoài phạm vi văn bằng đại học để hỗ trợ hồ sơ học tập số, chứng chỉ nghề nghiệp và các chứng nhận vi mô. Cấu trúc mặt nạ bit ở Mục 3.4.2 đã hỗ trợ việc này về mặt thiết kế, nhưng khi số loại chứng thực vượt độ rộng của số nguyên được chọn thì cần chuyển sang nhiều từ hoặc sang một sổ đăng ký loại dựa trên chuỗi định danh.
+
+\section{Thảo luận một số vấn đề đặt ra}
+
+Phần này xem xét sáu vấn đề mà thiết kế trong khóa luận đặt ra và chưa được trả lời đầy đủ ở các chương trước. Mục đích không phải bảo vệ thiết kế mà xác định chính xác chỗ nào lập luận còn yếu, bởi một hạn chế được nêu đúng thì có giá trị hơn một kết luận được phát biểu quá mức.
+
+\noindent \textbf{Thứ nhất: nếu bài toán chỉ gồm ba thuộc tính tin cậy thì hợp đồng thông minh là lựa chọn quá đắt.}
+
+Đây là phản biện mạnh nhất đối với thiết kế, và câu trả lời là: đúng. Như đã phân tích tại Mục 2.5.3, một sổ ghi chỉ-thêm có bằng chứng về tính nhất quán đạt được xác thực nguồn gốc, toàn vẹn nội dung và kiểm tra trạng thái với chi phí thấp hơn đáng kể \cite{RFC6962, Saramago2021}. Lý do dùng môi trường thi hành quy tắc chỉ xuất hiện khi bổ sung thuộc tính thứ tư --- thẩm quyền cấp phát --- và yêu cầu rằng quy tắc về thẩm quyền phải được \emph{thi hành tại thời điểm cấp phát}, không chỉ được \emph{ghi nhận để kiểm tra về sau}.
+
+Hệ quả cho người đọc: nếu một tổ chức chỉ cần chống sửa nội dung văn bằng, kiến trúc trong khóa luận là lựa chọn phức tạp hơn mức cần thiết. Nó chỉ tương xứng khi bài toán thực sự bao gồm việc quản lý thẩm quyền của nhiều đơn vị cấp phát.
+
+\noindent \textbf{Thứ hai: mô hình vẫn có một điểm tập trung, nên nó khác gì mô hình tập trung hiện tại?}
+
+Khác ở phạm vi quyền lực, không ở việc có hay không có điểm tập trung. Trong mô hình hiện tại, cơ sở cấp phát kiểm soát đồng thời bốn thứ: dữ liệu của người học, khóa ký, bản ghi trạng thái, và khả năng trả lời câu hỏi xác minh. Trong mô hình đề xuất, cơ quan quản trị chỉ kiểm soát \emph{một} thứ --- quyết định ai được cấp phát loại văn bằng nào --- và không giữ dữ liệu người học, không ký thay bên phát hành, không tham gia vào từng lần xác minh, không xóa được dấu vết thao tác của chính mình.
+
+Phần phải thừa nhận: đây là sự thu hẹp phạm vi quyền lực, không phải sự loại bỏ. Khảo sát hệ thống trong lĩnh vực mô tả tự chủ như một phổ chứ không phải thuộc tính nhị phân, và ghi nhận rằng không hệ thống nào đang vận hành đạt mức tự chủ đầy đủ trên mọi chiều \cite{Ambati2026}. Hệ thống này nằm trên phổ đó, không ở đầu phổ.
+
+\noindent \textbf{Thứ ba: khoảng trống về thẩm quyền có thực sự quan trọng, hay chỉ là một chi tiết về sự hoàn chỉnh của mô hình?}
+
+Câu hỏi này được trả lời bằng bằng chứng bên ngoài nghiên cứu. Hai phân tích an toàn trên hai hệ thống chứng nhận văn bằng đã triển khai cho thấy khoảng trống này là một lớp lỗ hổng khai thác được, không phải một thiếu sót về hình thức. Baldi và cộng sự chỉ ra một tấn công mạo danh trên Blockcerts, với nguyên nhân là quy trình xác minh đối chiếu danh tính bên phát hành với một hồ sơ không được xác thực \cite{Baldi2019}. Zonneveld và cộng sự báo cáo một tấn công giả mạo trên Block.co và quy nguyên nhân về việc thiếu một cơ quan có thẩm quyền được tin cậy để ràng buộc danh tính pháp lý của tổ chức với danh tính số của bên phát hành \cite{Zonneveld2026}.
+
+Điểm đáng chú ý trong cả hai trường hợp: hệ thống bị tấn công đều có chữ ký số hợp lệ và giá trị băm neo đúng cách. Việc bổ sung thêm cơ chế mật mã không lấp được khoảng trống này.
+
+\noindent \textbf{Thứ tư: tại sao không dùng ngay một phương thức định danh đã chuẩn hóa?}
+
+Đây là đánh đổi mà khóa luận chọn sai nếu xét theo tiêu chí liên thông, và đúng nếu xét theo tiêu chí quản trị. Như đã nêu tại Mục 2.3.1, lý do thiết kế một phương thức riêng \emph{không} phải vì các phương thức khác thiếu khả năng giữ lịch sử phiên bản --- đặc tả phân giải định danh của W3C đã chuẩn hóa việc này. Lý do là nhu cầu đặt sổ đăng ký định danh và sổ đăng ký thẩm quyền trong cùng một miền tin cậy.
+
+Nếu phải làm lại, một phương án đáng xem xét là giữ một phương thức đã chuẩn hóa cho lớp định danh và chỉ đặt sổ đăng ký thẩm quyền trên chuỗi. Phương án này đánh mất tính chất {``}một lần truy vấn trả lời cả hai câu hỏi{''} nhưng giữ được khả năng liên thông, và với một hệ thống hướng tới sử dụng thực tế thì đó có thể là đánh đổi đúng hơn.
+
+\noindent \textbf{Thứ năm: hệ thống có thực sự tuân thủ quy định về bảo vệ dữ liệu cá nhân?}
+
+Chưa. Đây là kết luận đã được chỉnh lại trong quá trình rà soát và cần nêu rõ. Lập luận ban đầu --- chỉ ghi giá trị băm lên chuỗi nên không có dữ liệu cá nhân trên chuỗi --- không đứng vững: theo cách giải thích hiện hành, dữ liệu đã băm vẫn là dữ liệu cá nhân, và giá trị băm không có muối không đủ bảo đảm mức bảo mật trên chuỗi công khai \cite{EDPB2025}. Trong kiến trúc này, giá trị băm nội dung buộc phải không có muối để bên xác minh tính lại được, nên nó hoạt động như một máy xác nhận.
+
+Tính chất đạt được vì vậy là \emph{giảm mức phơi nhiễm}, không phải \emph{bảo đảm quyền xóa}. Hai hướng xử lý đã nêu tại Mục 5.4, và cả hai đòi hỏi thay đổi kiến trúc chứ không chỉ thêm một lớp bảo vệ.
+
+\noindent \textbf{Thứ sáu: một hệ thống mà người dùng tự giữ khóa có triển khai được trong thực tế không?}
+
+Khóa luận không có cơ sở để trả lời câu hỏi này, và đó là giới hạn nghiêm trọng nhất của nghiên cứu. Kết luận của báo cáo là về tính khả thi kỹ thuật; tính khả dụng và mức độ chấp nhận là hai câu hỏi khác không suy ra được từ đó \cite{SSI_Adoption2025}.
+
+Những gì biết được từ tài liệu không lạc quan. Khôi phục khóa được mô tả là bài toán chưa được giải quyết nghiêm trọng nhất của lĩnh vực; cụm từ ghi nhớ là phương thức sao lưu chủ đạo trong khi các nghiên cứu cho thấy người dùng gặp khó khăn khi lưu giữ chúng an toàn; và nghiên cứu người dùng trong lĩnh vực ghi nhận rằng quá trình khởi tạo gây khó hiểu và người dùng lo lắng về việc mất khóa \cite{Ambati2026, Zaeem2021}. Đồng thời, lĩnh vực thiếu bằng chứng để kết luận: chỉ 2 trong 47 công trình được phân tích có nghiên cứu người dùng \cite{Ambati2026}.
+
+Hệ quả đối với cách đọc khóa luận: phần đóng góp nằm ở lớp quản trị thẩm quyền, và lớp đó không phụ thuộc vào việc ví là lưu ký hay không lưu ký. Nếu một triển khai thực tế phải chọn mô hình lưu ký vì lý do khả dụng, khung quản trị vẫn áp dụng được --- điều mất đi là bước kiểm tra chữ ký của người trình bày, với hệ quả đã phân tích tại Mục 3.8.
+
+\section{Kết luận chung}
+
+Nghiên cứu xuất phát từ một quan sát về bản chất của bài toán: vấn đề của hệ thống văn bằng hiện hành không phải là thiếu công cụ phát hiện văn bằng giả, mà là chi phí của một lần kiểm chứng quá cao, khiến việc xác minh trở thành ngoại lệ thay vì thao tác mặc định. Dữ liệu thực tiễn củng cố quan sát này: ngay tại những nơi đã có dịch vụ xác minh hoạt động nhiều năm, tỷ lệ các bên thực sự đối chiếu bằng cấp với cơ quan cấp phát vẫn ở mức thấp.
+
+Từ đó, khóa luận đề xuất một kiến trúc trong đó thông tin đủ để kiểm chứng được nhúng vào bản thân văn bằng và được neo trên một hạ tầng công khai bất biến. Trên nền tảng đó, nghiên cứu bổ sung phần mà các hệ thống hiện có còn để trống: một khung quản trị niềm tin trong đó chuỗi thẩm quyền --- phạm vi cấp phát, thời hạn ủy quyền, ủy quyền nhiều cấp, quy tắc thu hồi --- được đặc tả thành mã thi hành và trở thành dữ liệu mà bất kỳ bên nào cũng tra cứu được.
+
+Điều củng cố định hướng này không phải một lập luận về sự hoàn chỉnh của mô hình mà là bằng chứng từ bên ngoài nghiên cứu. Hai phân tích an toàn trên hai hệ thống chứng nhận văn bằng đã triển khai, cách nhau bảy năm, cùng chỉ về một nguyên nhân gốc: thiếu cơ chế ràng buộc danh tính pháp lý của tổ chức với danh tính số của bên phát hành \cite{Baldi2019, Zonneveld2026}. Trong cả hai trường hợp, hệ thống bị tấn công đều có chữ ký số hợp lệ và giá trị băm neo đúng cách --- cho thấy khoảng trống này thuộc phạm trù quản trị và việc bổ sung thêm cơ chế mật mã không lấp được nó.
+
+Kết quả thực nghiệm cho thấy hướng tiếp cận này khả thi về mặt kỹ thuật, với các giới hạn đã nêu rõ. Đáng kể hơn các con số về hiệu năng là ba nguyên tắc thiết kế được rút ra trong quá trình xây dựng --- bất đối xứng giữa cấp và thu hồi, chuyển quyền gốc hai bước, và khôi phục vai trò kèm phiên bản. Cả ba đều không được suy ra từ lý thuyết mà được phát hiện bằng cách dựng các kịch bản làm hệ thống thất bại, và cả ba đều có phạm vi áp dụng rộng hơn bài toán văn bằng số.
+
+Về mặt phương pháp, nghiên cứu xác nhận một nguyên tắc có giá trị tổng quát trong việc xây dựng hệ thống an toàn: một bước kiểm tra luôn cho kết quả đạt còn tệ hơn việc không có bước đó, vì nó tạo cảm giác an toàn không có cơ sở. Nhiều vấn đề nghiêm trọng nhất được phát hiện trong quá trình thực hiện đều thuộc loại này --- một hàm được khai báo mà không ai gọi, một nhánh mã không bao giờ được thực thi, một bảng dữ liệu không thành phần nào ghi vào, một tập lệnh kiểm thử báo đạt bất kể kết quả thật. Mỗi lần, cách phát hiện đều giống nhau: viết một phép kiểm được thiết kế để làm bước đó thất bại, rồi xem nó có thất bại thật hay không.
+
+Nguyên tắc ấy cũng áp dụng cho chính bản báo cáo này. Ba vấn đề được nêu tại Mục 5.5 --- hợp đồng thông minh là lựa chọn quá đắt nếu bài toán chỉ gồm ba thuộc tính tin cậy, hệ thống chưa bảo đảm quyền xóa dữ liệu, và khóa luận không có cơ sở để kết luận về tính khả dụng --- đều được tìm ra bằng cách hỏi {``}điều gì khiến kết luận này sai{''} thay vì {``}làm sao chứng minh nó đúng{''}. Việc nêu chúng không làm các hạn chế biến mất, nhưng nó xác định đúng loại kết luận mà báo cáo có quyền phát biểu, và đó là điều kiện để kết quả có ích cho người đọc sau.
+
+Hệ thống hiện ở mức kiểm chứng khái niệm. Tuy vậy, trong bối cảnh hành lang pháp lý trong nước đã công nhận giá trị pháp lý của văn bằng số và hạ tầng số quốc gia đang hình thành, phần có giá trị lâu dài hơn bản thân hệ thống --- mô hình quản trị thẩm quyền và các nguyên tắc thiết kế kèm theo --- có thể đóng góp vào quá trình xây dựng hạ tầng văn bằng số cho hệ thống giáo dục Việt Nam.

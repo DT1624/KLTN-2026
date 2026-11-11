@@ -1,0 +1,44 @@
+# Chỉ theo dõi hai thư mục chính
+/*
+!/.gitignore
+!/KLTN_TranAnhDuong_22028334/
+!/vnu-trust/
+
+# Bí mật, khoá
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+key.txt
+.aptos/
+.movement/
+
+# Môi trường / editor
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Ghi chú nội bộ
+*.local.md
+REVIEW-LOG.md
+BUILD.md
+TOMTAT.md
+*CHECKLIST*.md
+
+# Báo cáo: file build và bản sao lưu
+KLTN_TranAnhDuong_22028334/out/
+KLTN_TranAnhDuong_22028334/out_v2/
+KLTN_TranAnhDuong_22028334/.backup-*/
+KLTN_TranAnhDuong_22028334/source/table/_unused/
+*.aux
+*.bbl
+*.blg
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.toc
+*.lof
+*.lot
+*.out

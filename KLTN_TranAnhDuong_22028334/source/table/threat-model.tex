@@ -1,0 +1,96 @@
+\begin{longtable}{|c|p{3.6cm}|p{5.3cm}|p{3.4cm}|}
+\caption{Mô hình đe dọa và rào chắn tương ứng}
+\label{tab:threat-model} \\
+
+\hline
+\textbf{Mã} & \textbf{Hành vi tấn công} & \textbf{Rào chắn} & \textbf{Vị trí rào chắn} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mã} & \textbf{Hành vi tấn công} & \textbf{Rào chắn} & \textbf{Vị trí rào chắn} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+T1 & Tự khai là bên phát hành rồi cấp văn bằng
+& Hợp đồng kiểm thẩm quyền trước khi ghi bản ghi; địa chỉ không có bản ghi thẩm quyền đang hoạt động thì thao tác thất bại
+& Hợp đồng
+\\ \hline
+
+T2 & Cấp loại văn bằng ngoài phạm vi được phép
+& Phép giao bit giữa loại văn bằng và mặt nạ phạm vi; kết quả bằng không thì từ chối
+& Hợp đồng
+\\ \hline
+
+T3 & Tiếp tục cấp văn bằng sau khi thẩm quyền đã hết hạn
+& Hợp đồng đối chiếu thời hạn ủy quyền với dấu thời gian của chuỗi
+& Hợp đồng
+\\ \hline
+
+T4 & Khai báo mã giao dịch không tồn tại để tạo bản ghi về văn bằng không có trên chuỗi
+& Bốn phép kiểm với nút đầy đủ trước khi ghi chỉ mục: giao dịch tồn tại; thành công; đúng hàm được gọi; đúng người gửi
+& Tầng dịch vụ
+\\ \hline
+
+T5 & Tái sử dụng một giao dịch thật của chính mình nhưng thuộc loại thao tác khác
+& Phép kiểm thứ ba trong T4: so khớp tên hàm trong phần tải của giao dịch với hàm mong đợi của tuyến
+& Tầng dịch vụ
+\\ \hline
+
+T6 & Tái sử dụng giao dịch của người khác
+& Phép kiểm thứ tư trong T4: so khớp người gửi giao dịch với tài khoản đang thực hiện yêu cầu
+& Tầng dịch vụ
+\\ \hline
+
+T7 & Sửa nội dung văn bằng sau khi cấp rồi ghim lại nội dung đã sửa
+& Bước thứ sáu của quy trình xác minh: tính lại giá trị băm của nội dung và đối chiếu với giá trị đã neo trên chuỗi
+& Quy trình xác minh
+\\ \hline
+
+T8 & Trình bày một chứng thực của người khác đã lấy được bản sao
+& Bước thứ ba của quy trình xác minh: chữ ký của người trình bày phải khớp khóa công khai của chủ thể ghi trong chứng thực
+& Quy trình xác minh
+\\ \hline
+
+T9 & Khai báo giá trị băm sai để nội dung không khớp vẫn được chấp nhận
+& Giá trị băm do máy khách khai báo đều được tính lại từ chính nội dung để đối chiếu trước khi ghi
+& Tầng dịch vụ
+\\ \hline
+
+T10 & Mạo danh người khác khi đăng nhập bằng cách gửi lại chữ ký đã thu được
+& Đăng nhập theo cơ chế thách thức -- đáp ứng với số dùng một lần có thời hạn; số đã dùng bị đánh dấu và không nhận lại
+& Tầng dịch vụ
+\\ \hline
+
+T11 & Lợi dụng vai trò ghi trong phiên đăng nhập để thực hiện thao tác vượt quyền
+& Các tuyến ghi có hệ quả trên chuỗi kiểm quyền trực tiếp trên chuỗi, không dựa vào vai trò trong phiên
+& Tầng dịch vụ và hợp đồng
+\\ \hline
+
+T12 & Gán quyền gốc cho một địa chỉ không ai kiểm soát, qua đó làm mất năng lực quản trị
+& Chuyển quyền gốc gồm hai bước; quyền chỉ chuyển sau khi người được đề cử tự ký để tiếp nhận
+& Hợp đồng
+\\ \hline
+
+T13 & Đơn vị tự đình chỉ chứng thực rồi tự kích hoạt lại để xóa dấu vết
+& Thao tác kích hoạt lại chỉ thuộc quản trị viên, không thuộc bên phát hành
+& Hợp đồng
+\\ \hline
+
+T14 & Đăng ký một chuỗi định danh đã thuộc về thực thể khác
+& Hợp đồng kiểm tính duy nhất của chuỗi định danh; đăng ký lại cho cùng một địa chỉ chỉ được phép sau khi định danh cũ đã bị thu hồi
+& Hợp đồng
+\\ \hline
+
+T15 & Khai thác cổng truy cập trung gian để trả về nội dung khác nội dung đã đăng ký
+& Phân giải định danh tính lại giá trị băm của tài liệu nhận được và đối chiếu với giá trị đã neo, bất kể nội dung đến từ cổng nào
+& Quy trình phân giải
+\\ \hline
+
+\end{longtable}

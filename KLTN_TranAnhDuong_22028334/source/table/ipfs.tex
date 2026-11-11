@@ -1,0 +1,51 @@
+\begin{longtable}{|p{3.2cm}|p{2.6cm}|p{3.1cm}|p{4.5cm}|}
+\caption{Chính sách bảo vệ các loại dữ liệu lưu ngoài chuỗi}
+\label{tab:encryption-policy}
+\\
+\hline
+\textbf{Loại dữ liệu} & \textbf{Mức bảo vệ trong thiết kế} & \textbf{Trạng thái trong bản thử nghiệm} & \textbf{Cơ sở} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Loại dữ liệu} & \textbf{Mức bảo vệ trong thiết kế} & \textbf{Trạng thái trong bản thử nghiệm} & \textbf{Cơ sở} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+DID Document
+& Không mã hóa
+& Không mã hóa, đúng thiết kế
+& Theo đặc tả, tài liệu này là thông tin công khai và chỉ chứa khóa công khai cùng điểm cuối dịch vụ; không chứa dữ liệu cá nhân
+\\ \hline
+
+Chứng thực ủy quyền
+& Không mã hóa
+& Không mã hóa, đúng thiết kế
+& Là bằng chứng về quan hệ ủy quyền giữa hai tổ chức, cần công khai để bên xác minh kiểm chứng được
+\\ \hline
+
+Nội dung chứng thực văn bằng
+& Mã hóa bằng khóa công khai của chủ thể trước khi ghim
+& \textbf{Chưa triển khai}: hiện ghim ở dạng không mã hóa
+& Chứa dữ liệu định danh cá nhân. Hạn chế này được ghi nhận tại Mục 3.5.2 và Mục 5.3
+\\ \hline
+
+Bản trình bày
+& Mã hóa hoặc giới hạn truy cập theo liên kết chia sẻ có thời hạn
+& Giới hạn bằng liên kết chia sẻ có thời hạn và có thể thu hồi
+& Bản trình bày được tạo cho một lần xác minh cụ thể, nên vòng đời ngắn là biện pháp giảm nhẹ hợp lý
+\\ \hline
+
+Khóa riêng của chủ thể
+& Không bao giờ rời khỏi thiết bị
+& Mã hóa AES-256-GCM, khóa dẫn xuất bằng PBKDF2-HMAC-SHA256, chỉ lưu bản mã trên thiết bị
+& Mục 2.4.3
+\\ \hline
+
+\end{longtable}

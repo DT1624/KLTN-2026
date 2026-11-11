@@ -1,0 +1,37 @@
+\begin{longtable}{|p{2.3cm}|p{2.6cm}|p{2.2cm}|p{6.2cm}|}
+\caption{Ma trận kết quả xác minh và ý nghĩa của từng loại thất bại}
+\label{tab:verification-matrix} \\
+
+\hline
+\textbf{Nhóm kỹ thuật} & \textbf{Nhóm thẩm quyền} & \textbf{Kết quả} & \textbf{Ý nghĩa đối với bên xác minh} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Nhóm kỹ thuật} & \textbf{Nhóm thẩm quyền} & \textbf{Kết quả} & \textbf{Ý nghĩa đối với bên xác minh} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Đạt & Đạt & Hợp lệ
+& Văn bằng hợp lệ cả về nội dung lẫn thẩm quyền cấp phát. Có thể chấp nhận.
+\\ \hline
+
+Không đạt & Đạt & Từ chối
+& Nội dung bị sửa, chữ ký sai, hoặc bản trình bày do thực thể khác ký. Đây là dấu hiệu của gian lận chủ động và cần được báo cáo.
+\\ \hline
+
+Đạt & Không đạt & Từ chối
+& Nội dung nguyên vẹn nhưng chứng thực đã bị thu hồi, đã hết hạn, hoặc bên phát hành không còn thẩm quyền. Báo cáo chỉ rõ nguyên nhân nào trong ba nguyên nhân này.
+\\ \hline
+
+Không đạt & Không đạt & Từ chối
+& Báo cáo liệt kê đầy đủ các bước không đạt thay vì dừng ở bước đầu tiên, để bên xác minh thấy toàn bộ vấn đề.
+\\ \hline
+
+\end{longtable}

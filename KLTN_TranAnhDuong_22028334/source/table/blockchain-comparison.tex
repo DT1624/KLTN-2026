@@ -1,0 +1,68 @@
+\begin{longtable}{|p{3.3cm}|p{3.3cm}|p{3.3cm}|p{3.3cm}|}
+\caption{So sánh ba hướng nền tảng chuỗi cho hệ thống văn bằng số}
+\label{tab:blockchain-comparison} \\
+\hline
+\textbf{Tiêu chí} & \textbf{Chuỗi công khai hợp đồng chung} & \textbf{Chuỗi được cấp phép} & \textbf{Chuỗi công khai máy ảo Move} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Tiêu chí} & \textbf{Chuỗi công khai hợp đồng chung} & \textbf{Chuỗi được cấp phép} & \textbf{Chuỗi công khai máy ảo Move} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Ngôn ngữ hợp đồng
+& Solidity
+& Go, Java, JavaScript
+& Move
+\\ \hline
+
+Mô hình lập trình
+& Hướng tài khoản
+& Hướng tài khoản
+& Hướng tài nguyên, hệ thống kiểu ngăn nhân bản và hủy ngoài ý muốn
+\\ \hline
+
+Kiểm soát truy cập giữa các mô-đun
+& Theo quy ước và bộ sửa đổi do lập trình viên viết
+& Theo chính sách của mạng
+& Cơ chế \texttt{friend} ở tầng ngôn ngữ
+\\ \hline
+
+Thời gian xác nhận
+& Khoảng 12 giây
+& Dưới 1 giây
+& Dưới 1 giây, nhờ thực thi song song
+\\ \hline
+
+Đọc dữ liệu không cần cấp phép
+& Có
+& \textbf{Không}: bên ngoài tập thành viên phải đi qua một cổng dịch vụ
+& Có
+\\ \hline
+
+Chi phí ở giai đoạn thử nghiệm
+& Cao và biến động theo thị trường
+& Cần vận hành nút xác thực riêng
+& Thấp trên mạng thử nghiệm
+\\ \hline
+
+Phù hợp cho kiểm chứng xác minh độc lập
+& Có
+& Không: không kiểm chứng được tính chất {``}không cần thỏa thuận trước{''}
+& Có
+\\ \hline
+
+Phù hợp cho triển khai thật nhiều cơ sở
+& Chi phí là rào cản
+& Phù hợp nếu theo mô hình liên hợp
+& Cần đánh giá lại chi phí và quản trị
+\\ \hline
+
+\end{longtable}

@@ -1,0 +1,49 @@
+% Trang bìa chính
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+% Khung ngoài
+\draw[line width=3pt]
+(current page text area.north west)
+rectangle
+(current page text area.south east);
+
+% Khung trong
+\draw[line width=1pt]
+([xshift=0.1cm,yshift=-0.1cm]current page text area.north west)
+rectangle
+([xshift=-0.1cm,yshift=0.1cm]current page text area.south east);
+
+\end{tikzpicture}
+\begin{center}
+
+{\fsize{12}
+\textbf{VIETNAM NATIONAL UNIVERSITY, HANOI} \\
+\textbf{UNIVERSITY OF ENGINEERING AND TECHNOLOGY}\\
+}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.35\linewidth]{images/logo-uet.jpg}
+\end{figure}
+
+{\fsize{14}
+\textbf{Tran Anh Duong} \\
+}
+\vspace{2cm}
+{\fsize{18pt}
+\textbf{A PROPOSED TRUST GOVERNANCE FRAMEWORK AND DIGITAL IDENTITY ARCHITECTURE\\
+FOR STUDENT DIGITAL IDENTITY AND DIGITAL CREDENTIAL AT VNU}\\
+}
+\vspace{3cm}
+
+{\fsize{14pt}
+\textbf{Major: Computer Science}\\
+}
+
+\vfill
+{\fsize{12}
+\textbf{HA NOI - 2026}
+}
+\end{center}
+\end{titlepage}

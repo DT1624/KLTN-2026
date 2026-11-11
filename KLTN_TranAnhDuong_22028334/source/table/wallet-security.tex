@@ -1,0 +1,61 @@
+\begin{longtable}{|p{3.1cm}|p{10.6cm}|}
+\caption{Mô hình bảo vệ khóa của ví không lưu ký}
+\label{tab:wallet-security} \\
+
+\hline
+\textbf{Lớp bảo vệ} & \textbf{Cách thực hiện} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Lớp bảo vệ} & \textbf{Cách thực hiện} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Sinh khóa
+& Cặp khóa Ed25519 sinh ngay trong trình duyệt bằng nguồn ngẫu nhiên mật mã của nền tảng \\
+\hline
+
+Lưu trữ
+& Chỉ lưu \textbf{bản mã} trong cơ sở dữ liệu cục bộ của chính thiết bị đó; khóa riêng dạng rõ không bao giờ được ghi xuống \\
+\hline
+
+Mã hóa
+& AES-256-GCM; khóa mã hóa dẫn xuất bằng PBKDF2-HMAC-SHA256 với 600.000 vòng lặp theo khuyến nghị OWASP \cite{OWASP_PasswordStorage}, muối 16 byte riêng cho mỗi ví \\
+\hline
+
+Toàn vẹn
+& Chế độ GCM có xác thực: sửa một byte của bản mã bị phát hiện ngay khi giải mã, thay vì cho ra một khóa sai một cách âm thầm \\
+\hline
+
+Thời gian tồn tại trong bộ nhớ
+& Khóa riêng dạng rõ chỉ tồn tại khi ví đang mở; ví tự khóa sau 15 phút không thao tác \\
+\hline
+
+Đăng nhập
+& Thách thức -- đáp ứng: dịch vụ gửi một số dùng một lần, trình duyệt ký, dịch vụ kiểm bằng khóa công khai đã ghi danh. \textbf{Không mật khẩu nào truyền qua mạng} \\
+\hline
+
+Phiên làm việc
+& Thẻ phiên lưu trong bộ lưu trữ theo phiên của trình duyệt, mất khi đóng thẻ \\
+\hline
+
+Sao lưu
+& Tệp kho khóa xuất ra \textbf{vẫn ở dạng đã mã hóa}, an toàn để cất giữ ngoài thiết bị \\
+\hline
+
+Khôi phục trên thiết bị khác
+& Cụm 12 từ ghi nhớ theo BIP-39, dẫn xuất theo SLIP-0010 cho họ khóa Ed25519 \\
+\hline
+
+Dữ liệu dịch vụ lưu
+& Chỉ bản ghi công khai: địa chỉ, khóa công khai, định danh, vai trò, nhãn. Không giá trị băm mật khẩu, không khóa riêng, không cụm từ khôi phục \\
+\hline
+
+\end{longtable}

@@ -1,0 +1,17 @@
+\begin{longtable}{|c|p{2.6cm}|p{2.3cm}|p{4.5cm}|p{3.4cm}|}
+\caption{Bảy kịch bản sử dụng bao phủ vòng đời văn bằng}
+\label{tab:v2-scenarios} \\
+\hline
+\textbf{KB} & \textbf{Kịch bản} & \textbf{Người ký} & \textbf{Hàm hợp đồng và kiểm tra chính} & \textbf{Kết quả mong đợi} \\ \hline
+\endfirsthead
+\hline
+\textbf{KB} & \textbf{Kịch bản} & \textbf{Người ký} & \textbf{Hàm hợp đồng và kiểm tra chính} & \textbf{Kết quả mong đợi} \\ \hline
+\endhead
+1 & Đăng ký định danh & Chủ thể & \texttt{register\_did}; định danh duy nhất, CID đúng độ dài, băm khớp nội dung & DID phân giải được, kiểm toàn vẹn đạt \\ \hline
+2 & Phê duyệt bên phát hành & Gốc hoặc quản trị viên & \texttt{approve\_issuer}; bên được duyệt có định danh hoạt động; bit uỷ quyền chỉ gốc cấp & Bản ghi thẩm quyền có phạm vi, thời hạn \\ \hline
+3 & Cấp phát chứng thực & Bên phát hành & \texttt{issue\_vc}; thẩm quyền còn hiệu lực, loại trong phạm vi, hai định danh hoạt động & Số hiệu đọc từ \texttt{VCIssuedEvent} \\ \hline
+4 & Trình bày và xác minh & Chủ thể ký VP & Bảy bước ở Mục \ref{sec:xac-minh} & Hợp lệ, báo cáo từng bước \\ \hline
+5 & Thu hồi thẩm quyền & Gốc hoặc quản trị viên & Đổi trạng thái bản ghi thẩm quyền & Chứng thực của đơn vị trượt bước 7 \\ \hline
+6 & Thu hồi chứng thực & Bên đã cấp & \texttt{revoke\_vc}; chỉ cần quyền sở hữu & Chứng thực trượt bước 5, kể cả khi đơn vị đã hết hạn uỷ quyền \\ \hline
+7 & Xác minh thất bại & --- & Sửa nội dung, đổi người trình bày, thu hồi & Báo đúng bước hỏng và đúng nguyên nhân \\ \hline
+\end{longtable}

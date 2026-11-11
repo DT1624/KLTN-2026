@@ -1,0 +1,151 @@
+% Chương 4: Hiện thực hoá hệ thống (bản rút gọn)
+\chapter{HIỆN THỰC HOÁ HỆ THỐNG}
+\label{chap:hien-thuc}
+
+Chương này mô tả cách kiến trúc ở Chương \ref{chap:kien-truc} được hiện thực thành một hệ thống chạy được, gọi là VNU-Trust. Trọng tâm là những quyết định kỹ thuật có ảnh hưởng tới tính chất an toàn hoặc tới cách đọc kết quả ở Chương \ref{chap:danh-gia}, không phải mô tả đầy đủ mã nguồn. Hệ thống mô phỏng mô hình liên trường của ĐHQGHN; những gì nằm ngoài phạm vi gồm tích hợp hệ thống quản lý đào tạo thật, liên hợp nhiều miền quản trị, mô-đun bảo mật phần cứng cho khoá của cơ quan quản trị và triển khai trên mạng chính.
+
+\section{Môi trường và lựa chọn nền tảng}
+\label{sec:moi-truong}
+
+\input{source/v2/table/system-environment}
+
+Bảng \ref{tab:v2-env} có hai điểm khác một triển khai thông thường. Tầng chỉ mục được viết \emph{hai lần}, bằng TypeScript và bằng Go, trên cùng một hợp đồng giao diện và cùng một lược đồ cơ sở dữ liệu (Mục \ref{sec:hai-cai-dat}). Giao diện \emph{không} dùng bộ công cụ phát triển chính thức của nền tảng chuỗi mà tự ký và gửi giao dịch bằng các thư viện mật mã độc lập (Mục \ref{sec:vi}).
+
+Hệ thống được triển khai trên mạng thử nghiệm công khai Movement, dùng máy ảo Move \cite{Movement2024}. Có bốn lý do. Mô hình hướng tài nguyên của Move \cite{Blackshear2019Move} loại bỏ ở tầng ngôn ngữ việc bản ghi thẩm quyền bị nhân bản hay huỷ ngoài ý muốn. Cơ chế \texttt{friend} cho phép mô-đun thẩm quyền gọi một số hàm nội bộ của mô-đun định danh mà không công khai chúng. Thời gian xác nhận dưới một giây nhờ Block-STM \cite{Gelashvili2023}. Và chỉ trên mạng công khai mới kiểm chứng được yêu cầu N1, tra cứu thẩm quyền không cần tài khoản. Lựa chọn này không mang tính khuyến nghị cho sản xuất: cách giải thích hiện hành của cơ quan bảo vệ dữ liệu nghiêng về chuỗi cấp phép vì trên chuỗi công khai không xác định được ai là bên kiểm soát dữ liệu \cite{EDPB2025}. Đây là lập luận về trách nhiệm pháp lý và nó mạnh hơn lập luận về chi phí. Kiến trúc phân lớp cho phép chuyển sang một chuỗi liên hợp như NDAChain \cite{NDAChain2025} mà không thiết kế lại khung quản trị.
+
+Ba thành phần cùng cần địa chỉ gói hợp đồng và thông số chuỗi: hai cài đặt tầng chỉ mục và giao diện. Ban đầu mỗi thành phần khai riêng trong tệp cấu hình của mình, và khi triển khai lại hợp đồng mà cập nhật sót một tệp, hai cài đặt nói chuyện với hai gói khác nhau mà không thành phần nào báo lỗi. Hiện toàn bộ thông số nằm trong một tệp duy nhất ở gốc dự án, có tập lệnh đồng bộ sang ba nơi, và tập lệnh triển khai tự cập nhật tệp đó sau khi xuất bản. Một giá trị cần nhất quán giữa nhiều thành phần thì phải có đúng một nguồn.
+
+\section{Hợp đồng thông minh}
+\label{sec:hop-dong}
+
+\subsection{Ba mô-đun}
+
+\texttt{did\_registry} quản lý định danh và DID Document: đăng ký, cập nhật kèm phiên bản, đình chỉ, kích hoạt lại, thu hồi và phân giải; mô-đun này không phụ thuộc hai mô-đun còn lại. \texttt{authority} quản lý chuỗi thẩm quyền: gốc, quản trị viên, bên phát hành, chuyển quyền gốc hai bước; nó phụ thuộc \texttt{did\_registry} vì một thực thể phải có định danh đang hoạt động mới được cấp thẩm quyền. \texttt{vc\_registry} quản lý bản ghi neo và trạng thái chứng thực; trước khi ghi, nó kiểm thẩm quyền qua \texttt{authority} và trạng thái định danh của cả hai bên qua \texttt{did\_registry}. Quan hệ phụ thuộc là một chiều, đúng nguyên tắc phân lớp.
+
+Trong hàm cấp phát, định danh của bên phát hành \emph{không} lấy từ tham số mà được suy ra từ địa chỉ người ký giao dịch. Nếu lấy từ tham số, một bên phát hành hợp lệ có thể khai định danh của trường khác và tạo ra chứng thực mang tên trường đó, mà mọi phép kiểm chữ ký vẫn đạt.
+
+Bản ghi thẩm quyền, thành phần trung tâm của khung quản trị, có cấu trúc như sau:
+
+\lstinputlisting[language=Move, caption={Cấu trúc bản ghi thẩm quyền trong mô-đun \texttt{authority}}]{source/code/issuer-record.move}
+
+Trường \texttt{vc\_type\_mask} là mặt nạ phạm vi, \texttt{expires\_at} là thời hạn uỷ quyền, hai trường \texttt{delegation\_vc\_*} trỏ tới chứng thực uỷ quyền, còn \texttt{version} hiện thực cơ chế cấp lại mà vẫn giữ dấu vết. Bản ghi định danh có thêm một trường lưu \emph{ai} đã đặt trạng thái đình chỉ. Hệ thống duy trì hai nhóm bộ đếm: tổng số đã từng cấp, chỉ tăng; và số đang hiệu lực, giảm khi thu hồi hay đình chỉ. Nếu chỉ có nhóm đầu, con số ``số văn bằng'' trên giao diện sẽ tính cả văn bằng đã bị thu hồi.
+
+Hợp đồng định nghĩa mã lỗi riêng cho từng loại vi phạm, chia theo ba nhóm ứng với ba mô-đun. Việc này có giá trị trực tiếp cho kiểm thử: một phép kiểm trường hợp vi phạm chỉ có giá trị khi nó thất bại \emph{đúng vì nguyên nhân dự kiến}. Với một mã lỗi chung, không phân biệt được ``phép kiểm thẩm quyền đã chặn'' với ``một phép kiểm định dạng nào đó đã chặn trước''. Trường hợp thứ hai đã thật sự xảy ra: phép kiểm ``mã giao dịch bịa bị từ chối'' cho kết quả đạt, nhưng thực ra là do CID sai định dạng bị chặn trước đó, và bước xác minh giao dịch chưa từng được chạy tới.
+
+\subsection{Mẫu dữ liệu}
+
+Phương thức \texttt{did:vnu} được hiện thực đúng như đặc tả ở Mục \ref{sec:mo-hinh-du-lieu}. Dưới đây là DID Document của một bên phát hành, đúng cấu trúc mà giao diện sinh ra khi đăng ký:
+
+\lstinputlisting[language=json, caption={DID Document của một bên phát hành}]{source/json/issuer-uet.json}
+
+Khoá công khai được biểu diễn ở dạng thập lục phân thay vì đa cơ số, để cùng một giá trị dùng được trực tiếp cho kiểm chữ ký chứng thực và kiểm chữ ký giao dịch. Hai trường \texttt{authentication} và \texttt{assertionMethod} được khai riêng dù trong bản thử nghiệm cùng trỏ tới một khoá; khi tách khoá đăng nhập khỏi khoá cấp phát, điều cần làm trong triển khai thật, cấu trúc tài liệu không phải thay đổi.
+
+Chứng thực văn bằng do bên phát hành sinh ra có dạng:
+
+\lstinputlisting[language=json, caption={Chứng thực văn bằng như giao diện sinh ra}]{source/v2/json/vc.json}
+
+Trường \texttt{expirationDate} chỉ xuất hiện khi văn bằng có thời hạn, và giá trị đó cũng được truyền vào tham số thời hạn của \texttt{issue\_vc}. Có bốn điểm cần nêu rõ, gồm cả những điểm chưa tuân thủ đầy đủ chuẩn. Một là các thuộc tính riêng nằm trong không gian tên \texttt{vnu} khai qua \texttt{@context}, nên một bộ xử lý JSON-LD không nhầm chúng với thuộc tính của chuẩn. Hai là bản thử nghiệm dùng ngữ cảnh của phiên bản 1.1 thay vì 2.0 \cite{W3C_VCDM2025}. Ba là chữ ký được lưu tách rời trong chỉ mục và trong bản trình bày chứ không nhúng trong đối tượng: giá trị băm neo trên chuỗi được tính trên chính đối tượng này, nên nhúng chữ ký vào sẽ phải định nghĩa thêm quy tắc loại trừ trường bằng chứng khi băm. Bốn là không có trường \texttt{credentialStatus} theo danh sách bit; bên xác minh dùng giá trị băm của \texttt{id} làm khoá tra cứu trạng thái trên chuỗi, và kết quả trả về gồm cả trạng thái lẫn giá trị băm nội dung, nên một lần truy vấn phục vụ được cả bước 5 và bước 6. Định danh \texttt{id} là UUID sinh ngẫu nhiên trong trình duyệt; thí nghiệm B ở Chương \ref{chap:danh-gia} cho thấy chính trường này là thứ đang đứng giữa giá trị băm trên chuỗi và một cuộc tấn công từ điển.
+
+\subsection{Rà soát an toàn và xuất bản lại}
+
+Hợp đồng đã qua một đợt rà soát có hệ thống, trong đó mỗi vấn đề được chứng minh bằng một phép kiểm thể hiện hệ quả trước khi sửa. Bảng \ref{tab:v2-audit} tóm tắt mười một vấn đề. Ba trong số đó (V1, V5, V8) không phải lỗi lập trình mà là lỗi mô hình, và chúng đã trở thành ba nguyên tắc thiết kế ở Chương \ref{chap:kien-truc}. Vấn đề V9 thuộc loại khó phát hiện nhất: tham số thời hạn bị ghi cứng bằng không nên toàn bộ nhánh xử lý hết hạn là mã chết, trong khi mã nguồn trông như đã xử lý việc hết hạn. Sau khi sửa, bộ kiểm thử được viết lại theo tiêu chí khác: trước đó mỗi phép kiểm đạt nghĩa là lỗi \emph{có thật}, sau đó nghĩa là lỗi \emph{đã sửa và không quay lại}.
+
+\input{source/v2/table/contract-audit}
+
+Ở bản báo cáo trước, các bản sửa này chỉ tồn tại trong mã nguồn vì gói trên chuỗi vẫn là bản cũ: hàm khởi tạo chỉ chạy một lần, nên muốn đặt lại quản trị viên gốc thì phải xuất bản ở một địa chỉ mới và bỏ lại dữ liệu ở địa chỉ cũ. Gói đã được xuất bản lại tại địa chỉ \texttt{0x0ede7f6b\ldots08e3}, trong đó người xuất bản chính là quản trị viên gốc nhờ bản sửa V1. Bộ đối chiếu tầng chuỗi (Mục \ref{sec:dg-chuc-nang}) xác nhận giao diện chương trình trên chuỗi đã khớp mã nguồn: hàm cấp phát nhận đủ bảy tham số kể cả thời hạn, và hai hàm \texttt{propose\_root}, \texttt{accept\_root} đã tồn tại.
+
+\section{Tầng chỉ mục với hai cài đặt độc lập}
+\label{sec:hai-cai-dat}
+
+\subsection{Mục đích của cài đặt thứ hai}
+
+Hai cài đặt dùng chung cơ sở dữ liệu và khoá ký phiên, nên phiên đăng nhập do bên này cấp dùng được ở bên kia, và giao diện đổi cài đặt ngay lúc chạy. Mục đích không phải dự phòng mà là biến đặc tả giao diện từ một tài liệu thành một tính chất kiểm chứng được. Khi chỉ có một cài đặt, không phân biệt được một hành vi là quyết định thiết kế hay hệ quả tình cờ của thư viện. Bộ đối chiếu giữa hai cài đặt đã phát hiện ba loại lệch mà kiểm thử thông thường không bắt được. Thứ nhất, thư viện kiểm lược đồ bên TypeScript mặc định \emph{bỏ qua} trường lạ trong thân yêu cầu còn bộ giải mã JSON của Go \emph{từ chối}; cùng một yêu cầu cho hai mã trạng thái khác nhau. Hai bên được thống nhất theo hướng nghiêm ngặt, vì gõ nhầm tên trường thời hạn phải báo lỗi ngay chứ không được âm thầm cấp một văn bằng vô thời hạn. Thứ hai, hai bên kiểm đầu vào theo thứ tự khác nhau nên cùng một yêu cầu sai cho hai mã lỗi khác nhau; hiện cả hai theo thứ tự rẻ trước, đắt sau. Thứ tự kiểm tra đầu vào cũng là một phần của hợp đồng giao diện. Thứ ba, hai tuyến chỉ tồn tại ở bản TypeScript mà bộ đối chiếu vẫn báo đạt trong thời gian dài, vì không phép đối chiếu nào chạm tới chúng.
+
+Ba bất biến phải giống nhau từng byte ở hai cài đặt và ở giao diện, mỗi bất biến có bộ kiểm riêng: chuỗi được ký khi đăng nhập theo cơ chế thách thức -- đáp ứng (lệch một ký tự là chữ ký không bao giờ khớp); phép tuần tự hoá tất định; và hàm băm SHA3-256 trả về tiền tố \texttt{0x} cùng 64 ký tự thập lục phân. Ba nơi dùng ba thư viện khác nhau và đã được đối chiếu cho cùng kết quả, kể cả với ký tự tiếng Việt và cấu trúc lồng sâu.
+
+\subsection{Xác minh giao dịch trước khi ghi chỉ mục}
+
+Theo nguyên tắc ``chỉ mục không phải nguồn sự thật'', mọi bản ghi có tham chiếu trên chuỗi đều mang một mã giao dịch, và tầng dịch vụ kiểm bốn điều với nút đầy đủ trước khi ghi: giao dịch tồn tại, thành công, gọi đúng hàm mong đợi của tuyến, và người gửi khớp tài khoản đang thực hiện yêu cầu. Phép kiểm thứ ba khiến tên hàm hợp đồng xuất hiện ở ba nơi: mã Move, hai cài đặt tầng chỉ mục và tầng chuỗi của giao diện. Sai lệch giữa các nơi này tạo ra kiểu hỏng khó chẩn đoán nhất: giao dịch lên chuỗi thành công nhưng dịch vụ từ chối ghi chỉ mục. Một bộ kiểm đọc trực tiếp mã Move, rút tập hàm công khai và đối chiếu với tên từng thành phần đang dùng. Khi được mở rộng sang nơi gọi thứ ba, bộ kiểm này phát hiện ngay giao diện gọi thao tác đình chỉ chứng thực bằng một tên khác với tên tầng dịch vụ dùng để xác minh.
+
+\subsection{Chế độ không phụ thuộc chuỗi}
+
+Hệ thống có cờ \texttt{VERIFY\_ONCHAIN} để chạy và kiểm thử khi chưa có chuỗi. Phiên bản đầu của cờ chỉ bỏ qua bước xác minh giao dịch mà không bỏ qua việc kiểm quyền trên chuỗi, nên hệ thống vẫn không chạy được khi thiếu chuỗi. Hiện cờ áp dụng nhất quán: khi tắt, cả hai cài đặt bỏ qua xác minh giao dịch \emph{và} trả lời câu hỏi về quyền, định danh, trạng thái bằng chỉ mục cơ sở dữ liệu. Chế độ này không trả lời ``chấp nhận'' vô điều kiện: người học vẫn bị chặn khỏi tuyến của bên phát hành. Nếu không, mọi bộ kiểm thử chạy ở chế độ này chỉ chứng minh rằng hệ thống không báo lỗi. Bốn rào chắn đi kèm: khởi động ở môi trường sản xuất với cờ tắt thì tiến trình thoát ngay; tuyến kiểm tra trạng thái trả giá trị cờ để giao diện hiện dải cảnh báo; mỗi phản hồi báo đúng nguồn dữ liệu là chỉ mục chứ không khai là chuỗi; và một bộ kiểm riêng chứng minh chế độ nghiêm ngặt vẫn chặn mã giao dịch bịa.
+
+Cần lưu ý rằng ở chế độ này, câu hỏi ``trạng thái của chứng thực số hiệu $n$'' được trả lời bằng một truy vấn trên cột \texttt{on\_chain\_vc\_id}, cột không có chỉ mục trong lược đồ. Với dữ liệu thử nghiệm vài trăm bản ghi, điều này không gây ra khác biệt nào đo được; Mục \ref{sec:tn-scale} cho thấy hệ quả khi dữ liệu tăng hai bậc.
+
+Cả hai cài đặt ghi nhật ký kiểm toán với cùng bộ tên hành động. Bảng nhật ký từng nằm sẵn trong lược đồ từ đầu mà \emph{không cài đặt nào ghi vào}, nên tuyến đọc nhật ký luôn trả về rỗng, và không bộ kiểm thử nào phát hiện vì chúng chỉ kiểm định dạng phản hồi. Một bảng có trong lược đồ không có nghĩa là có ai ghi vào nó.
+
+\section{Ví định danh và tầng chuỗi phía máy khách}
+\label{sec:vi}
+
+\subsection{Bảo vệ khoá và khôi phục}
+
+Khoá riêng Ed25519 được sinh trong trình duyệt, mã hoá bằng AES-256-GCM với khoá dẫn xuất qua PBKDF2-SHA256 600.000 vòng và muối 16 byte riêng cho mỗi ví; chỉ bản mã nằm trong IndexedDB (Hình \ref{fig:v2-wallet}). Khoá dạng rõ chỉ tồn tại trong bộ nhớ phiên và ví tự khoá sau 15 phút. Đăng nhập là ký một số dùng một lần, nên không mật khẩu nào đi qua mạng. Tầng dịch vụ chỉ giữ bản ghi công khai của mỗi thực thể (địa chỉ, khoá công khai, định danh, vai trò): đó là một cuốn danh bạ, không phải kho tài khoản. Biết địa chỉ của một người mà không có khoá riêng thì không đăng nhập được. Đánh đổi đã chấp nhận và được cảnh báo rõ trên giao diện: mất mật khẩu là mất ví.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.42\textwidth]{images/khoi-tao-vi.png}
+    \caption{Các bước sinh khoá và lưu trữ khi khởi tạo ví}
+    \label{fig:v2-wallet}
+\end{figure}
+
+Bảng \ref{tab:v2-wallet} tóm tắt các lớp bảo vệ. Hình \ref{fig:v2-unlock} là trình tự khi người dùng quay lại mở ví để đăng nhập hoặc dựng bản trình bày: mật khẩu chỉ dùng để dẫn xuất khoá giải mã ngay trong trình duyệt, khoá riêng được giải mã vào bộ nhớ phiên, và tầng dịch vụ chỉ nhận chữ ký.
+
+\input{source/v2/table/wallet-security}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{images/mo-khoa-su-dung.png}
+    \caption{Sơ đồ tuần tự mở khoá ví và dựng bản trình bày}
+    \label{fig:v2-unlock}
+\end{figure}
+
+Để dùng trên thiết bị khác, khoá được dẫn xuất từ mười hai từ BIP-39 qua SLIP-0010 theo đường dẫn \texttt{m/44'/637'/0'/0'/0'}, trùng với đường dẫn của các ví phổ thông trong hệ sinh thái Move. Kết quả dẫn xuất đã được đối chiếu với bộ công cụ chính thức trên năm cụm từ ngẫu nhiên, khớp tuyệt đối ở cả khoá riêng, khoá công khai và địa chỉ. Giá trị kỳ vọng được lấy từ một nguồn độc lập chứ không do người viết kiểm thử tự đặt ra; nếu chỉ so với một hằng số tự nghĩ, phép kiểm sẽ đạt cả khi phép dẫn xuất sai.
+
+\subsection{Tự ký và gửi giao dịch}
+
+Phiên bản đầu của giao diện có ô ``Mã giao dịch'' ở mọi biểu mẫu: người dùng phải mở một ví ngoài, tự gọi hàm hợp đồng, chép mã giao dịch rồi dán lại. Thiết kế này sai ở hai mức. Về trải nghiệm, nó đẩy phần khó nhất sang người dùng trong khi trình duyệt đã có sẵn khoá. Về dữ liệu, giao diện không tự gửi giao dịch nên cũng không đọc được phản hồi. Số hiệu chứng thực do hợp đồng cấp nằm trong sự kiện \texttt{VCIssuedEvent} mà giao dịch phát ra, và vì không đọc được sự kiện đó, trường số hiệu trên chuỗi bị ghi cứng bằng không. Một trường bịa nằm im trong cơ sở dữ liệu, trông như dữ liệu thật.
+
+Cách hiển nhiên là nhúng bộ công cụ của nền tảng, nhưng điều đó đưa gói giao diện lên 4,98\,MB. Hướng đã chọn là nhờ chính nút đầy đủ tuần tự hoá giao dịch:
+
+\begin{lstlisting}
+POST /v1/transactions/encode_submission   <- giao dich chua ky
+   -> chuoi thap luc phan cua thong diep can ky
+ed25519.sign(thong diep, khoa rieng trong bo nho)
+POST /v1/transactions                     <- giao dich + chu ky
+GET  /v1/transactions/by_hash/{hash}      lap cho den khi xac nhan
+\end{lstlisting}
+
+Mã JavaScript của giao diện giảm xuống khoảng 410\,KB (khoảng 134\,KB sau nén gzip), đổi lại thêm một vòng gọi mạng mỗi giao dịch. Đường ký được kiểm chứng trên chuỗi thật bằng tuyến mô phỏng giao dịch, tuyến chạy đủ các bước giải mã tham số, tìm hàm, vào thân hàm và tính gas nhưng không ghi gì lên chuỗi. Quá trình này làm lộ ba chi tiết không có trong tài liệu: tham số kiểu dãy byte phải truyền dạng chuỗi thập lục phân chứ không phải mảng số; nút đầy đủ từ chối mô phỏng một giao dịch có chữ ký hợp lệ, nên phải gửi chữ ký toàn số không kèm khoá công khai thật; và khoá xác thực trong thông tin tài khoản là giá trị băm của khoá công khai chứ không phải bản thân khoá.
+
+\section{Giao diện theo vai trò}
+\label{sec:giao-dien}
+
+Mỗi màn hình chỉ hiện những thao tác mà vai trò đó thật sự được phép làm trên chuỗi. Điều này không thay việc kiểm quyền, vì rào chắn thật vẫn ở hợp đồng, nhưng tránh để người dùng làm một thao tác chắc chắn thất bại. Các quy tắc được lấy thẳng từ Bảng \ref{tab:v2-role}: ô cấp bit uỷ quyền bị khoá nếu người dùng không phải gốc; thao tác cấp quyền quản trị viên và đề cử gốc chỉ có ở màn hình quản trị gốc; thẻ ký nhận quyền gốc nằm ở trang cá nhân vì lúc ký người đó chưa phải gốc; nút kích hoạt lại chứng thực chỉ có ở màn hình quản trị viên.
+
+Mỗi thao tác ghi hiển thị năm bước: chuẩn bị dữ liệu, bảo đảm có gas, ký, chờ chuỗi xác nhận, ghi chỉ mục. Mã giao dịch hiện ra như \emph{kết quả}, kèm liên kết tới trình xem giao dịch. Việc tách bước có giá trị chẩn đoán: ba nguyên nhân thất bại thường gặp (thiếu gas, bị hợp đồng từ chối vì thiếu quyền, chuỗi xác nhận chậm) cần ba cách xử lý khác nhau. Thẻ gas cho phép mọi vai trò xin token thử nghiệm cho chính tài khoản của mình, vì đăng ký định danh cũng tốn gas. Hệ thống không có chức năng chuyển token nào.
+
+\section{Các kịch bản sử dụng}
+\label{sec:kich-ban}
+
+Bảy kịch bản ở Bảng \ref{tab:v2-scenarios} bao phủ vòng đời văn bằng cùng các luồng quản trị, và là căn cứ cho bộ kiểm thử luồng nghiệp vụ ở Chương \ref{chap:danh-gia}. Mỗi kịch bản ghi rõ ai là người ký, vì trong kiến trúc này người ký giao dịch chính là căn cứ phân quyền: hợp đồng không tin bất kỳ tham số nào khai ``tôi là ai''.
+
+\input{source/v2/table/scenarios}
+
+Hai kịch bản đầu đáng được mô tả kỹ hơn vì chúng chứa những chi tiết dễ làm sai. Ở kịch bản đăng ký định danh (Hình \ref{fig:v2-seq-did}), thứ tự các bước có ý nghĩa: DID Document phải được ghim lên IPFS \emph{trước} để có CID, rồi giá trị băm được tính trên đúng bản tuần tự hoá tất định của tài liệu, rồi mới ký giao dịch. Nếu băm trên một bản tuần tự hoá khác, chẳng hạn bản có khoảng trắng do thư viện in đẹp chèn vào, bước kiểm toàn vẹn khi phân giải sẽ hỏng dù dữ liệu nguyên vẹn. Tầng dịch vụ tính lại giá trị băm từ nội dung trước khi ghi chỉ mục chứ không tin giá trị máy khách gửi lên.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/seq_dang_ky_did_client.png}
+    \caption{Sơ đồ tuần tự đăng ký định danh phía máy khách}
+    \label{fig:v2-seq-did}
+\end{figure}
+
+Ở kịch bản cấp phát (Hình \ref{fig:v2-seq-issue}), số hiệu chứng thực trên chuỗi được đọc từ sự kiện \texttt{VCIssuedEvent} trong phản hồi của giao dịch rồi mới gửi cho tầng dịch vụ, thay vì để trống hay tự đánh số. Số hiệu này là thứ quản trị viên cần khi ký thao tác thu hồi; nếu phải gõ tay, gõ nhầm một chữ số là thu hồi nhầm văn bằng của người khác. Vì vậy tầng dịch vụ có tuyến trả về số hiệu trên chuỗi theo định danh chứng thực, và màn hình quản trị đọc số hiệu qua tuyến này.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/seq_cap_phat_vc_authorized.png}
+    \caption{Sơ đồ tuần tự cấp phát chứng thực}
+    \label{fig:v2-seq-issue}
+\end{figure}

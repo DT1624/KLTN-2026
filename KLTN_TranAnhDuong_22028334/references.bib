@@ -1,0 +1,861 @@
+%% ============================================================
+%% VNU-Trust — Tài liệu tham khảo
+%%
+%% Tổ chức theo nhóm: (A) đặc tả và tiêu chuẩn kỹ thuật,
+%% (B) tiêu chuẩn mật mã và hướng dẫn an toàn, (C) công trình
+%% học thuật, (D) hệ thống và hạ tầng triển khai, (E) văn bản
+%% pháp quy và báo cáo ngành của Việt Nam.
+%% ============================================================
+
+
+%% ------------------------------------------------------------
+%% (A) Đặc tả và tiêu chuẩn kỹ thuật
+%% ------------------------------------------------------------
+
+@misc{W3C_DIDCore2022,
+  author       = {Sporny, Manu and Longley, Dave and Sabadello, Markus and
+                  Reed, Drummond and Steele, Orie and Allen, Christopher},
+  title        = {Decentralized Identifiers (DIDs) v1.0: Core architecture,
+                  data model, and representations},
+  howpublished = {W3C Recommendation},
+  month        = jul,
+  year         = {2022},
+  note         = {\url{https://www.w3.org/TR/did-core/}}
+}
+
+@misc{W3C_DID11_2026,
+  author       = {Sporny, Manu and Guy, Amy and Sabadello, Markus and
+                  Reed, Drummond and Steele, Orie},
+  title        = {Decentralized Identifiers (DIDs) v1.1},
+  howpublished = {W3C Candidate Recommendation Snapshot},
+  month        = mar,
+  year         = {2026},
+  note         = {\url{https://www.w3.org/TR/did-1.1/}}
+}
+
+@misc{W3C_DIDResolution,
+  author       = {Sabadello, Markus and Jordan, Dmitri and
+                  Longley, Dave and Sporny, Manu},
+  title        = {Decentralized Identifier Resolution (DID Resolution) v0.3},
+  howpublished = {W3C Working Draft},
+  year         = {2024},
+  note         = {\url{https://www.w3.org/TR/did-resolution/}}
+}
+
+@misc{W3C_VCDM2025,
+  author       = {Sporny, Manu and Thibodeau Jr., Ted and Herman, Ivan and
+                  Cohen, Gabe and Jones, Michael B.},
+  title        = {Verifiable Credentials Data Model v2.0},
+  howpublished = {W3C Recommendation},
+  month        = may,
+  year         = {2025},
+  note         = {\url{https://www.w3.org/TR/vc-data-model-2.0/}}
+}
+
+@misc{W3C_VCDataIntegrity2025,
+  author       = {Longley, Dave and Sporny, Manu and Steele, Orie},
+  title        = {Verifiable Credential Data Integrity v1.0: Securing the
+                  integrity of verifiable credential graphs},
+  howpublished = {W3C Recommendation},
+  month        = may,
+  year         = {2025},
+  note         = {\url{https://www.w3.org/TR/vc-data-integrity/}}
+}
+
+@misc{W3C_VCJOSECOSE2025,
+  author       = {Jones, Michael B. and Steele, Orie and Prorock, Michael},
+  title        = {Securing Verifiable Credentials using JOSE and COSE},
+  howpublished = {W3C Recommendation},
+  month        = may,
+  year         = {2025},
+  note         = {\url{https://www.w3.org/TR/vc-jose-cose/}}
+}
+
+@misc{W3C_BitstringStatusList2025,
+  author       = {Longley, Dave and Sporny, Manu and Steele, Orie},
+  title        = {Bitstring Status List v1.0: Privacy-preserving status
+                  information for verifiable credentials},
+  howpublished = {W3C Recommendation},
+  month        = may,
+  year         = {2025},
+  note         = {\url{https://www.w3.org/TR/vc-bitstring-status-list/}}
+}
+
+@misc{W3C_JSONLD2020,
+  author       = {Kellogg, Gregg and Champin, Pierre-Antoine and Longley, Dave},
+  title        = {JSON-LD 1.1: A JSON-based Serialization for Linked Data},
+  howpublished = {W3C Recommendation},
+  month        = jul,
+  year         = {2020},
+  note         = {\url{https://www.w3.org/TR/json-ld11/}}
+}
+
+@misc{W3C_RDFC2024,
+  author       = {Longley, Dave and Kellogg, Gregg and Yamamoto, Dan},
+  title        = {RDF Dataset Canonicalization (RDFC-1.0)},
+  howpublished = {W3C Recommendation},
+  month        = may,
+  year         = {2024},
+  note         = {\url{https://www.w3.org/TR/rdf-canon/}}
+}
+
+@misc{W3C_WebCrypto,
+  author       = {Watson, Mark},
+  title        = {Web Cryptography API},
+  howpublished = {W3C Recommendation},
+  year         = {2017},
+  note         = {\url{https://www.w3.org/TR/WebCryptoAPI/}}
+}
+
+@misc{W3C_IndexedDB,
+  author       = {Bell, Joshua and Alabbas, Ali},
+  title        = {Indexed Database API 3.0},
+  howpublished = {W3C Working Draft},
+  year         = {2024},
+  note         = {\url{https://www.w3.org/TR/IndexedDB/}}
+}
+
+@misc{DIDWeb2023,
+  author       = {Sporny, Manu and Longley, Dave and Sabadello, Markus and
+                  Steele, Orie},
+  title        = {{did:web} Method Specification},
+  howpublished = {W3C Credentials Community Group Report},
+  year         = {2023},
+  note         = {\url{https://w3c-ccg.github.io/did-method-web/}}
+}
+
+@misc{DIDKey2022,
+  author       = {Longley, Dave and Sporny, Manu and Steele, Orie},
+  title        = {The {did:key} Method v0.7: A DID Method for Static
+                  Cryptographic Keys},
+  howpublished = {W3C Credentials Community Group Report},
+  year         = {2022},
+  note         = {\url{https://w3c-ccg.github.io/did-key-spec/}}
+}
+
+@misc{DIDEthr2023,
+  author       = {Lundkvist, Christian and Heck, Rouven and Torstensson, Joel and
+                  Mitton, Zac and Sena, Michael},
+  title        = {{did:ethr} Method Specification},
+  howpublished = {Decentralized Identity Foundation Specification},
+  year         = {2023},
+  note         = {\url{https://github.com/decentralized-identity/ethr-did-resolver}}
+}
+
+@misc{DIDION2021,
+  author       = {{Decentralized Identity Foundation}},
+  title        = {Sidetree Protocol Specification and the {ION} Network},
+  howpublished = {DIF Ratified Specification},
+  year         = {2021},
+  note         = {\url{https://identity.foundation/sidetree/spec/}}
+}
+
+@misc{RFC9901,
+  author       = {Fett, Daniel and Yasuda, Kristina and Campbell, Brian},
+  title        = {{RFC 9901}: Selective Disclosure for JSON Web Tokens (SD-JWT)},
+  howpublished = {IETF Proposed Standard},
+  month        = nov,
+  year         = {2025},
+  note         = {\url{https://www.rfc-editor.org/rfc/rfc9901}}
+}
+
+@misc{SDJWTVC2025,
+  author       = {Terbu, Oliver and Fett, Daniel and Campbell, Brian},
+  title        = {SD-JWT-based Verifiable Credentials (SD-JWT VC)},
+  howpublished = {IETF OAuth Working Group Internet-Draft},
+  year         = {2025},
+  note         = {\url{https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/}}
+}
+
+@misc{OpenID4VP2025,
+  author       = {Terbu, Oliver and Lodderstedt, Torsten and Yasuda, Kristina and
+                  Looker, Tobias},
+  title        = {OpenID for Verifiable Presentations},
+  howpublished = {OpenID Foundation Specification},
+  year         = {2025},
+  note         = {\url{https://openid.net/specs/openid-4-verifiable-presentations-1_0.html}}
+}
+
+@misc{DIDComm2021,
+  author       = {Curran, Sam and Hardman, Daniel and Lodder, Mike and
+                  Aristy, Oskar},
+  title        = {{DIDComm} Messaging v2.0},
+  howpublished = {Decentralized Identity Foundation Specification},
+  year         = {2021},
+  note         = {\url{https://identity.foundation/didcomm-messaging/spec/}}
+}
+
+@misc{OpenBadges2024,
+  author       = {{1EdTech Consortium}},
+  title        = {Open Badges Specification v3.0},
+  howpublished = {1EdTech Final Release},
+  month        = may,
+  year         = {2024},
+  note         = {\url{https://www.imsglobal.org/spec/ob/v3p0/}}
+}
+
+@misc{ToIP_Stack2022,
+  author       = {Davie, Matthew and Gisolfi, Dan and Hardman, Daniel and
+                  Jordan, John and O'Donnell, Darrell and Reed, Drummond},
+  title        = {Evolution of the {ToIP} Stack},
+  howpublished = {Trust over IP Foundation, Technical Architecture
+                  Task Force, v1.0},
+  month        = nov,
+  year         = {2022},
+  note         = {\url{https://trustoverip.org/permalink/Evolution-of-the-ToIP-Stack-V1.0-2022-11-14.pdf}}
+}
+
+@misc{ToIP_TRQP2026,
+  author       = {O'Donnell, Darrell and Kesselman, Andor and Reed, Drummond},
+  title        = {Trust Registry Query Protocol ({TRQP}) Specification v2.0},
+  howpublished = {Trust over IP Foundation, Approved Deliverable},
+  month        = apr,
+  year         = {2026},
+  note         = {\url{https://trustoverip.org/our-work/specifications/}}
+}
+
+@misc{ToIP_GovMetamodel2022,
+  author       = {{Trust over IP Foundation}},
+  title        = {{ToIP} Governance Architecture Specification and
+                  Governance Metamodel},
+  howpublished = {Trust over IP Foundation, Governance Stack Working Group},
+  year         = {2022},
+  note         = {\url{https://trustoverip.org/our-work/specifications/}}
+}
+
+@misc{EBSI_TrustModel,
+  author       = {{European Commission}},
+  title        = {{EBSI} Verifiable Credentials Framework: Issuer Trust
+                  Model v4},
+  howpublished = {European Blockchain Services Infrastructure, Technical
+                  Documentation},
+  year         = {2024},
+  note         = {\url{https://hub.ebsi.eu/vc-framework/trust-model/issuer-trust-model-v4}}
+}
+
+@misc{EDC_ELM,
+  author       = {{European Commission, Directorate-General for Employment,
+                  Social Affairs and Inclusion}},
+  title        = {European Digital Credentials for Learning and the
+                  European Learning Model},
+  howpublished = {Europass Technical Documentation},
+  year         = {2023},
+  note         = {\url{https://europass.europa.eu/en/european-digital-credentials-learning}}
+}
+
+
+%% ------------------------------------------------------------
+%% (B) Tiêu chuẩn mật mã và hướng dẫn an toàn
+%% ------------------------------------------------------------
+
+@misc{RFC8032,
+  author       = {Josefsson, Simon and Liusvaara, Ilari},
+  title        = {{RFC 8032}: Edwards-Curve Digital Signature Algorithm (EdDSA)},
+  howpublished = {IETF Informational},
+  month        = jan,
+  year         = {2017},
+  note         = {\url{https://www.rfc-editor.org/rfc/rfc8032}}
+}
+
+@misc{RFC8785,
+  author       = {Rundgren, Anders and Jordan, Bret and Erdtman, Samuel},
+  title        = {{RFC 8785}: JSON Canonicalization Scheme (JCS)},
+  howpublished = {IETF Informational},
+  month        = jun,
+  year         = {2020},
+  note         = {\url{https://www.rfc-editor.org/rfc/rfc8785}}
+}
+
+@techreport{NIST_FIPS202,
+  author       = {{National Institute of Standards and Technology}},
+  title        = {{FIPS PUB 202}: SHA-3 Standard --- Permutation-Based Hash
+                  and Extendable-Output Functions},
+  institution  = {U.S. Department of Commerce},
+  month        = aug,
+  year         = {2015},
+  doi          = {10.6028/NIST.FIPS.202}
+}
+
+@techreport{NIST_FIPS186_5,
+  author       = {{National Institute of Standards and Technology}},
+  title        = {{FIPS PUB 186-5}: Digital Signature Standard (DSS)},
+  institution  = {U.S. Department of Commerce},
+  month        = feb,
+  year         = {2023},
+  doi          = {10.6028/NIST.FIPS.186-5}
+}
+
+@techreport{NIST_SP800_38D,
+  author       = {Dworkin, Morris J.},
+  title        = {{NIST SP 800-38D}: Recommendation for Block Cipher Modes of
+                  Operation --- Galois/Counter Mode (GCM) and GMAC},
+  institution  = {National Institute of Standards and Technology},
+  month        = nov,
+  year         = {2007},
+  doi          = {10.6028/NIST.SP.800-38D}
+}
+
+@techreport{NIST_SP800_132,
+  author       = {Turan, Meltem S{\"o}nmez and Barker, Elaine and Burr, William
+                  and Chen, Lily},
+  title        = {{NIST SP 800-132}: Recommendation for Password-Based Key
+                  Derivation --- Part 1: Storage Applications},
+  institution  = {National Institute of Standards and Technology},
+  month        = dec,
+  year         = {2010},
+  doi          = {10.6028/NIST.SP.800-132}
+}
+
+@techreport{NIST_SP800_63_3,
+  author       = {Grassi, Paul A. and Garcia, Michael E. and Fenton, James L.},
+  title        = {{NIST SP 800-63-3}: Digital Identity Guidelines},
+  institution  = {National Institute of Standards and Technology},
+  year         = {2017},
+  doi          = {10.6028/NIST.SP.800-63-3}
+}
+
+@misc{OWASP_PasswordStorage,
+  author       = {{OWASP Foundation}},
+  title        = {Password Storage Cheat Sheet},
+  howpublished = {OWASP Cheat Sheet Series},
+  year         = {2024},
+  note         = {\url{https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html}}
+}
+
+@misc{BIP39,
+  author       = {Palatinus, Marek and Rusnak, Pavol and Voisine, Aaron and
+                  Bowe, Sean},
+  title        = {{BIP-39}: Mnemonic Code for Generating Deterministic Keys},
+  howpublished = {Bitcoin Improvement Proposal},
+  year         = {2013},
+  note         = {\url{https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki}}
+}
+
+@misc{SLIP0010,
+  author       = {Rusnak, Pavol},
+  title        = {{SLIP-0010}: Universal Private Key Derivation from Master
+                  Private Key},
+  howpublished = {SatoshiLabs Improvement Proposal},
+  year         = {2016},
+  note         = {\url{https://github.com/satoshilabs/slips/blob/master/slip-0010.md}}
+}
+
+@misc{Looker_BBS2025,
+  author       = {Looker, Tobias and Kalos, Vasilis and Whitehead, Andrew and
+                  Lodder, Mike},
+  title        = {The BBS Signature Scheme},
+  howpublished = {IETF CFRG Internet-Draft},
+  year         = {2025},
+  note         = {\url{https://datatracker.ietf.org/doc/draft-irtf-cfrg-bbs-signatures/}}
+}
+
+
+%% ------------------------------------------------------------
+%% (C) Công trình học thuật
+%% ------------------------------------------------------------
+
+@article{Goldwasser1989,
+  author  = {Goldwasser, Shafi and Micali, Silvio and Rackoff, Charles},
+  title   = {The Knowledge Complexity of Interactive Proof Systems},
+  journal = {SIAM Journal on Computing},
+  volume  = {18},
+  number  = {1},
+  pages   = {186--208},
+  year    = {1989},
+  doi     = {10.1137/0218012}
+}
+
+@article{Hevner2004,
+  author  = {Hevner, Alan R. and March, Salvatore T. and Park, Jinsoo and
+             Ram, Sudha},
+  title   = {Design Science in Information Systems Research},
+  journal = {MIS Quarterly},
+  volume  = {28},
+  number  = {1},
+  pages   = {75--105},
+  year    = {2004},
+  doi     = {10.2307/25148625}
+}
+
+@article{Peffers2007,
+  author  = {Peffers, Ken and Tuunanen, Tuure and Rothenberger, Marcus A. and
+             Chatterjee, Samir},
+  title   = {A Design Science Research Methodology for Information Systems
+             Research},
+  journal = {Journal of Management Information Systems},
+  volume  = {24},
+  number  = {3},
+  pages   = {45--77},
+  year    = {2007},
+  doi     = {10.2753/MIS0742-1222240302}
+}
+
+@article{Muhle2018,
+  author  = {M{\"u}hle, Alexander and Gr{\"u}ner, Andreas and
+             Gayvoronskaya, Tatiana and Meinel, Christoph},
+  title   = {A survey on essential components of a self-sovereign identity},
+  journal = {Computer Science Review},
+  volume  = {30},
+  pages   = {80--86},
+  year    = {2018},
+  doi     = {10.1016/j.cosrev.2018.10.002}
+}
+
+@article{Schardong2022,
+  author  = {Schardong, Frederico and Cust{\'o}dio, Ricardo},
+  title   = {Self-Sovereign Identity: A Systematic Review, Mapping and Taxonomy},
+  journal = {Sensors},
+  volume  = {22},
+  number  = {15},
+  pages   = {5641},
+  year    = {2022},
+  doi     = {10.3390/s22155641}
+}
+
+@article{Sedlmeir2021,
+  author  = {Sedlmeir, Johannes and Smethurst, Reilly and Rieger, Alexander and
+             Fridgen, Gilbert},
+  title   = {Digital Identities and Verifiable Credentials},
+  journal = {Business \& Information Systems Engineering},
+  volume  = {63},
+  number  = {5},
+  pages   = {603--613},
+  year    = {2021},
+  doi     = {10.1007/s12599-021-00722-y}
+}
+
+@article{Turkanovic2018,
+  author  = {Turkanovi{\'c}, Muhamed and H{\"o}lbl, Marko and
+             Ko{\v{s}}i{\v{c}}, Kristjan and Heri{\v{c}}ko, Marjan and
+             Kami{\v{s}}ali{\'c}, Aida},
+  title   = {{EduCTX}: A Blockchain-Based Higher Education Credit Platform},
+  journal = {IEEE Access},
+  volume  = {6},
+  pages   = {5112--5127},
+  year    = {2018},
+  doi     = {10.1109/ACCESS.2018.2789929}
+}
+
+@article{DeAlwis2025,
+  author  = {De Alwis, Chamitha and Shrestha, Anup and Sarker, Tapan},
+  title   = {Exploring governance for accreditation in the education sector
+             using blockchain technology: a systematic literature review},
+  journal = {Discover Education},
+  volume  = {4},
+  year    = {2025},
+  doi     = {10.1007/s44217-025-00449-y}
+}
+
+@inproceedings{Gelashvili2023,
+  author    = {Gelashvili, Rati and Spiegelman, Alexander and Xiang, Zhuolun and
+               Danezis, George and Li, Zekun and Xia, Yu and Zhou, Runtian and
+               Malkhi, Dahlia},
+  title     = {Block-{STM}: Scaling Blockchain Execution by Turning Ordering
+               Curse to a Performance Blessing},
+  booktitle = {Proceedings of the 28th ACM SIGPLAN Annual Symposium on
+               Principles and Practice of Parallel Programming (PPoPP '23)},
+  pages     = {232--244},
+  year      = {2023},
+  doi       = {10.1145/3572848.3577524}
+}
+
+@misc{Blackshear2019Move,
+  author       = {Blackshear, Sam and Cheng, Evan and Dill, David L. and
+                  Gao, Victor and Maurer, Ben and Nowacki, Todd and
+                  Pott, Kevin and Qadeer, Shaz and Russi, Dario and
+                  Sezer, Stephane and Zakian, Tim and Zhou, Runtian},
+  title        = {Move: A Language With Programmable Resources},
+  howpublished = {Diem Association Technical Report},
+  year         = {2019},
+  note         = {\url{https://developers.diem.com/docs/technical-papers/move-paper/}}
+}
+
+@inproceedings{Androulaki2018,
+  author    = {Androulaki, Elli and Barger, Artem and Bortnikov, Vita and
+               Cachin, Christian and Christidis, Konstantinos and
+               De Caro, Angelo and Enyeart, David and Ferris, Christopher and
+               Laventman, Gennady and Manevich, Yacov and others},
+  title     = {Hyperledger Fabric: A Distributed Operating System for
+               Permissioned Blockchains},
+  booktitle = {Proceedings of the Thirteenth EuroSys Conference (EuroSys '18)},
+  pages     = {1--15},
+  year      = {2018},
+  doi       = {10.1145/3190508.3190538}
+}
+
+@misc{Benet2014,
+  author       = {Benet, Juan},
+  title        = {{IPFS} --- Content Addressed, Versioned, P2P File System},
+  howpublished = {arXiv preprint arXiv:1407.3561},
+  year         = {2014},
+  note         = {\url{https://arxiv.org/abs/1407.3561}}
+}
+
+@book{Preukschat2021,
+  author    = {Preukschat, Alex and Reed, Drummond},
+  title     = {Self-Sovereign Identity: Decentralized Digital Identity and
+               Verifiable Credentials},
+  publisher = {Manning Publications},
+  address   = {Shelter Island, NY},
+  year      = {2021}
+}
+
+@book{Windley2023,
+  author    = {Windley, Phillip J.},
+  title     = {Learning Digital Identity: Design, Deploy, and Manage Identity
+               Architectures},
+  publisher = {O'Reilly Media},
+  address   = {Sebastopol, CA},
+  year      = {2023}
+}
+
+@book{EzellBear2012,
+  author    = {Ezell, Allen and Bear, John},
+  title     = {Degree Mills: The Billion-Dollar Industry That Has Sold Over a
+               Million Fake Diplomas},
+  publisher = {Prometheus Books},
+  address   = {Amherst, NY},
+  year      = {2012}
+}
+
+@misc{Allen2016,
+  author       = {Allen, Christopher},
+  title        = {The Path to Self-Sovereign Identity},
+  howpublished = {Life with Alacrity},
+  month        = apr,
+  year         = {2016},
+  note         = {\url{http://www.lifewithalacrity.com/2016/04/the-path-to-self-soverereign-identity.html}}
+}
+
+@techreport{Cavoukian2009,
+  author      = {Cavoukian, Ann},
+  title       = {Privacy by Design: The 7 Foundational Principles},
+  institution = {Information and Privacy Commissioner of Ontario},
+  year        = {2009}
+}
+
+@techreport{Grech2017,
+  author      = {Grech, Alexander and Camilleri, Anthony F.},
+  title       = {Blockchain in Education},
+  institution = {Publications Office of the European Union},
+  type        = {JRC Science for Policy Report},
+  number      = {EUR 28778 EN},
+  address     = {Luxembourg},
+  year        = {2017},
+  note        = {Inamorato dos Santos, A. (ed.)},
+  doi         = {10.2760/60649}
+}
+
+
+%% ------------------------------------------------------------
+%% (D) Hệ thống và hạ tầng triển khai
+%% ------------------------------------------------------------
+
+@misc{Blockcerts2016,
+  author       = {{MIT Media Lab} and {Learning Machine}},
+  title        = {Blockcerts: An Open Standard and Infrastructure for
+                  Blockchain Academic Credentials},
+  howpublished = {Open-source project documentation},
+  year         = {2016},
+  note         = {\url{https://www.blockcerts.org/}}
+}
+
+@misc{Aptos2022,
+  author       = {{Aptos Labs}},
+  title        = {The Aptos Blockchain: Safe, Scalable, and Upgradeable
+                  Web3 Infrastructure},
+  howpublished = {Aptos Whitepaper},
+  year         = {2022},
+  note         = {\url{https://aptosfoundation.org/whitepaper}}
+}
+
+@misc{Movement2024,
+  author       = {{Movement Labs}},
+  title        = {Movement Network: A Move-based Modular Blockchain Framework},
+  howpublished = {Technical Documentation},
+  year         = {2024},
+  note         = {\url{https://docs.movementnetwork.xyz/}}
+}
+
+@misc{eIDAS2014,
+  author       = {{European Parliament and Council of the European Union}},
+  title        = {Regulation (EU) No 910/2014 on electronic identification and
+                  trust services for electronic transactions in the internal
+                  market (eIDAS)},
+  howpublished = {Official Journal of the European Union, L 257},
+  year         = {2014}
+}
+
+@misc{eIDAS2_2024,
+  author       = {{European Parliament and Council of the European Union}},
+  title        = {Regulation (EU) 2024/1183 amending Regulation (EU) No
+                  910/2014 as regards establishing the European Digital
+                  Identity Framework},
+  howpublished = {Official Journal of the European Union, L series},
+  month        = apr,
+  year         = {2024}
+}
+
+@misc{NDAChain2025,
+  author       = {{Trung tâm Dữ liệu Quốc gia} and
+                  {Hiệp hội Dữ liệu Quốc gia}},
+  title        = {{NDAChain} --- Nền tảng blockchain quốc gia và giải pháp
+                  định danh phi tập trung {NDA DID}},
+  howpublished = {Tài liệu giới thiệu nền tảng},
+  year         = {2025}
+}
+
+@misc{Prospects_Hedd2026,
+  author       = {{Prospects Hedd}},
+  title        = {Higher Education Degree Datacheck: Degree Fraud and
+                  Verification Statistics},
+  howpublished = {Jisc/Prospects Luminate},
+  year         = {2026},
+  note         = {\url{https://luminate.prospects.ac.uk/}}
+}
+
+
+
+%% ------------------------------------------------------------
+%% (E) Văn bản pháp quy và báo cáo ngành của Việt Nam
+%% ------------------------------------------------------------
+
+@misc{QD749_2020,
+  author       = {{Thủ tướng Chính phủ}},
+  title        = {Quyết định số 749/QĐ-TTg phê duyệt {``}Chương trình Chuyển
+                  đổi số quốc gia đến năm 2025, định hướng đến năm 2030{''}},
+  howpublished = {Văn bản quy phạm pháp luật},
+  month        = jun,
+  year         = {2020}
+}
+
+@misc{QD131_2022,
+  author       = {{Thủ tướng Chính phủ}},
+  title        = {Quyết định số 131/QĐ-TTg phê duyệt Đề án {``}Tăng cường ứng
+                  dụng công nghệ thông tin và chuyển đổi số trong giáo dục và
+                  đào tạo giai đoạn 2022--2025, định hướng đến năm 2030{''}},
+  howpublished = {Văn bản quy phạm pháp luật},
+  month        = jan,
+  year         = {2022}
+}
+
+@misc{QD452_2025,
+  author       = {{Thủ tướng Chính phủ}},
+  title        = {Quyết định số 452/QĐ-TTg phê duyệt Quy hoạch mạng lưới cơ sở
+                  giáo dục đại học và sư phạm thời kỳ 2021--2030, tầm nhìn đến
+                  năm 2050},
+  howpublished = {Văn bản quy phạm pháp luật},
+  year         = {2025}
+}
+
+@misc{TT13_2021,
+  author       = {{Bộ Giáo dục và Đào tạo}},
+  title        = {Thông tư số 13/2021/TT-BGDĐT quy định về điều kiện, trình tự,
+                  thủ tục, thẩm quyền công nhận văn bằng do cơ sở giáo dục
+                  nước ngoài cấp để sử dụng tại Việt Nam},
+  howpublished = {Văn bản quy phạm pháp luật},
+  month        = apr,
+  year         = {2021}
+}
+
+@misc{TT10_2026,
+  author       = {{Bộ Giáo dục và Đào tạo}},
+  title        = {Thông tư số 10/2026/TT-BGDĐT ban hành Quy chế quản lý văn
+                  bằng, chứng chỉ của hệ thống giáo dục quốc dân},
+  howpublished = {Văn bản quy phạm pháp luật},
+  month        = feb,
+  year         = {2026}
+}
+
+@misc{TT164_2016,
+  author       = {{Bộ Tài chính}},
+  title        = {Thông tư số 164/2016/TT-BTC quy định mức thu, chế độ thu,
+                  nộp, quản lý và sử dụng phí xác minh giấy tờ, tài liệu theo
+                  yêu cầu của tổ chức, cá nhân trong nước},
+  howpublished = {Văn bản quy phạm pháp luật},
+  year         = {2016}
+}
+
+@misc{LuatGDDT2023,
+  author       = {{Quốc hội nước Cộng hòa xã hội chủ nghĩa Việt Nam}},
+  title        = {Luật Giao dịch điện tử số 20/2023/QH15},
+  howpublished = {Văn bản quy phạm pháp luật},
+  month        = jun,
+  year         = {2023}
+}
+
+@misc{LuatBVDLCN2025,
+  author       = {{Quốc hội nước Cộng hòa xã hội chủ nghĩa Việt Nam}},
+  title        = {Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15},
+  howpublished = {Văn bản quy phạm pháp luật},
+  month        = jun,
+  year         = {2025}
+}
+
+@misc{MOET_Stats2025,
+  author       = {{Bộ Giáo dục và Đào tạo}},
+  title        = {Số liệu thống kê giáo dục đại học và báo cáo tổng kết năm
+                  học 2024--2025},
+  howpublished = {Hội nghị giáo dục đại học},
+  year         = {2025}
+}
+
+@misc{VNU_Report2026,
+  author       = {{Đại học Quốc gia Hà Nội}},
+  title        = {Báo cáo tổng kết nhiệm kỳ và số liệu quy mô đào tạo},
+  howpublished = {Bản tin Đại học Quốc gia Hà Nội},
+  year         = {2026},
+  note         = {\url{https://www.vnu.edu.vn/}}
+}
+
+
+%% ------------------------------------------------------------
+%% (F) Bổ sung — lượt rà soát 1: khảo sát hệ thống về niềm tin
+%%     trong định danh tự chủ và các công trình gần nhất
+%% ------------------------------------------------------------
+
+@article{Krul2024,
+  author  = {Krul, Evan and Paik, Hye-young and Ruj, Sushmita and
+             Kanhere, Salil S.},
+  title   = {{SoK}: Trusting Self-Sovereign Identity},
+  journal = {Proceedings on Privacy Enhancing Technologies},
+  volume  = {2024},
+  number  = {3},
+  pages   = {297--313},
+  year    = {2024},
+  doi     = {10.56553/popets-2024-0079}
+}
+
+@misc{Ambati2026,
+  author       = {Ambati, Sushanth and Adeel, Kainat and Myers, Jack and
+                  Ivanov, Nikolay},
+  title        = {{SoK}: Self-Sovereign Digital Identities},
+  howpublished = {arXiv preprint arXiv:2603.06896},
+  year         = {2026},
+  note         = {\url{https://arxiv.org/abs/2603.06896}}
+}
+
+@article{Turco2026,
+  author  = {Turco, Calogero and De Salve, Andrea and
+             Di Francesco Maesa, Damiano and Mori, Paolo and Ricci, Laura},
+  title   = {A survey charting trust models and systems in self-sovereign
+             identity},
+  journal = {Computer Science Review},
+  year    = {2026},
+  doi     = {10.1016/j.cosrev.2026.100840}
+}
+
+@article{DeSalve2023,
+  author  = {De Salve, Andrea and Di Francesco Maesa, Damiano and Mori, Paolo
+             and Ricci, Laura and Puccia, Alessandro},
+  title   = {A multi-layer trust framework for Self Sovereign Identity on
+             blockchain},
+  journal = {Online Social Networks and Media},
+  volume  = {37--38},
+  pages   = {100265},
+  year    = {2023},
+  doi     = {10.1016/j.osnem.2023.100265}
+}
+
+@misc{Eer2022,
+  author       = {Eer, Kai Jun and Diaz, Jesus and Kohlweiss, Markulf},
+  title        = {Bottom-up Trust Registry in Self Sovereign Identity},
+  howpublished = {arXiv preprint arXiv:2208.04624},
+  year         = {2022},
+  note         = {\url{https://arxiv.org/abs/2208.04624}}
+}
+
+@article{Weigl2025,
+  author  = {Weigl, Linda and Barbereau, Tom and Sedlmeir, Johannes and
+             Zavolokina, Liudmila},
+  title   = {Self-sovereign identity: A conceptual framework and research
+             agenda},
+  journal = {Electronic Markets},
+  volume  = {35},
+  year    = {2025},
+  doi     = {10.1007/s12525-025-00867-8}
+}
+
+@article{SSI_Adoption2025,
+  author  = {Alamri, Bandar and Crowley, Katie and Richardson, Ita},
+  title   = {Self-sovereign identity adoption: Antecedents and potential
+             outcomes},
+  journal = {Technology in Society},
+  volume  = {82},
+  pages   = {102866},
+  year    = {2025},
+  doi     = {10.1016/j.techsoc.2025.102866}
+}
+
+@article{SSI_Survey2025,
+  author  = {Ghaffari, Fariba and Gilani, Komal and Bertin, Emmanuel and
+             Crespi, Noel},
+  title   = {Self-Sovereign Identity as a Secure and Trustworthy Approach to
+             Digital Identity Management: A Comprehensive Survey},
+  journal = {ACM Computing Surveys},
+  year    = {2025},
+  doi     = {10.1145/3785466}
+}
+
+@misc{Zaeem2021,
+  author       = {Zaeem, Razieh Nokhbeh and Chang, Kai Chih and
+                  Huang, Teng-Chieh and Liau, David and Barber, K. Suzanne},
+  title        = {Blockchain-Based Self-Sovereign Identity: Survey, Requirements,
+                  Use-Cases, and Comparative Study},
+  howpublished = {Proceedings of the IEEE/WIC/ACM International Conference on
+                  Web Intelligence and Intelligent Agent Technology},
+  year         = {2021}
+}
+
+
+%% ------------------------------------------------------------
+%% (G) Bổ sung — lượt rà soát 2: phân tích an toàn các hệ thống
+%%     đã triển khai, thiết kế thay thế, và quy định về dữ liệu
+%% ------------------------------------------------------------
+
+@misc{Baldi2019,
+  author       = {Baldi, Marco and Chiaraluce, Franco and Kodra, Migelan and
+                  Spalazzi, Luca},
+  title        = {Security analysis of a blockchain-based protocol for the
+                  certification of academic credentials},
+  howpublished = {arXiv preprint arXiv:1910.04622},
+  year         = {2019},
+  note         = {\url{https://arxiv.org/abs/1910.04622}}
+}
+
+@misc{Zonneveld2026,
+  author       = {Zonneveld, Giacomo and Rafaiani, Giulia and Baldi, Marco},
+  title        = {A forgery attack on the {Block.co} blockchain-based digital
+                  credential certification system},
+  howpublished = {arXiv preprint arXiv:2606.31462},
+  year         = {2026},
+  note         = {\url{https://arxiv.org/abs/2606.31462}}
+}
+
+@misc{Saramago2021,
+  author       = {Saramago, Rodrigo Q. and Jehl, Leander and Meling, Hein and
+                  Estrada-Gali{\~n}anes, Vero},
+  title        = {A Tree-based Construction for Verifiable Diplomas with
+                  Issuer Transparency},
+  howpublished = {arXiv preprint arXiv:2109.11590},
+  year         = {2021},
+  note         = {\url{https://arxiv.org/abs/2109.11590}}
+}
+
+@misc{EDPB2025,
+  author       = {{European Data Protection Board}},
+  title        = {Guidelines 02/2025 on processing of personal data through
+                  blockchain technologies},
+  howpublished = {EDPB Guidelines, công bố lấy ý kiến tháng 4/2025},
+  year         = {2025},
+  note         = {\url{https://www.edpb.europa.eu/}}
+}
+
+@misc{RFC6962,
+  author       = {Laurie, Ben and Langley, Adam and Kasper, Emilia},
+  title        = {{RFC 6962}: Certificate Transparency},
+  howpublished = {IETF Experimental},
+  month        = jun,
+  year         = {2013},
+  note         = {\url{https://www.rfc-editor.org/rfc/rfc6962}}
+}

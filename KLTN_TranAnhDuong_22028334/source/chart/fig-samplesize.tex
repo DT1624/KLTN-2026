@@ -1,0 +1,63 @@
+% SINH TỰ ĐỘNG bởi scripts/bench-plot.mjs — đừng sửa tay.
+% Nguồn dữ liệu: .bench/samplesize.json
+% 12 lượt độc lập cho mỗi mức số mẫu, đồng thời 12, đo 2026-10-13T14:40:15.734Z
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    name=ssA,
+    width=0.95\textwidth, height=5.0cm,
+    xlabel={}, ylabel={Hệ số biến thiên của p95 (\%)},
+    xmode=log, log basis x=10,
+    xtick={60,120,250,500,1000,2000,4000},
+    xticklabels={60,120,250,500,1000,2000,4000},
+    ymin=0,
+    grid=both, grid style={gray!18},
+    legend style={font=\tiny, at={(0.98,0.98)}, anchor=north east, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40},
+    label style={font=\small}, tick label style={font=\footnotesize},
+    title={(a) Độ phân tán của p95 giảm khi tăng số mẫu}, title style={font=\small},
+    extra y ticks={10}, extra y tick labels={}, extra y tick style={grid=major, grid style={red!45, densely dashed}},
+]
+    \addplot[color=blue!70!black,mark=*,mark size=1.5pt,thick] coordinates {(60,132.99) (120,80.88) (250,75.39) (500,46.47) (1000,21.31) (2000,52.26) (4000,32.85)};
+    \addlegendentry{/health --- TS}
+    \addplot[dashed,color=blue!70!black,mark=square*,mark size=1.5pt,thick] coordinates {(60,179.24) (120,129.36) (250,107.81) (500,77.86) (1000,71.70) (2000,67.87) (4000,25.75)};
+    \addlegendentry{/health --- GO}
+    \addplot[color=red!70!black,mark=*,mark size=1.5pt,thick] coordinates {(60,122.08) (120,81.86) (250,31.16) (500,18.93) (1000,35.38) (2000,29.87) (4000,66.35)};
+    \addlegendentry{/did/resolve --- TS}
+    \addplot[dashed,color=red!70!black,mark=square*,mark size=1.5pt,thick] coordinates {(60,142.01) (120,89.40) (250,111.76) (500,87.51) (1000,78.74) (2000,84.52) (4000,39.59)};
+    \addlegendentry{/did/resolve --- GO}
+    \addplot[color=green!55!black,mark=*,mark size=1.5pt,thick] coordinates {(60,74.50) (120,28.51) (250,99.15) (500,125.51) (1000,66.53) (2000,20.91) (4000,54.60)};
+    \addlegendentry{/auth/me --- TS}
+    \addplot[dashed,color=green!55!black,mark=square*,mark size=1.5pt,thick] coordinates {(60,120.54) (120,54.57) (250,43.21) (500,53.95) (1000,46.81) (2000,54.13) (4000,28.75)};
+    \addlegendentry{/auth/me --- GO}
+\end{axis}
+\begin{axis}[
+    at={(ssA.below south west)}, anchor=above north west, yshift=-0.9cm,
+    width=0.95\textwidth, height=5.0cm,
+    xlabel={Số yêu cầu mỗi lượt đo (thang logarit)}, ylabel={p95 trung bình (ms)},
+    xmode=log, log basis x=10,
+    xtick={60,120,250,500,1000,2000,4000},
+    xticklabels={60,120,250,500,1000,2000,4000},
+    ymin=0,
+    grid=both, grid style={gray!18},
+    legend style={font=\tiny, at={(0.98,0.98)}, anchor=north east, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40},
+    label style={font=\small}, tick label style={font=\footnotesize},
+    title={(b) Giá trị p95 đo được cũng giảm --- mẫu nhỏ cho kết quả lệch cao}, title style={font=\small},
+]
+    \addplot[color=blue!70!black,mark=*,mark size=1.5pt,thick] coordinates {(60,17.51) (120,11.61) (250,13.90) (500,8.47) (1000,4.33) (2000,7.91) (4000,5.18)};
+    \addlegendentry{/health --- TS}
+    \addplot[dashed,color=blue!70!black,mark=square*,mark size=1.5pt,thick] coordinates {(60,25.06) (120,14.44) (250,9.34) (500,9.77) (1000,8.15) (2000,5.88) (4000,5.70)};
+    \addlegendentry{/health --- GO}
+    \addplot[color=red!70!black,mark=*,mark size=1.5pt,thick] coordinates {(60,11.28) (120,11.38) (250,6.95) (500,6.71) (1000,9.60) (2000,7.06) (4000,14.09)};
+    \addlegendentry{/did/resolve --- TS}
+    \addplot[dashed,color=red!70!black,mark=square*,mark size=1.5pt,thick] coordinates {(60,13.56) (120,10.56) (250,15.66) (500,8.28) (1000,16.36) (2000,17.93) (4000,9.56)};
+    \addlegendentry{/did/resolve --- GO}
+    \addplot[color=green!55!black,mark=*,mark size=1.5pt,thick] coordinates {(60,30.18) (120,14.11) (250,54.82) (500,141.00) (1000,36.56) (2000,20.70) (4000,49.90)};
+    \addlegendentry{/auth/me --- TS}
+    \addplot[dashed,color=green!55!black,mark=square*,mark size=1.5pt,thick] coordinates {(60,27.82) (120,13.57) (250,12.33) (500,33.40) (1000,20.05) (2000,18.00) (4000,12.66)};
+    \addlegendentry{/auth/me --- GO}
+\end{axis}
+\end{tikzpicture}
+\caption{Ảnh hưởng của số mẫu tới phép đo độ trễ. Mỗi điểm là trung bình của 12 lượt đo độc lập ở cùng mức 12 yêu cầu đồng thời. Đường gạch đỏ ở hình (a) là mức hệ số biến thiên 10\%.}
+\label{fig:bench-samplesize}
+\end{figure}

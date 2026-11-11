@@ -1,0 +1,21 @@
+\begin{longtable}{|c|p{5.4cm}|p{7.4cm}|}
+\caption{Các vấn đề phát hiện trong đợt rà soát hợp đồng và cách xử lý}
+\label{tab:v2-audit} \\
+\hline
+\textbf{Mã} & \textbf{Vấn đề} & \textbf{Cách xử lý} \\ \hline
+\endfirsthead
+\hline
+\textbf{Mã} & \textbf{Vấn đề} & \textbf{Cách xử lý} \\ \hline
+\endhead
+V1 & Chuyển quyền gốc một bước & Đề cử rồi ký nhận; hàm khởi tạo tự lấy người xuất bản làm gốc \\ \hline
+V2 & Mọi bên phát hành bị đòi băm chứng thực uỷ quyền & Chỉ bắt buộc khi thực sự có quan hệ uỷ quyền \\ \hline
+V3 & Không có uỷ quyền nhiều cấp & Thêm với ba ràng buộc ở Mục \ref{sec:uy-quyen} \\ \hline
+V4 & Vai trò bị thu hồi không cấp lại được & Cấp lại với phiên bản tăng, giữ bản ghi cũ \\ \hline
+V5 & Định danh bị thu hồi khoá địa chỉ vĩnh viễn & Cho đăng ký định danh mới; định danh cũ vẫn tra ra ``đã thu hồi'' \\ \hline
+V6 & CID không được kiểm độ dài dù chú thích nói có & Kiểm ở cả ba thao tác ghi CID \\ \hline
+V7 & Không phân biệt tự đình chỉ với bị đình chỉ & Thêm trường ghi người đặt trạng thái \\ \hline
+V8 & Thu hồi chứng thực đòi thẩm quyền còn hiệu lực & Chỉ cần quyền sở hữu (Mục \ref{sec:bat-doi-xung}) \\ \hline
+V9 & Thời hạn chứng thực ghi cứng bằng không, nhánh hết hạn là mã chết & Thời hạn thành tham số thật \\ \hline
+V10 & Hàm liệt kê vỡ âm thầm khi vượt giới hạn gas & Thêm hàm phân trang; hàm liệt kê dừng rõ ràng khi vượt ngưỡng \\ \hline
+V11 & Nhóm lỗi nhỏ: sai mã lỗi, nhánh chết, số hiệu trùng, xung đột vai trò, bộ đếm & Sửa từng mục \\ \hline
+\end{longtable}

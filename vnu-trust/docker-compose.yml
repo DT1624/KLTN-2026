@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vnu_trust_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-vnu_trust}
+      POSTGRES_USER: ${DB_USER:-vnu_trust}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-vnu_trust}
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-vnu_trust} -d ${DB_NAME:-vnu_trust}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [vnu_trust_net]
+
+volumes:
+  pgdata: { name: vnu_trust_pgdata }
+
+networks:
+  vnu_trust_net: { name: vnu_trust_network, driver: bridge }

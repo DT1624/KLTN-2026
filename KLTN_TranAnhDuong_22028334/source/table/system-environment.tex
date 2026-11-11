@@ -1,0 +1,91 @@
+\begin{longtable}{|p{3.4cm}|p{2.9cm}|p{7.3cm}|}
+\caption{Thành phần và phiên bản của hệ thống thử nghiệm}
+\label{tab:system-environment}
+\\
+\hline
+\textbf{Thành phần} & \textbf{Phiên bản} & \textbf{Vai trò trong hệ thống} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Thành phần} & \textbf{Phiên bản} & \textbf{Vai trò trong hệ thống} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Mạng thử nghiệm Move
+& Mã chuỗi 250
+& Nguồn sự thật: định danh, thẩm quyền, trạng thái chứng thực \\
+\hline
+
+Trình biên dịch Move
+& Phiên bản 3.x
+& Biên dịch và xuất bản ba mô-đun hợp đồng \\
+\hline
+
+Node.js
+& 20 LTS trở lên
+& Môi trường chạy cài đặt TypeScript của tầng chỉ mục và công cụ phát triển giao diện \\
+\hline
+
+TypeScript
+& 5.7
+& Cài đặt thứ nhất của tầng chỉ mục, biên dịch ở chế độ kiểm kiểu nghiêm ngặt \\
+\hline
+
+Express, \texttt{pg}, \texttt{zod}
+& 4.21 / 8.13 / 3.24
+& Khung dịch vụ HTTP, truy cập cơ sở dữ liệu, kiểm tra lược đồ thân yêu cầu \\
+\hline
+
+Go
+& 1.23
+& Cài đặt thứ hai của tầng chỉ mục, dùng thư viện HTTP chuẩn \\
+\hline
+
+\texttt{pgx}, \texttt{golang-jwt}, \texttt{x/crypto}
+& 5.7 / 5.2 / 0.31
+& Truy cập cơ sở dữ liệu, ký phiên, hàm băm SHA-3 \\
+\hline
+
+PostgreSQL
+& 16
+& Tầng chỉ mục dùng chung cho cả hai cài đặt, kèm nhật ký kiểm toán \\
+\hline
+
+React, Vite, Tailwind
+& 18.3 / 6.0 / 3.4
+& Giao diện theo vai trò, gói phát hành 405\,KB \\
+\hline
+
+\texttt{@noble/curves}, \texttt{@noble/hashes}
+& 1.9 / 1.8
+& Ký Ed25519 và băm SHA3-256 phía máy khách, thay cho bộ công cụ của nền tảng \\
+\hline
+
+\texttt{@scure/bip39}
+& 1.6
+& Sinh và kiểm tra cụm từ ghi nhớ để khôi phục ví trên thiết bị khác \\
+\hline
+
+Web Cryptography API
+& Theo trình duyệt
+& Dẫn xuất khóa PBKDF2 và mã hóa AES-256-GCM cho kho khóa cục bộ \\
+\hline
+
+Indexed Database API
+& Theo trình duyệt
+& Lưu bản mã của kho khóa trên thiết bị người dùng \\
+\hline
+
+Dịch vụ ghim IPFS
+& Giao diện HTTP
+& Lưu DID Document và nội dung chứng thực ngoài chuỗi; có chế độ mô phỏng dùng cơ sở dữ liệu dùng chung \\
+\hline
+
+\end{longtable}

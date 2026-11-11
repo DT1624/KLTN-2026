@@ -1,0 +1,22 @@
+\begin{longtable}{|c|p{3.4cm}|p{6.0cm}|p{3.0cm}|}
+\caption{Yêu cầu chức năng và tiêu chí kiểm chứng}
+\label{tab:v2-func} \\
+\hline
+\textbf{Mã} & \textbf{Yêu cầu} & \textbf{Tiêu chí kiểm chứng} & \textbf{Bằng chứng} \\ \hline
+\endfirsthead
+\hline
+\textbf{Mã} & \textbf{Yêu cầu} & \textbf{Tiêu chí kiểm chứng} & \textbf{Bằng chứng} \\ \hline
+\endhead
+F1 & Đăng ký định danh & Phân giải được; băm tính lại khớp băm đã neo & Kiểm thử đầu cuối \\ \hline
+F2 & Xoay khoá, giữ phiên bản & Cập nhật tăng phiên bản; chứng thực ký bằng khoá cũ vẫn kiểm được & Kiểm thử hợp đồng \\ \hline
+F3 & Vòng đời thẩm quyền & Thu hồi có hiệu lực ngay ở lần xác minh kế tiếp; mọi thao tác có mã giao dịch & Kiểm thử hợp đồng, chế độ nghiêm ngặt \\ \hline
+F4 & Uỷ quyền nhiều cấp & Phạm vi vượt tập cha, thời hạn vượt hạn cha đều bị từ chối; bit uỷ quyền không truyền tiếp & Kiểm thử hợp đồng \\ \hline
+F5 & Chuyển quyền gốc hai bước & Quyền chỉ chuyển sau khi người được đề cử tự ký & Kiểm thử hợp đồng, mô phỏng trên chuỗi \\ \hline
+F6 & Cấp phát chứng thực & Loại ngoài phạm vi bị hợp đồng từ chối & Kiểm thử hợp đồng \\ \hline
+F7 & Bảo vệ khoá phía chủ thể & Không gói tin nào gửi lên dịch vụ chứa khoá riêng hay mật khẩu & Kiểm thử ví \\ \hline
+F8 & Trình bày có chọn lọc & Bản trình bày chỉ chứa chứng thực được chọn, có chữ ký chủ thể & Kiểm thử đầu cuối \\ \hline
+F9 & Xác minh toàn vẹn và quyền sở hữu & Phát hiện nội dung bị sửa sau khi cấp & Bộ kiểm sửa nội dung \\ \hline
+F10 & Xác minh thẩm quyền độc lập & Phát hiện bên phát hành bị thu hồi hoặc hết hạn & Kiểm thử hợp đồng \\ \hline
+F11 & Trạng thái chứng thực & Đơn vị hết hạn uỷ quyền vẫn thu hồi được chứng thực mình đã cấp & Kiểm thử hợp đồng \\ \hline
+F12 & Dấu vết kiểm toán & Nhật ký đúng thao tác, cùng bộ tên hành động ở hai cài đặt & Kiểm thử luồng nghiệp vụ \\ \hline
+\end{longtable}

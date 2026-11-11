@@ -1,0 +1,23 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    { "vnu": "https://vnu.edu.vn/credentials/v1#" }
+  ],
+  "id": "urn:uuid:f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "type": ["VerifiableCredential", "VNUDegreeCredential"],
+  "issuer": "did:vnu:issuer:0x1a2b...ef12",
+  "issuanceDate": "2026-06-15T07:00:00.000Z",
+  "expirationDate": null,
+  "credentialSubject": {
+    "id": "did:vnu:holder:0x8f3a...4b5c",
+    "vnu:studentId": "22028334",
+    "vnu:degreeName": "Ky thuat Cong nghe thong tin",
+    "vnu:faculty": "Truong Dai hoc Cong nghe",
+    "vnu:gpa": "3.72",
+    "vnu:graduationYear": "2026"
+  },
+  "credentialStatus": {
+    "id": "move://testnet/<dia-chi-goi>/vc_registry/<vc_id_hash>",
+    "type": "VnuOnChainStatus"
+  }
+}

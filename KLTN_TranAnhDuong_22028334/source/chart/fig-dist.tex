@@ -1,0 +1,52 @@
+% SINH TỰ ĐỘNG bởi scripts/bench-plot.mjs — đừng sửa tay.
+% Nguồn dữ liệu: .bench/dist.json  (1500 yêu cầu mỗi tuyến, đo 2026-10-13T14:30:43.508Z)
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.92\textwidth, height=6.2cm,
+    xlabel={Độ trễ (ms, thang logarit)}, ylabel={Tỉ lệ yêu cầu hoàn tất (\%)},
+    xmode=log,
+    ymin=0, ymax=101,
+    ytick={0,25,50,75,90,95,99,100},
+    grid=both, grid style={gray!18},
+    legend style={font=\scriptsize, at={(0.02,0.98)}, anchor=north west, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40},
+    label style={font=\small}, tick label style={font=\footnotesize},
+    extra y ticks={95}, extra y tick labels={}, extra y tick style={grid=major, grid style={red!40, densely dashed}},
+]
+    \addplot[color=blue!70!black,thick,no marks] coordinates {(1.014,5.00) (1.293,10.00) (1.449,15.00) (1.56,20.00) (1.671,25.00) (1.753,30.00) (1.852,35.00) (1.968,40.00) (2.11,45.00) (2.278,50.00) (2.444,55.00) (2.637,60.00) (2.839,65.00) (3.193,70.00) (3.446,75.00) (3.801,80.00) (4.413,85.00) (5.542,90.00) (7.224,95.00) (8.445,96.00) (10.115,97.00) (20.929,98.00) (30.443,99.00) (35.455,99.30) (37.716,99.50) (40.327,99.70) (53.648,99.90) (54.255,100.00)};
+    \addlegendentry{/health --- TS}
+    \addplot[color=violet!70!black,thick,no marks] coordinates {(1.083,5.00) (1.217,10.00) (1.295,15.00) (1.351,20.00) (1.427,25.00) (1.521,30.00) (1.62,35.00) (1.745,40.00) (1.881,45.00) (2.027,50.00) (2.222,55.00) (2.389,60.00) (2.567,65.00) (2.764,70.00) (2.951,75.00) (3.211,80.00) (3.741,85.00) (4.611,90.00) (5.805,95.00) (6.588,96.00) (7.445,97.00) (8.605,98.00) (11.321,99.00) (25.731,99.30) (26.792,99.50) (27.306,99.70) (27.498,99.90) (27.534,100.00)};
+    \addlegendentry{/stats --- TS}
+    \addplot[color=red!70!black,thick,no marks] coordinates {(3.289,5.00) (3.924,10.00) (4.414,15.00) (4.751,20.00) (5.188,25.00) (5.573,30.00) (5.856,35.00) (6.31,40.00) (6.678,45.00) (7.171,50.00) (7.724,55.00) (8.154,60.00) (8.696,65.00) (9.693,70.00) (10.585,75.00) (11.771,80.00) (13.321,85.00) (16.103,90.00) (22.124,95.00) (26.157,96.00) (31.973,97.00) (34.512,98.00) (44.105,99.00) (54.018,99.30) (55.033,99.50) (58.65,99.70) (59.049,99.90) (59.165,100.00)};
+    \addlegendentry{/did/resolve --- TS}
+    \addplot[dashed,color=blue!70!black,thick,no marks] coordinates {(1.024,5.00) (1.401,10.00) (1.547,15.00) (1.632,20.00) (1.72,25.00) (1.803,30.00) (1.863,35.00) (1.935,40.00) (1.996,45.00) (2.048,50.00) (2.121,55.00) (2.22,60.00) (2.324,65.00) (2.465,70.00) (2.636,75.00) (2.818,80.00) (2.982,85.00) (3.216,90.00) (3.693,95.00) (3.857,96.00) (4.249,97.00) (4.84,98.00) (7.561,99.00) (24.806,99.30) (25.838,99.50) (26.437,99.70) (27.13,99.90) (27.17,100.00)};
+    \addlegendentry{/health --- GO}
+    \addplot[dashed,color=violet!70!black,thick,no marks] coordinates {(0.948,5.00) (1.321,10.00) (1.522,15.00) (1.645,20.00) (1.75,25.00) (1.821,30.00) (1.898,35.00) (1.959,40.00) (2.03,45.00) (2.144,50.00) (2.255,55.00) (2.338,60.00) (2.484,65.00) (2.603,70.00) (2.772,75.00) (2.987,80.00) (3.273,85.00) (3.748,90.00) (5.68,95.00) (6.448,96.00) (7.399,97.00) (8.461,98.00) (10.525,99.00) (42.315,99.30) (42.478,99.50) (42.595,99.70) (46.644,99.90) (46.782,100.00)};
+    \addlegendentry{/stats --- GO}
+    \addplot[dashed,color=red!70!black,thick,no marks] coordinates {(1.314,5.00) (1.437,10.00) (1.548,15.00) (1.651,20.00) (1.734,25.00) (1.825,30.00) (1.918,35.00) (2.006,40.00) (2.106,45.00) (2.2,50.00) (2.324,55.00) (2.494,60.00) (2.638,65.00) (2.808,70.00) (2.985,75.00) (3.195,80.00) (3.622,85.00) (4.119,90.00) (5.473,95.00) (5.809,96.00) (6.675,97.00) (8.516,98.00) (27.414,99.00) (30.959,99.30) (31.79,99.50) (32.415,99.70) (32.84,99.90) (33.062,100.00)};
+    \addlegendentry{/did/resolve --- GO}
+\end{axis}
+\end{tikzpicture}
+\caption{Hàm phân bố tích luỹ của độ trễ, 1500 yêu cầu mỗi tuyến. Đường gạch ngang màu đỏ là mức phân vị 95. Khoảng cách giữa phần thân và phần đuôi của mỗi đường là lý do báo cáo dùng phân vị thay cho giá trị trung bình.}
+\label{fig:bench-dist}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Thống kê độ trễ của ba tuyến, 1500 yêu cầu mỗi tuyến (đơn vị ms)}
+\label{tab:bench-dist}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|c|l|r|r|r|r|r|r|}
+\hline
+\textbf{Cài đặt} & \textbf{Tuyến} & \textbf{Trung bình} & \textbf{p50} & \textbf{p95} & \textbf{p99} & \textbf{Lớn nhất} & \textbf{p95/p50} \\
+\hline
+TS & \texttt{/health} & 3.4 & 2.3 & 7.2 & 30.4 & 54.3 & 3.2$\times$ \\
+TS & \texttt{/stats} & 2.7 & 2.0 & 5.8 & 11.3 & 27.5 & 2.9$\times$ \\
+TS & \texttt{/did/resolve} & 9.3 & 7.2 & 22.1 & 44.1 & 59.2 & 3.1$\times$ \\
+GO & \texttt{/health} & 2.4 & 2.0 & 3.7 & 7.6 & 27.2 & 1.8$\times$ \\
+GO & \texttt{/stats} & 2.8 & 2.1 & 5.7 & 10.5 & 46.8 & 2.6$\times$ \\
+GO & \texttt{/did/resolve} & 3.0 & 2.2 & 5.5 & 27.4 & 33.1 & 2.5$\times$ \\
+\hline
+\end{tabular}
+\end{table}

@@ -1,0 +1,100 @@
+\begin{longtable}{|p{2.9cm}|p{3.6cm}|p{3.6cm}|p{3.8cm}|}
+
+\caption{Các đánh đổi trong quyết định thiết kế hệ thống
+\label{tab:design-tradeoff}} \\
+
+\hline
+\textbf{Quyết định} &
+\textbf{Thuộc tính thu được} &
+\textbf{Thuộc tính phải hy sinh} &
+\textbf{Cơ sở của lựa chọn} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Quyết định} &
+\textbf{Thuộc tính thu được} &
+\textbf{Thuộc tính phải hy sinh} &
+\textbf{Cơ sở của lựa chọn} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Sổ đăng ký tin cậy trên chuỗi công khai thay cho cơ sở dữ liệu
+&
+Bên xác minh đọc được trạng thái thẩm quyền trực tiếp, không cần quan hệ trước với tổ chức nào; lịch sử quản trị không thể sửa
+&
+Chi phí giao dịch cho mỗi thao tác quản trị; trạng thái thẩm quyền trở thành thông tin công khai
+&
+Nếu sổ đăng ký là cơ sở dữ liệu thì bên xác minh lại phải tin tổ chức vận hành nó --- tức chỉ di chuyển sự phụ thuộc chứ không loại bỏ
+\\ \hline
+
+Một nguồn niềm tin gốc duy nhất
+&
+Mô hình quản trị đơn giản, trách nhiệm rõ ràng, phù hợp phạm vi kiểm chứng khái niệm
+&
+Tồn tại một điểm tập trung quyền lực quản trị
+&
+Phản ánh đúng cấu trúc thể chế hiện có của ĐHQGHN; kiến trúc phân lớp cho phép chuyển sang mô hình liên hợp mà không thay đổi ba lớp dưới
+\\ \hline
+
+Ví không lưu ký
+&
+Chủ thể là bên duy nhất ký được bản trình bày của mình, nhờ đó bước kiểm tra chữ ký của người trình bày có giá trị thật
+&
+Trải nghiệm phức tạp hơn; mất cụm từ khôi phục là mất quyền truy cập, không có cơ chế đặt lại
+&
+Mô hình lưu ký làm thay đổi tính chất an toàn mà hệ thống cung cấp, không chỉ làm giảm tính tự chủ về nguyên tắc
+\\ \hline
+
+Tách dữ liệu trên chuỗi và ngoài chuỗi
+&
+Chi phí lưu trữ thấp; không có dữ liệu cá nhân trên hạ tầng không thể xóa
+&
+Phụ thuộc vào tính khả dụng dài hạn của lớp lưu trữ ngoài chuỗi và cơ chế ghim
+&
+Ghi dữ liệu cá nhân lên hạ tầng bất biến khiến không thể thực hiện quyền của chủ thể dữ liệu theo quy định pháp luật
+\\ \hline
+
+Trạng thái theo từng bản ghi thay cho danh sách bit
+&
+Truy vấn trạng thái tức thời; thống nhất hạ tầng của ba sổ đăng ký trên cùng một lớp
+&
+Mỗi lần thu hồi là một giao dịch riêng; mỗi lần tra cứu để lại dấu vết về chứng thực được kiểm tra
+&
+Đơn giản hóa vận hành ở quy mô thử nghiệm; đây là điểm cần chuyển đổi khi mở rộng, và chỉ ảnh hưởng tới lớp chứng thực
+\\ \hline
+
+Chuẩn hóa JSON thay cho chuẩn hóa tập dữ liệu RDF
+&
+Triển khai được bằng mã ngắn, đồng nhất được giữa nhiều ngôn ngữ, dễ kiểm chứng tính tất định
+&
+Chỉ bảo đảm tương đương ở mức cú pháp; bên xác minh ngoài hệ thống cần mã kiểm tra riêng
+&
+Tương đương ngữ nghĩa của RDF yêu cầu bên xác minh triển khai toàn bộ phép xử lý JSON-LD, chi phí không tương xứng ở phạm vi hiện tại
+\\ \hline
+
+Giao diện dịch vụ theo kiểu REST thay cho giao thức truyền thông điệp giữa các tác nhân
+&
+Giảm đáng kể độ phức tạp triển khai và tích hợp
+&
+Khả năng tương tác giữa các hệ sinh thái thấp hơn kiến trúc tham chiếu đầy đủ
+&
+Phù hợp mục tiêu kiểm chứng mô hình quản trị; việc bổ sung giao thức truyền thông điệp không làm thay đổi kết luận về khung quản trị
+\\ \hline
+
+Giới hạn chuỗi ủy quyền ở hai cấp
+&
+Trách nhiệm luôn truy vết được tới một đơn vị cụ thể
+&
+Không biểu diễn được cấu trúc tổ chức sâu hơn hai cấp
+&
+Chuỗi ủy quyền sâu không giới hạn khiến việc truy vết trách nhiệm trở nên bất khả thi, trong khi lợi ích không rõ ràng
+\\ \hline
+
+\end{longtable}

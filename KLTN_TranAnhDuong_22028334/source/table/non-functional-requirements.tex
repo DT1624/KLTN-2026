@@ -1,0 +1,73 @@
+\begin{longtable}{|c|p{2.6cm}|p{4.6cm}|p{5.4cm}|}
+\caption{Danh sách yêu cầu phi chức năng}
+\label{tab:non-functional-requirements} \\
+
+\hline
+\textbf{Mã} & \textbf{Nhóm} & \textbf{Yêu cầu} & \textbf{Tiêu chí đo lường} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mã} & \textbf{Nhóm} & \textbf{Yêu cầu} & \textbf{Tiêu chí đo lường} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+N1 & Niềm tin &
+Thẩm quyền của bên phát hành kiểm chứng được độc lập &
+Tra cứu trạng thái thẩm quyền không cần liên hệ bên phát hành hay cơ quan quản trị, không cần tài khoản hay thỏa thuận trước \\ \hline
+
+N2 & Niềm tin &
+Mọi thay đổi quản trị để lại dấu vết bất biến &
+Toàn bộ thao tác ghi sổ đăng ký tin cậy đều có mã giao dịch trên chuỗi; không có thao tác nào xóa hoặc sửa được lịch sử, kể cả từ quản trị viên gốc \\ \hline
+
+N3 & Niềm tin &
+Quy tắc phân quyền được thi hành ở nơi không thể bỏ qua &
+Mọi quy tắc phân quyền nằm trong hợp đồng; gọi trực tiếp hợp đồng mà bỏ qua tầng dịch vụ vẫn bị chặn \\ \hline
+
+N4 & An toàn &
+Không có thông tin học thuật đọc trực tiếp được từ dữ liệu trên chuỗi &
+Liệt kê đầy đủ các trường được ghi vào hợp đồng; không trường nào chứa nội dung văn bằng ở dạng đọc được. Lưu ý: tiêu chí này \textbf{không} đồng nghĩa với {``}không có dữ liệu cá nhân trên chuỗi{''} --- xem phân tích tại Mục 2.5.4 và Mục 3.5.1 \\ \hline
+
+N5 & An toàn &
+Khóa riêng không rời khỏi thiết bị của chủ thể &
+Kiểm tra toàn bộ gói tin gửi lên dịch vụ, không gói tin nào chứa khóa riêng, mật khẩu hay cụm từ khôi phục \\ \hline
+
+N6 & An toàn &
+Phát hiện toàn bộ kịch bản gian lận được định nghĩa trước &
+Mỗi kịch bản ở Mục 3.7.2 bị chặn, và thông điệp từ chối khớp đúng nguyên nhân thật chứ không do một phép kiểm khác chặn trước \\ \hline
+
+N7 & Quyền riêng tư &
+Chủ thể kiểm soát việc chia sẻ &
+Bản trình bày chỉ chứa các chứng thực chủ thể chọn; không thành phần nào của hệ thống trình bày được chứng thực thay chủ thể \\ \hline
+
+N8 & Phi tập trung &
+Xác minh không phụ thuộc bên phát hành trực tuyến &
+Xác minh hoàn tất khi dịch vụ của bên phát hành ngừng hoạt động, chỉ cần chuỗi và lớp lưu trữ ngoài chuỗi \\ \hline
+
+N9 & Liên thông &
+Tuân thủ chuẩn W3C DID Core và mô hình dữ liệu chứng thực &
+Cấu trúc DID Document và chứng thực hợp lệ theo đặc tả \cite{W3C_DIDCore2022, W3C_VCDM2025}; các điểm chưa tuân thủ được liệt kê tường minh \\ \hline
+
+N10 & Liên thông &
+Tầng dịch vụ có hợp đồng giao diện ổn định, không phụ thuộc cài đặt &
+Hai cài đặt độc lập trả cùng kết quả và cùng mã trạng thái cho cùng một yêu cầu, kể cả với dữ liệu vào không hợp lệ \\ \hline
+
+N11 & Hiệu năng &
+Thời gian xác minh ở mức chấp nhận được &
+Phân vị 95 của các tuyến đọc không vượt 500\,ms dưới tải đồng thời. \textbf{Yêu cầu này không kiểm chứng được} trên cách thiết lập đo hiện tại --- xem phân tích tại Mục 4.9.6 \\ \hline
+
+N12 & Hiệu năng &
+Hệ thống không sinh lỗi chức năng dưới tải &
+Không yêu cầu nào thất bại và không yêu cầu nào chạm hạn mức trong toàn bộ phép đo. Đây là một phép đếm nên không bị ảnh hưởng bởi nhiễu đo \\ \hline
+
+N13 & Khả năng mở rộng &
+Kiến trúc hỗ trợ mở rộng ngang &
+Tầng dịch vụ không giữ trạng thái phiên; mọi trạng thái dùng chung nằm trong cơ sở dữ liệu dùng chung hoặc trên chuỗi \\ \hline
+
+\end{longtable}

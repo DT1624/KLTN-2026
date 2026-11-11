@@ -1,0 +1,24 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/crypto.json
+% 11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz, Node v24.15.0, 7 lượt mỗi điểm
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[group style={group size=2 by 1, horizontal sep=1.7cm}, width=0.5\textwidth, height=5.4cm, grid=both, grid style={gray!18}, label style={font=\small}, tick label style={font=\footnotesize},
+    legend style={font=\scriptsize, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40}]
+\nextgroupplot[xmode=log, ymode=log, xlabel={Số vòng lặp PBKDF2}, ylabel={Thời gian (ms)},
+    title={(a) Dẫn xuất khoá mở ví}, title style={font=\small},
+    extra x ticks={600000}, extra x tick labels={}, extra x tick style={grid=major, grid style={red!60, densely dashed, thick}}]
+    \addplot[color=blue!70!black, mark=*, mark size=1.5pt, thick, error bars/.cd, y dir=both, y explicit] coordinates {(10000,1.60) +- (0,0.15) (50000,6.98) +- (0,0.39) (100000,14.14) +- (0,1.11) (210000,29.70) +- (0,2.14) (310000,44.12) +- (0,2.10) (600000,85.15) +- (0,5.62) (1000000,140.87) +- (0,7.81) (2000000,281.35) +- (0,26.29)};
+    \node[font=\scriptsize, red!60!black, anchor=south east, align=right] at (axis cs:560000,106.4) {600.000 vòng\\85{,}1 ms};
+\nextgroupplot[xmode=log, ymode=log, xlabel={Kích thước đầu vào (byte)}, ylabel={Thông lượng (MB/s)},
+    title={(b) SHA3-256: thư viện JS so với OpenSSL}, title style={font=\small}, legend pos=south east]
+    \addplot[color=red!70!black, mark=square*, mark size=1.5pt, thick] coordinates {(64,7.97) (256,16.85) (1024,16.29) (4096,17.72) (16384,19.27) (65536,18.85) (262144,18.30) (1048576,19.17)};
+    \addlegendentry{@noble/hashes (JS thuần)}
+    \addplot[dashed, color=green!50!black, mark=*, mark size=1.5pt, thick] coordinates {(64,31.12) (256,66.70) (1024,294.39) (4096,348.10) (16384,463.61) (65536,509.60) (262144,440.87) (1048576,510.42)};
+    \addlegendentry{node:crypto (OpenSSL)}
+\end{groupplot}
+\end{tikzpicture}
+\caption{Chi phí mật mã phía máy khách: (a) thời gian dẫn xuất khoá theo số vòng lặp, thanh lỗi là khoảng nhỏ nhất--lớn nhất; (b) thông lượng băm theo kích thước đầu vào}
+\label{fig:v2-crypto}
+\end{figure}

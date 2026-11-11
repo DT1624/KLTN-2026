@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.next/
+.env
+*.log
+.DS_Store
+contracts/build/
+.dev-logs/
+.run/
+bin/
+*.tsbuildinfo
+frontend/.tmp-*.mjs
+
+# Dữ liệu đo hiệu năng — sinh lại được bằng scripts/bench-*.mjs.
+# Bản dùng cho báo cáo đã được copy vào KLTN_.../source/chart/ nên không cần commit ở đây.
+.bench/
+
+# Cấu hình CLI chứa khoá riêng — không bao giờ commit.
+.aptos/
+.movement/

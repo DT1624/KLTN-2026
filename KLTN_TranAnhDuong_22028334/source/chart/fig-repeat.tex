@@ -1,0 +1,48 @@
+% SINH TỰ ĐỘNG bởi scripts/bench-plot.mjs — đừng sửa tay.
+% Nguồn dữ liệu: .bench/repeat.json  (15 lượt mỗi tuyến, đo 2026-10-13T14:30:43.508Z)
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    name=plotR,
+    width=0.95\textwidth, height=5.4cm,
+    ybar, bar width=7pt,
+    xlabel={}, ylabel={Độ trễ p95 (ms)},
+    xtick={0,1,2,3,4,5}, xticklabels={/health, /stats, /did/resolve, /lookup, /auth/me, /holder/credentials},
+    x tick label style={font=\scriptsize, rotate=20, anchor=north east},
+    tick label style={font=\footnotesize}, label style={font=\small},
+    ymin=0,
+    grid=both, grid style={gray!18},
+    error bars/y dir=both, error bars/y explicit,
+    legend style={font=\scriptsize, at={(0.98,0.98)}, anchor=north east, draw=gray!40},
+    title={(a) p95 trung bình qua 15 lượt đo, thanh sai số là một độ lệch chuẩn},
+    title style={font=\small},
+]
+    \addplot[fill=blue!35, draw=blue!60!black, error bars/error bar style={black}] coordinates {(0,45.52) +- (0,33.10) (1,41.32) +- (0,31.09) (2,18.17) +- (0,8.15) (3,19.28) +- (0,14.51) (4,40.12) +- (0,21.07) (5,16.62) +- (0,13.01)};
+    \addlegendentry{TypeScript}
+    \addplot[fill=orange!45, draw=orange!70!black, error bars/error bar style={black}] coordinates {(0,16.33) +- (0,18.97) (1,13.23) +- (0,27.17) (2,15.33) +- (0,20.01) (3,12.05) +- (0,11.21) (4,16.23) +- (0,14.34) (5,10.52) +- (0,9.12)};
+    \addlegendentry{Go}
+\end{axis}
+\begin{axis}[
+    at={(plotR.below south west)}, anchor=above north west, yshift=-0.9cm,
+    width=0.95\textwidth, height=4.2cm,
+    ybar, bar width=7pt,
+    ylabel={Hệ số biến thiên của p95 (\%)},
+    xtick={0,1,2,3,4,5}, xticklabels={/health, /stats, /did/resolve, /lookup, /auth/me, /holder/credentials},
+    x tick label style={font=\scriptsize, rotate=20, anchor=north east},
+    tick label style={font=\footnotesize}, label style={font=\small},
+    ymin=0,
+    grid=both, grid style={gray!18},
+    legend style={font=\scriptsize, at={(0.98,0.98)}, anchor=north east, draw=gray!40},
+    title={(b) Hệ số biến thiên --- càng cao thì số đo một lượt càng ít ý nghĩa},
+    title style={font=\small},
+]
+    \addplot[fill=blue!35, draw=blue!60!black] coordinates {(0,72.7) (1,75.2) (2,44.9) (3,75.3) (4,52.5) (5,78.3)};
+    \addlegendentry{TypeScript}
+    \addplot[fill=orange!45, draw=orange!70!black] coordinates {(0,116.2) (1,205.4) (2,130.6) (3,93.0) (4,88.3) (5,86.7)};
+    \addlegendentry{Go}
+\end{axis}
+\end{tikzpicture}
+\caption{Độ lặp lại của phép đo độ trễ: cùng một phép đo (120 yêu cầu, 12 yêu cầu đồng thời) chạy lại 15 lần trên cùng một máy và cùng một cấu hình.}
+\label{fig:bench-repeat}
+\end{figure}

@@ -1,0 +1,22 @@
+\begin{table}[H]
+\centering
+\caption{Kết quả kiểm chứng chức năng ở lần chạy gần nhất (môi trường cách ly)}
+\label{tab:v2-test-results}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{4.6cm}|p{3.6cm}|p{5.0cm}|}
+\hline
+\textbf{Bộ kiểm} & \textbf{Kết quả} & \textbf{Ghi chú} \\ \hline
+Hợp đồng Move & \textbf{140/140} đạt & 93 phép (66\%) là phép kiểm trường hợp vi phạm, khẳng định đúng mã lỗi \\ \hline
+Tên hàm hợp đồng ở ba nơi gọi & \textbf{19/19} khớp & Mã Move, hai cài đặt tầng chỉ mục, giao diện \\ \hline
+Luồng nghiệp vụ & \textbf{31/31} $\times$ 2 cài đặt & Cùng một bộ chạy lên cả hai \\ \hline
+Kiểm thử đầu cuối & \textbf{19/19} $\times$ 2 cài đặt & \\ \hline
+Đối chiếu hai cài đặt & \textbf{65/65} khớp & Cùng kết quả, cùng mã trạng thái, kể cả với đầu vào sai \\ \hline
+Phát hiện nội dung bị sửa & \textbf{7/7} $\times$ 2 cài đặt & Bước 6 hỏng, bước 5 vẫn đạt \\ \hline
+Chế độ nghiêm ngặt & \textbf{8/8} $\times$ 2 cài đặt & Chặn mã giao dịch bịa, chặn bên tự khai \\ \hline
+Ví trong trình duyệt & \textbf{17/17} đạt & Không gói tin nào chứa khoá riêng hay mật khẩu \\ \hline
+Đăng nhập trên máy khác & \textbf{17/17} đạt & Biết địa chỉ mà không có khoá thì bị từ chối \\ \hline
+Tầng chuỗi với fullnode thật & \textbf{12/12} đạt & Giao diện chương trình trên chuỗi khớp mã nguồn \\ \hline
+Kiểm kiểu và kiểm tĩnh & 0 lỗi & TypeScript ở hai nơi; \texttt{gofmt}, \texttt{go vet}, \texttt{go test} \\ \hline
+\end{tabular}
+\end{table}

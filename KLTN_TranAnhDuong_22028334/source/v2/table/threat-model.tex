@@ -1,0 +1,25 @@
+\begin{longtable}{|c|p{4.6cm}|p{6.0cm}|p{2.0cm}|}
+\caption{Mô hình đe doạ và rào chắn tương ứng}
+\label{tab:v2-threat} \\
+\hline
+\textbf{Mã} & \textbf{Hành vi} & \textbf{Rào chắn} & \textbf{Vị trí} \\ \hline
+\endfirsthead
+\hline
+\textbf{Mã} & \textbf{Hành vi} & \textbf{Rào chắn} & \textbf{Vị trí} \\ \hline
+\endhead
+T1 & Tự khai là bên phát hành rồi cấp & Kiểm thẩm quyền trước khi ghi & Hợp đồng \\ \hline
+T2 & Cấp loại ngoài phạm vi & Phép giao bit với mặt nạ phạm vi & Hợp đồng \\ \hline
+T3 & Cấp sau khi hết hạn uỷ quyền & Đối chiếu thời hạn với dấu thời gian chuỗi & Hợp đồng \\ \hline
+T4 & Khai mã giao dịch không tồn tại & Bốn phép kiểm với nút đầy đủ trước khi ghi chỉ mục & Dịch vụ \\ \hline
+T5 & Dùng lại giao dịch thật nhưng khác loại & So khớp tên hàm trong giao dịch & Dịch vụ \\ \hline
+T6 & Dùng lại giao dịch của người khác & So khớp người gửi & Dịch vụ \\ \hline
+T7 & Sửa nội dung sau khi cấp, ghim lại & Bước 6: đối chiếu với băm đã neo & Xác minh \\ \hline
+T8 & Trình bày chứng thực của người khác & Bước 3: chữ ký người trình bày & Xác minh \\ \hline
+T9 & Khai giá trị băm sai & Tính lại băm từ nội dung trước khi ghi & Dịch vụ \\ \hline
+T10 & Phát lại chữ ký đăng nhập & Thách thức dùng một lần, có thời hạn & Dịch vụ \\ \hline
+T11 & Lợi dụng vai trò trong phiên & Kiểm quyền trực tiếp trên chuỗi & Dịch vụ, hợp đồng \\ \hline
+T12 & Chuyển quyền gốc tới địa chỉ không ai giữ & Chuyển hai bước & Hợp đồng \\ \hline
+T13 & Tự ngưng rồi tự bật chứng thực & Kích hoạt lại chỉ thuộc quản trị viên & Hợp đồng \\ \hline
+T14 & Chiếm chuỗi định danh của người khác & Kiểm tính duy nhất của định danh & Hợp đồng \\ \hline
+T15 & Cổng IPFS trả nội dung khác & Tính lại băm khi phân giải & Phân giải \\ \hline
+\end{longtable}

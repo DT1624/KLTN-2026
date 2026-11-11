@@ -1,0 +1,86 @@
+\begin{longtable}{|p{4.3cm}|p{3.2cm}|p{6.5cm}|}
+\caption{Phân tách thẩm quyền theo thao tác}
+\label{tab:role-permission} \\
+
+\hline
+\textbf{Thao tác} & \textbf{Vai trò được phép} & \textbf{Cơ sở của quy định} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Thao tác} & \textbf{Vai trò được phép} & \textbf{Cơ sở của quy định} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Cấp và thu hồi quyền quản trị viên
+& Chỉ quản trị viên gốc
+& Quyền phê duyệt bên phát hành là quyền có hệ quả rộng nhất, nên việc trao quyền đó phải tập trung ở gốc
+\\ \hline
+
+Cấp bit ủy quyền cho bên phát hành
+& Chỉ quản trị viên gốc
+& Bit này cho phép mở rộng chuỗi thẩm quyền; nếu quản trị viên cấp được thì chuỗi có thể mở rộng ngoài kiểm soát của gốc
+\\ \hline
+
+Phê duyệt bên phát hành (không kèm bit ủy quyền)
+& Quản trị viên gốc, quản trị viên
+& Đây là thao tác quản trị thường xuyên, cần phân cấp để vận hành được
+\\ \hline
+
+Phê duyệt bên phát hành cấp dưới
+& Bên phát hành có bit ủy quyền
+& Phạm vi phải là tập con, thời hạn không vượt thời hạn của bên ủy quyền, bit ủy quyền không truyền tiếp
+\\ \hline
+
+Đình chỉ, kích hoạt lại, thu hồi bên phát hành
+& Quản trị viên gốc, quản trị viên
+& Thao tác làm giảm quyền, nên điều kiện tiên quyết lỏng hơn thao tác cấp
+\\ \hline
+
+Đề cử người nhận quyền gốc; hủy đề cử
+& Chỉ quản trị viên gốc
+& Chỉ gốc hiện tại mới có quyền quyết định người kế nhiệm
+\\ \hline
+
+Ký nhận quyền gốc
+& Địa chỉ đang được đề cử, không chặn theo vai trò
+& Tại thời điểm ký nhận, người được đề cử chưa phải gốc; rào chắn thật là điều kiện trùng khớp địa chỉ trong hợp đồng
+\\ \hline
+
+Cấp phát chứng thực
+& Bên phát hành đang hoạt động, loại nằm trong phạm vi
+& Yêu cầu đầy đủ nhất trong hệ thống: cần cả thẩm quyền còn hiệu lực và phạm vi phù hợp
+\\ \hline
+
+Thu hồi chứng thực
+& Bên đã cấp chứng thực đó
+& Chỉ cần quyền sở hữu; không kiểm thẩm quyền còn hiệu lực, theo nguyên tắc bất đối xứng ở Mục 3.4.5
+\\ \hline
+
+Đình chỉ chứng thực
+& Bên đã cấp chứng thực đó
+& Thao tác tạm thời, thuộc quyền của đơn vị cấp
+\\ \hline
+
+Kích hoạt lại chứng thực bị đình chỉ
+& Chỉ quản trị viên gốc, quản trị viên
+& Nếu bên phát hành tự đình chỉ rồi tự kích hoạt lại, thao tác đình chỉ mất giá trị kiểm toán
+\\ \hline
+
+Đình chỉ, kích hoạt lại định danh của chính mình
+& Chủ sở hữu định danh
+& Tự khóa thì tự mở được; hệ thống ghi nhận ai đã đặt trạng thái đình chỉ để phân biệt với trường hợp bị quản trị viên khóa
+\\ \hline
+
+Đình chỉ, thu hồi định danh của người khác
+& Quản trị viên gốc, quản trị viên
+& Định danh bị quản trị viên khóa thì phải quản trị viên mở, tránh việc đối tượng bị xử lý tự giải khóa
+\\ \hline
+
+\end{longtable}

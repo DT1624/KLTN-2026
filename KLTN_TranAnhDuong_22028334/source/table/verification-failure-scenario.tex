@@ -1,0 +1,83 @@
+\begin{longtable}{|p{3.4cm}|p{10.3cm}|}
+\caption{Đặc tả kịch bản xác minh thất bại}
+\label{tab:verification-failure-scenario} \\
+
+\hline
+\textbf{Mục} & \textbf{Nội dung} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mục} & \textbf{Nội dung} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Mã kịch bản & KB7 \\
+\hline
+
+Tác nhân chính & Bên xác minh \\
+\hline
+
+Mục đích &
+Kiểm chứng rằng quy trình xác minh không chỉ từ chối đúng các trường hợp không hợp lệ, mà còn \textbf{nêu đúng nguyên nhân} --- điều kiện cần để bên xác minh biết phải xử lý thế nào \\
+\hline
+
+Nguyên tắc thiết kế được kiểm chứng &
+Quy trình không dừng ở bước thất bại đầu tiên mà chạy hết cả bảy bước, rồi trả báo cáo đầy đủ. Lý do: một bản trình bày có thể hỏng ở nhiều chỗ, và bên xác minh cần thấy toàn bộ vấn đề \\
+\hline
+
+Trường hợp A: nội dung chứng thực bị sửa sau khi cấp &
+Bước 6 (đối chiếu nội dung với giá trị băm đã neo) \textbf{thất bại}, trong khi bước 5 (trạng thái hiệu lực) và bước 7 (thẩm quyền bên phát hành) \textbf{vẫn đạt}. Đây là trường hợp quan trọng nhất của kịch bản: nó chứng minh một quy trình thiếu bước 6 sẽ chấp nhận chứng thực đã bị sửa. Tương ứng hành vi T7 \\
+\hline
+
+Trường hợp B: bản trình bày do thực thể khác ký &
+Bước 3 (chữ ký của người trình bày) thất bại. Các bước còn lại có thể vẫn đạt, vì bản thân chứng thực không bị sửa gì. Tương ứng hành vi T8 \\
+\hline
+
+Trường hợp C: chứng thực đã bị thu hồi &
+Bước 5 thất bại, nêu rõ trạng thái là đã thu hồi kèm lý do. Bước 6 vẫn đạt, vì nội dung không bị sửa --- đây là điểm phân biệt với trường hợp A \\
+\hline
+
+Trường hợp D: chứng thực đã hết hạn &
+Bước 5 thất bại với trạng thái đã hết hạn. Báo cáo phân biệt rõ hết hạn với thu hồi, vì hai trạng thái này mang hai thông điệp khác nhau \\
+\hline
+
+Trường hợp E: bên phát hành đã bị thu hồi thẩm quyền &
+Bước 7 thất bại. Các bước kỹ thuật đều đạt, vì chứng thực vẫn nguyên vẹn và chữ ký vẫn đúng. Tương ứng kịch bản KB5 \\
+\hline
+
+Trường hợp F: định danh của người trình bày đã bị thu hồi &
+Bước 4 thất bại, nêu rõ trạng thái định danh. Trường hợp này tương ứng tình huống chủ thể đã thu hồi định danh cũ sau khi lộ khóa riêng \\
+\hline
+
+Trường hợp G: DID Document bị thay đổi trên lớp lưu trữ &
+Phép đối chiếu giá trị băm trong quy trình phân giải định danh thất bại, nên bước 4 không hoàn tất. Tương ứng hành vi T15 \\
+\hline
+
+Trường hợp H: không tải được bản trình bày &
+Bước 1 thất bại. Báo cáo phân biệt rõ đây là \textbf{lỗi khả dụng} chứ không phải \textbf{lỗi hợp lệ} --- một bản trình bày không tải được không có nghĩa là văn bằng không hợp lệ \\
+\hline
+
+Trường hợp I: liên kết chia sẻ hết hạn hoặc đã bị thu hồi &
+Dịch vụ từ chối ngay ở bước mở liên kết, với mã trạng thái riêng phân biệt với lỗi không tìm thấy \\
+\hline
+
+Kết quả sau cùng &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Mọi trường hợp đều bị từ chối ở kết quả tổng thể
+    \item Báo cáo nêu đúng bước nào thất bại và vì nguyên nhân gì
+    \item Ba nhóm nguyên nhân --- nội dung bị sửa, trạng thái không còn hiệu lực, thẩm quyền không còn --- được phân biệt rõ, theo Bảng \ref{tab:verification-matrix}
+\end{itemize} \\
+\hline
+
+Tính chất được kiểm chứng &
+F9, F10, N6 --- và các hành vi T7, T8, T15 trong mô hình đe dọa \\
+\hline
+
+\end{longtable}

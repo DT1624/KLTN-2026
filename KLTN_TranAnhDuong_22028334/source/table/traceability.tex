@@ -1,0 +1,128 @@
+\begin{longtable}{|c|c|p{2.3cm}|p{1.9cm}|p{1.6cm}|p{2.4cm}|c|}
+\caption{Ma trận truy vết: từ câu hỏi nghiên cứu đến bằng chứng và đóng góp}
+\label{tab:traceability} \\
+
+\hline
+\textbf{CH} & \textbf{Gap} & \textbf{Yêu cầu} & \textbf{Thiết kế} & \textbf{Kịch bản} & \textbf{Bằng chứng} & \textbf{Mức} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{CH} & \textbf{Gap} & \textbf{Yêu cầu} & \textbf{Thiết kế} & \textbf{Kịch bản} & \textbf{Bằng chứng} & \textbf{Mức} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+CH1 & G4 & F1, F2, N8, N9
+& Mục 3.5.3, 3.6
+& KB1, KB4
+& Đối chiếu tầng chuỗi 11/12; bộ kiểm nội dung bị sửa 7/7 $\times$ 2
+& 2
+\\ \hline
+
+CH1 & G4 & F8, F9
+& Mục 3.6.1
+& KB4, KB7
+& Bộ kiểm nội dung bị sửa; kiểm thử luồng nghiệp vụ 31/31 $\times$ 2
+& 2
+\\ \hline
+
+CH1 & G4 & F11, N6
+& Mục 3.6.2
+& KB6, KB7
+& Kiểm thử đơn vị hợp đồng; kiểm thử luồng nghiệp vụ
+& 2
+\\ \hline
+
+CH2 & G2 & N1, N2, N3
+& Mục 3.3.3, 3.4.1
+& KB2, KB5
+& Kiểm thử đơn vị hợp đồng; kiểm thử chế độ nghiêm ngặt 6/6
+& 1
+\\ \hline
+
+CH2 & G3 & F3, F10
+& Mục 3.4.2
+& KB2, KB3
+& Kiểm thử đơn vị hợp đồng (phạm vi, thời hạn)
+& 1
+\\ \hline
+
+CH2 & G1, G3 & F4
+& Mục 3.4.3
+& KB2
+& Kiểm thử đơn vị hợp đồng (ba ràng buộc, mỗi ràng buộc một phép kiểm)
+& 1
+\\ \hline
+
+CH2 & G2 & F5
+& Mục 3.4.4
+& KB2
+& Kiểm thử đơn vị hợp đồng (kịch bản địa chỉ không ai kiểm soát)
+& 1
+\\ \hline
+
+CH2 & G3 & F11
+& Mục 3.4.5
+& KB6
+& Kiểm thử đơn vị hợp đồng (đơn vị hết hạn ủy quyền vẫn thu hồi được)
+& 1
+\\ \hline
+
+CH2 & G2 & F12, N2
+& Mục 3.4.6, 3.4.7
+& KB2, KB5, KB6
+& Kiểm thử luồng nghiệp vụ (nội dung thực của nhật ký)
+& 2
+\\ \hline
+
+CH3 & --- & N6
+& Mục 3.7
+& KB7
+& Bảng \ref{tab:detection-results}; giới hạn tại Mục 4.11.1
+& 3
+\\ \hline
+
+CH3 & --- & N10
+& Mục 4.4
+& ---
+& Đối chiếu hai cài đặt 59/59; giới hạn tại Mục 4.11.1
+& 3 (hạ mức)
+\\ \hline
+
+CH3 & --- & N11
+& Mục 4.9
+& ---
+& Bảng \ref{tab:bench-sweep}; \textbf{không kiểm chứng được} trên cách thiết lập đo hiện tại (Mục 4.9.6)
+& 3
+\\ \hline
+
+CH3 & --- & N4, N5, N7
+& Mục 3.5, 4.5
+& KB1, KB4
+& Kiểm thử ví 17/17; khôi phục thiết bị khác 17/17
+& 3
+\\ \hline
+
+--- & G6 & ---
+& Mục 1.2.1, 2.7.6
+& ---
+& Phân tích tài liệu; chưa có triển khai tích hợp
+& 4
+\\ \hline
+
+--- & G5 & ---
+& ---
+& ---
+& \textbf{Không có}: khóa luận nằm trong cùng giới hạn (Mục 4.11)
+& ---
+\\ \hline
+
+\end{longtable}
+
+\noindent Cách đọc bảng: mỗi hàng là một đường truy vết hoàn chỉnh từ một câu hỏi nghiên cứu (CH1--CH3, Mục 1.3.1), qua khoảng trống tương ứng (G1--G6, Mục 2.8.1), yêu cầu hệ thống (F và N, Mục 3.1), mục thiết kế, kịch bản sử dụng (KB1--KB7, Mục 4.7), đến bằng chứng và mức đóng góp (Mục 1.6). Hai hàng cuối là hai khoảng trống không gắn với một câu hỏi nghiên cứu cụ thể: G6 được xử lý ở mức phân tích, còn G5 không được xử lý và được thừa nhận.

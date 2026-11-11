@@ -1,0 +1,24 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/crypto.json
+\begin{table}[H]
+\centering
+\caption{Thời gian một phép mật mã phía máy khách (trung vị 7 lượt)}
+\label{tab:v2-crypto}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{5.4cm}|r|r|p{4.6cm}|}
+\hline
+\textbf{Phép tính} & \textbf{µs} & \textbf{CV (\%)} & \textbf{Dùng ở đâu} \\ \hline
+Ed25519 sinh khoá & 237{,}6 & 34{,}6 & Tạo ví \\ \hline
+Ed25519 ký thông điệp đăng nhập & 406{,}9 & 39{,}6 & Đăng nhập, ký VP, ký giao dịch \\ \hline
+Ed25519 kiểm chữ ký (JS thuần) & 1537{,}9 & 3{,}3 & Kiểm chữ ký phía máy khách \\ \hline
+Chuẩn hoá một VC 631 byte & 4{,}7 & 98{,}8 & Trước mọi phép băm \\ \hline
+Chuẩn hoá và băm SHA3-256 một VC & 42{,}5 & 3{,}3 & Cấp phát, bước 6 xác minh \\ \hline
+AES-256-GCM mã hoá khoá 32 byte & 72{,}9 & 7{,}3 & Lưu ví \\ \hline
+SLIP-0010, 5 cấp dẫn xuất & 63{,}7 & 5{,}6 & Khôi phục trên máy khác \\ \hline
+\hline
+\multicolumn{4}{|l|}{\textbf{Tính bằng mili giây}} \\ \hline
+BIP-39 cụm từ $\rightarrow$ hạt giống & 7{,}5 & 4{,}3 & PBKDF2-SHA512, 2048 vòng \\ \hline
+PBKDF2-SHA256, 600.000 vòng & 85{,}1 & 4{,}7 & Mỗi lần mở ví \\ \hline
+\end{tabular}
+\end{table}

@@ -1,0 +1,57 @@
+\begin{longtable}{|c|p{2.9cm}|p{4.4cm}|p{2.5cm}|p{2.6cm}|}
+\caption{Phân loại khoảng trống nghiên cứu theo tầng và phạm vi can thiệp của khóa luận}
+\label{tab:gap-taxonomy} \\
+
+\hline
+\textbf{Mã} & \textbf{Tầng} & \textbf{Nội dung khoảng trống} & \textbf{Bằng chứng} & \textbf{Khóa luận xử lý} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mã} & \textbf{Tầng} & \textbf{Nội dung khoảng trống} & \textbf{Bằng chứng} & \textbf{Khóa luận xử lý} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+G1 & Chuẩn hóa
+& Chuẩn về truy vấn sổ đăng ký tin cậy còn hoãn phần ủy quyền nhiều cấp; chuẩn về trạng thái chứng thực không biểu diễn thẩm quyền
+& \cite{ToIP_TRQP2026}, \cite{W3C_BitstringStatusList2025}
+& \textbf{Góp một điểm dữ liệu}: đưa ra cách biểu diễn cụ thể và chứng minh nó chạy được
+\\ \hline
+
+G2 & Kiến trúc
+& Lớp quản trị khi tồn tại thường là cơ sở dữ liệu do một tổ chức vận hành, nên chỉ \emph{di chuyển} sự phụ thuộc vào trung gian chứ không loại bỏ
+& \cite{Baldi2019}, \cite{Zonneveld2026}, \cite{SSI_Survey2025}
+& \textbf{Xử lý trực tiếp}: sổ đăng ký là trạng thái hợp đồng trên chuỗi công khai
+\\ \hline
+
+G3 & Biểu diễn thẩm quyền
+& Thẩm quyền biểu diễn ở dạng nhị phân; thiếu ba chiều phạm vi, thời hạn và số cấp ủy quyền
+& \cite{Blockcerts2016}, \cite{OpenBadges2024}, \cite{ToIP_TRQP2026}
+& \textbf{Xử lý trực tiếp}: mặt nạ bit, trường thời hạn, ủy quyền hai cấp có ràng buộc
+\\ \hline
+
+G4 & Ngữ nghĩa xác minh
+& Quy trình xác minh không phân biệt loại thất bại; nhiều hệ thống không đối chiếu nội dung với giá trị băm đã neo
+& Mục 2.7.1, Mục 2.7.3
+& \textbf{Xử lý trực tiếp}: bảy bước có báo cáo riêng, gồm bước đối chiếu nội dung
+\\ \hline
+
+G5 & Phương pháp đánh giá
+& Lĩnh vực thiếu nghiên cứu người dùng: chỉ 2 trong 47 công trình được phân tích có đánh giá tính khả dụng; các khung niềm tin chỉ kiểm chứng bằng cài đặt hợp đồng
+& \cite{Ambati2026}, \cite{DeSalve2023}
+& \textbf{Không xử lý} --- khóa luận nằm trong cùng giới hạn này; thừa nhận tại Mục 4.11 và Mục 5.3
+\\ \hline
+
+G6 & Bối cảnh
+& Tại Việt Nam, hành lang pháp lý và hạ tầng số đã hình thành nhưng chưa có lớp quản trị thẩm quyền cấp phát cho lĩnh vực giáo dục
+& \cite{TT10_2026}, \cite{LuatBVDLCN2025}, \cite{NDAChain2025}
+& \textbf{Xử lý một phần}: trong phạm vi một trường hợp nghiên cứu
+\\ \hline
+
+\end{longtable}

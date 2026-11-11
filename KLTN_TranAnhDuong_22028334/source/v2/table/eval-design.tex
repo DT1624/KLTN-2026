@@ -1,0 +1,17 @@
+\begin{table}[H]
+\centering
+\caption{Các thí nghiệm đánh giá và câu hỏi mà mỗi thí nghiệm trả lời}
+\label{tab:v2-eval-design}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|c|p{3.6cm}|p{5.4cm}|p{3.4cm}|}
+\hline
+\textbf{TN} & \textbf{Đối tượng đo} & \textbf{Câu hỏi} & \textbf{Thiết lập} \\ \hline
+A & Phép mật mã phía máy khách & Ví có đủ nhanh không, và 600.000 vòng PBKDF2 mua được bao nhiêu an toàn? & 7 lượt mỗi phép, thuần CPU \\ \hline
+B & Giá trị băm nội dung trên chuỗi & Kẻ đọc chuỗi khôi phục được gì, tuỳ theo hiểu biết sẵn có? & Tấn công từ điển thật, 20 mục tiêu \\ \hline
+C & Danh sách bit trạng thái & Lựa chọn trạng thái theo bản ghi tốn bao nhiêu so với chuẩn W3C? & 10 hạt giống mỗi điểm \\ \hline
+D & Quy mô dữ liệu & Thời gian xác minh thay đổi thế nào khi dữ liệu tăng từ vài trăm lên $10^5$ bản ghi? & CSDL cách ly, 1 yêu cầu đồng thời \\ \hline
+E & Nguồn nhiễu của phép đo & Tách bộ sinh tải khỏi hệ thống có làm phép đo lặp lại được không? & 10 lượt $\times$ 1000 yêu cầu, ghim CPU \\ \hline
+F & Chi phí phía chuỗi & Ở chế độ on-chain, một lần xác minh tốn bao nhiêu vòng gọi mạng; một thao tác ghi tốn bao nhiêu gas? & Fullnode thật, chỉ đọc và mô phỏng \\ \hline
+\end{tabular}
+\end{table}

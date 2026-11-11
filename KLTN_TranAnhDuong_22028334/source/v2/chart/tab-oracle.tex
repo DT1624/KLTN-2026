@@ -1,0 +1,19 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/oracle.json
+\begin{table}[H]
+\centering
+\caption{Không gian tìm kiếm theo hiểu biết sẵn có của kẻ tấn công}
+\label{tab:v2-oracle}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|c|p{6.4cm}|r|r|}
+\hline
+\textbf{Mã} & \textbf{Kẻ tấn công đã biết} & \textbf{Số ứng viên} & \textbf{Thời gian (4 luồng)} \\ \hline
+A1 & Biết mọi trường trừ điểm & $10^{2{,}6}$ & 0{,}6 ms \\ \hline
+A2 & Biết mọi trường trừ điểm và năm & $10^{4{,}0}$ & 16{,}3 ms \\ \hline
+B & Biết vcId, người học, đơn vị & $10^{11{,}5}$ & 5{,}5 ngày \\ \hline
+C & Như B, chưa biết mã sinh viên & $10^{16{,}5}$ & $10^{3}$ năm \\ \hline
+D & Chỉ có dữ liệu trên chuỗi (không biết vcId) & $10^{53{,}2}$ & $10^{40}$ năm \\ \hline
+E & Như A1 nhưng có muối 128 bit & $10^{41{,}1}$ & $10^{28}$ năm \\ \hline
+\end{tabular}
+\end{table}

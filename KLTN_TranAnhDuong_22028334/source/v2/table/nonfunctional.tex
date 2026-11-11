@@ -1,0 +1,22 @@
+\begin{longtable}{|c|p{4.4cm}|p{8.6cm}|}
+\caption{Yêu cầu phi chức năng và tiêu chí đo lường}
+\label{tab:v2-nonfunc} \\
+\hline
+\textbf{Mã} & \textbf{Yêu cầu} & \textbf{Tiêu chí đo lường} \\ \hline
+\endfirsthead
+\hline
+\textbf{Mã} & \textbf{Yêu cầu} & \textbf{Tiêu chí đo lường} \\ \hline
+\endhead
+N1 & Thẩm quyền kiểm chứng độc lập & Tra cứu trạng thái thẩm quyền không cần tài khoản hay thoả thuận trước \\ \hline
+N2 & Thay đổi quản trị để lại dấu vết & Mọi thao tác ghi sổ đăng ký có mã giao dịch; không thao tác nào xoá được lịch sử \\ \hline
+N3 & Quy tắc thi hành ở nơi không bỏ qua được & Gọi thẳng hợp đồng, bỏ qua tầng dịch vụ, vẫn bị chặn \\ \hline
+N4 & Không đọc được thông tin học thuật từ chuỗi & Không trường nào trên chuỗi chứa nội dung văn bằng ở dạng đọc được. Tiêu chí này \emph{không} đồng nghĩa với ``không có dữ liệu cá nhân trên chuỗi'' (Mục \ref{sec:tn-oracle}) \\ \hline
+N5 & Khoá riêng không rời thiết bị & Không gói tin nào chứa khoá riêng, mật khẩu hay cụm từ khôi phục \\ \hline
+N6 & Phát hiện kịch bản gian lận định nghĩa trước & Mỗi kịch bản ở Bảng \ref{tab:v2-threat} bị chặn, và thông điệp từ chối khớp đúng nguyên nhân \\ \hline
+N7 & Xác minh không cần nơi cấp trực tuyến & Hoàn tất khi dịch vụ của bên phát hành ngừng, chỉ cần chuỗi và lớp lưu trữ \\ \hline
+N8 & Tuân thủ W3C DID Core và VC & Cấu trúc hợp lệ theo đặc tả \cite{W3C_DIDCore2022, W3C_VCDM2025}; điểm chưa tuân thủ được liệt kê \\ \hline
+N9 & Hợp đồng giao diện ổn định & Hai cài đặt trả cùng kết quả, cùng mã trạng thái, kể cả với đầu vào sai \\ \hline
+N10 & Thời gian xác minh chấp nhận được & Phân vị 95 của tuyến đọc dưới 500\,ms khi có tải đồng thời \\ \hline
+N11 & Không lỗi chức năng dưới tải & Không yêu cầu nào thất bại trong toàn bộ phép đo \\ \hline
+N12 & Chi phí ví chấp nhận được & Mở khoá ví dưới 1 giây trên thiết bị phổ thông; một lần ký dưới 10\,ms \\ \hline
+\end{longtable}

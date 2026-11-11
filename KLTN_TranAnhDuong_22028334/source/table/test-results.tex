@@ -1,0 +1,81 @@
+\begin{longtable}{|p{5.4cm}|p{3.1cm}|p{5.2cm}|}
+\caption{Kết quả kiểm chứng chức năng ở lần chạy gần nhất}
+\label{tab:test-results} \\
+
+\hline
+\textbf{Thành phần hoặc bộ kiểm} & \textbf{Kết quả} & \textbf{Ghi chú} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Thành phần hoặc bộ kiểm} & \textbf{Kết quả} & \textbf{Ghi chú} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Hợp đồng thông minh (Move)
+& \textbf{126 / 126 đạt}
+& Bao gồm 83 phép kiểm trường hợp vi phạm; mười vấn đề rà soát đều có phép kiểm chứng minh đã sửa \\
+\hline
+
+Đối chiếu tên hàm ba nơi gọi
+& \textbf{19 / 19 khớp}
+& Tăng từ 16 phép khi bổ sung tầng chuỗi của giao diện làm nơi gọi thứ ba \\
+\hline
+
+Tầng chỉ mục, cài đặt TypeScript
+& 0 lỗi kiểm kiểu; \textbf{19 / 19} đầu cuối; \textbf{31 / 31} luồng nghiệp vụ
+& Biên dịch ở chế độ kiểm kiểu nghiêm ngặt \\
+\hline
+
+Tầng chỉ mục, cài đặt Go
+& Biên dịch và kiểm tĩnh sạch; \textbf{19 / 19} đầu cuối; \textbf{31 / 31} luồng nghiệp vụ
+& Chạy cùng bộ kiểm thử với cài đặt TypeScript \\
+\hline
+
+Đối chiếu hai cài đặt
+& \textbf{59 / 59 khớp}
+& Tăng từ 53 phép sau khi bổ sung các tuyến còn thiếu ở cài đặt Go \\
+\hline
+
+Giao diện
+& 0 lỗi kiểm kiểu; gói phát hành 405\,KB
+& Giảm từ 4,98\,MB sau khi loại bộ công cụ của nền tảng \\
+\hline
+
+Kiểm thử ví
+& \textbf{17 / 17 đạt}
+& Gồm phép kiểm rằng không gói tin nào gửi lên dịch vụ chứa khóa riêng hoặc mật khẩu \\
+\hline
+
+Khôi phục trên thiết bị khác
+& \textbf{17 / 17 đạt}
+& Gồm phép kiểm rằng biết địa chỉ mà không có khóa thì đăng nhập bị từ chối \\
+\hline
+
+Phát hiện nội dung bị sửa
+& \textbf{7 / 7 đạt} $\times$ 2 cài đặt
+& Xem phân tích tại Mục 4.8.3 \\
+\hline
+
+Chế độ nghiêm ngặt
+& \textbf{6 / 6 đạt}
+& Chạy ở chế độ phụ thuộc chuỗi \\
+\hline
+
+Tầng chuỗi với nút đầy đủ
+& \textbf{11 / 12 đạt}
+& Phép còn lại thất bại vì gói trên chuỗi là bản xuất bản trước đợt sửa; xem phân tích tại Mục 4.8.2 \\
+\hline
+
+Phép đo tải, bốn thí nghiệm
+& \textbf{0 lỗi / 905.160 yêu cầu}
+& 0 phản hồi vượt hạn mức. Kết luận về ngưỡng độ trễ: xem Mục 4.9.6 \\
+\hline
+
+\end{longtable}

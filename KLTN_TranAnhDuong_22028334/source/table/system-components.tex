@@ -1,0 +1,84 @@
+\begin{longtable}{|p{2.8cm}|p{4.3cm}|p{2.1cm}|p{2.4cm}|p{2.4cm}|}
+\caption{Các thành phần chính của hệ thống}
+\label{tab:system-components} \\
+
+\hline
+\textbf{Thành phần} & \textbf{Trách nhiệm} & \textbf{Đầu vào chính} & \textbf{Đầu ra chính} & \textbf{Phụ thuộc} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Thành phần} & \textbf{Trách nhiệm} & \textbf{Đầu vào chính} & \textbf{Đầu ra chính} & \textbf{Phụ thuộc} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Sổ đăng ký định danh
+& Đăng ký, cập nhật, thu hồi định danh; giữ lịch sử phiên bản DID Document
+& Giá trị băm và định danh nội dung của DID Document
+& Bản ghi định danh trên chuỗi
+& Lớp lưu trữ ngoài chuỗi
+\\ \hline
+
+Sổ đăng ký tin cậy
+& Lưu và công bố trạng thái thẩm quyền: phạm vi, thời hạn, trạng thái, phiên bản
+& Địa chỉ của bên phát hành
+& Bản ghi thẩm quyền trên chuỗi
+& Sổ đăng ký định danh
+\\ \hline
+
+Sổ đăng ký chứng thực
+& Neo giá trị băm của chứng thực và quản lý trạng thái hiệu lực
+& Giá trị băm, định danh nội dung, loại và thời hạn
+& Bản ghi chứng thực trên chuỗi
+& Sổ đăng ký tin cậy, sổ đăng ký định danh
+\\ \hline
+
+Ví định danh số
+& Sinh và bảo vệ khóa, ký chứng thực và ký giao dịch, dựng bản trình bày
+& Mật khẩu hoặc cụm từ khôi phục
+& Chữ ký, giao dịch đã ký, bản trình bày
+& Không phụ thuộc tầng dịch vụ
+\\ \hline
+
+Tầng chuỗi phía máy khách
+& Dựng giao dịch, lấy dạng tuần tự hóa từ nút đầy đủ, ký, gửi và chờ xác nhận
+& Tên hàm và tham số
+& Mã giao dịch đã xác nhận
+& Ví định danh, nút đầy đủ
+\\ \hline
+
+Dịch vụ xác minh giao dịch
+& Kiểm bốn điều kiện của giao dịch với nút đầy đủ trước khi ghi chỉ mục
+& Mã giao dịch do máy khách khai báo
+& Kết luận chấp nhận hoặc từ chối
+& Nút đầy đủ
+\\ \hline
+
+Dịch vụ xác minh chứng thực
+& Thực hiện bảy bước kiểm tra và trả báo cáo theo từng bước
+& Bản trình bày
+& Báo cáo xác minh chi tiết
+& Toàn bộ sổ đăng ký, lớp lưu trữ ngoài chuỗi
+\\ \hline
+
+Tầng chỉ mục
+& Lưu bản sao phục vụ truy vấn nhanh, nhật ký kiểm toán, dữ liệu danh sách
+& Bản ghi đã được xác minh
+& Kết quả truy vấn
+& Cơ sở dữ liệu dùng chung
+\\ \hline
+
+Điểm vào dịch vụ
+& Điều phối yêu cầu, xác thực phiên, giới hạn tần suất
+& Yêu cầu HTTP
+& Phản hồi theo hợp đồng giao diện
+& Toàn bộ hệ thống
+\\ \hline
+
+\end{longtable}

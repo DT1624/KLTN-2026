@@ -1,0 +1,42 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://credentials.vnu.edu.vn/contexts/academic/v2"
+  ],
+  "id": "urn:uuid:3a9f4c21-8e7d-4b3f-9a1c-2e5d8f6a0b4c",
+  "type": [
+    "VerifiableCredential",
+    "BachelorDegreeCredential"
+  ],
+  "issuer": {
+    "id": "did:vnu:0xbb01e7a3f2c4d5e6",
+    "name": "VNU University of Engineering and Technology"
+  },
+  "validFrom": "2024-06-15T09:00:00Z",
+  "credentialSubject": {
+    "id": "did:vnu:0xdd01student12345",
+    "degree": {
+      "type": "BachelorOfEngineering",
+      "name": "Bachelor of Computer Science",
+      "gpa": "3.62",
+      "graduationDate": "2024-06-10"
+    },
+    "alumniOf": {
+      "id": "did:vnu:0xbb01e7a3f2c4d5e6",
+      "name": "VNU University of Engineering and Technology"
+    }
+  },
+  "credentialStatus": {
+    "id": "aptos:0xCAFE::vc_registry",
+    "type": "AptosOnChainStatus",
+    "contractAddress": "0xCAFE",
+    "vcIdHash": "a3f8d2c1e5b9047f6a2e4d8c0b3f7a1d..."
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2024-06-15T09:00:00Z",
+    "verificationMethod": "did:vnu:0xbb01...#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z58DAdFfa9SkqZMVPxAQpic7ndSayn1PzZs6ZjWp1CktyGesjuTSwRdoWh..."
+  }
+}

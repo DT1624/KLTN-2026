@@ -1,0 +1,96 @@
+\begin{longtable}{|c|p{3.9cm}|p{3.4cm}|p{4.5cm}|}
+\caption{Kết quả kiểm chứng khả năng phát hiện các hành vi trong mô hình đe dọa}
+\label{tab:detection-results} \\
+
+\hline
+\textbf{Mã} & \textbf{Hành vi} & \textbf{Nơi bị chặn} & \textbf{Bộ kiểm chứng minh} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mã} & \textbf{Hành vi} & \textbf{Nơi bị chặn} & \textbf{Bộ kiểm chứng minh} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+T1 & Tự khai là bên phát hành rồi cấp văn bằng
+& Hợp đồng, phép kiểm thẩm quyền
+& Kiểm thử đơn vị hợp đồng; kiểm thử chế độ nghiêm ngặt
+\\ \hline
+
+T2 & Cấp loại văn bằng ngoài phạm vi
+& Hợp đồng, phép giao bit
+& Kiểm thử đơn vị hợp đồng
+\\ \hline
+
+T3 & Cấp văn bằng sau khi thẩm quyền hết hạn
+& Hợp đồng, đối chiếu thời hạn
+& Kiểm thử đơn vị hợp đồng
+\\ \hline
+
+T4 & Khai báo mã giao dịch không tồn tại
+& Tầng dịch vụ, phép kiểm tồn tại
+& Kiểm thử chế độ nghiêm ngặt
+\\ \hline
+
+T5 & Tái sử dụng giao dịch thật thuộc loại thao tác khác
+& Tầng dịch vụ, so khớp tên hàm
+& Kiểm thử chế độ nghiêm ngặt; đối chiếu tên hàm
+\\ \hline
+
+T6 & Tái sử dụng giao dịch của người khác
+& Tầng dịch vụ, so khớp người gửi
+& Kiểm thử chế độ nghiêm ngặt
+\\ \hline
+
+T7 & Sửa nội dung văn bằng sau khi cấp
+& Quy trình xác minh, bước thứ sáu
+& Bộ kiểm phát hiện nội dung bị sửa, cả hai cài đặt
+\\ \hline
+
+T8 & Trình bày chứng thực của người khác
+& Quy trình xác minh, bước thứ ba
+& Kiểm thử luồng nghiệp vụ
+\\ \hline
+
+T9 & Khai báo giá trị băm sai
+& Tầng dịch vụ, tính lại giá trị băm
+& Kiểm thử đầu cuối; đối chiếu hai cài đặt
+\\ \hline
+
+T10 & Gửi lại chữ ký đăng nhập đã thu được
+& Tầng dịch vụ, số dùng một lần
+& Kiểm thử ví; khôi phục thiết bị khác
+\\ \hline
+
+T11 & Lợi dụng vai trò trong phiên để vượt quyền
+& Tầng dịch vụ và hợp đồng
+& Kiểm thử chế độ nghiêm ngặt
+\\ \hline
+
+T12 & Gán quyền gốc cho địa chỉ không ai kiểm soát
+& Hợp đồng, cơ chế hai bước
+& Kiểm thử đơn vị hợp đồng
+\\ \hline
+
+T13 & Tự đình chỉ rồi tự kích hoạt lại chứng thực
+& Hợp đồng, phân tách thẩm quyền
+& Kiểm thử đơn vị hợp đồng; kiểm thử luồng nghiệp vụ
+\\ \hline
+
+T14 & Đăng ký chuỗi định danh đã thuộc thực thể khác
+& Hợp đồng, phép kiểm duy nhất
+& Kiểm thử đơn vị hợp đồng
+\\ \hline
+
+T15 & Cổng truy cập trả về nội dung khác nội dung đã đăng ký
+& Quy trình phân giải, bước đối chiếu giá trị băm
+& Bộ kiểm phát hiện nội dung bị sửa
+\\ \hline
+
+\end{longtable}

@@ -1,0 +1,15 @@
+% Tóm tắt bằng Tiếng Việt (bản rút gọn)
+\mychapter{TÓM TẮT}
+
+{\fsize{12pt}
+\textbf{Tóm tắt:} Khoá luận đề xuất một kiến trúc định danh số và một khung quản trị niềm tin cho văn bằng số trong môi trường giáo dục nhiều tổ chức, lấy Đại học Quốc gia Hà Nội làm trường hợp nghiên cứu. Vấn đề không nằm ở việc thiếu công cụ phát hiện văn bằng giả, mà ở một đặc điểm kiến trúc của mô hình hiện hành: thông tin xác thực nằm ở nơi cấp chứ không nằm trong văn bằng, nên chi phí kiểm chứng tăng theo số lần kiểm chứng và việc xác minh trở thành ngoại lệ.
+
+Dựa trên mô hình định danh tự chủ (SSI), khoá luận dùng định danh phi tập trung (DID), chứng thực có thể xác minh (VC) và ví định danh số theo chuẩn W3C, kết hợp lưu trữ trên chuỗi và ngoài chuỗi. Đóng góp trọng tâm nằm ở lớp mà mật mã học không giải quyết được: tổ chức ký văn bằng có thẩm quyền cấp loại văn bằng đó hay không. Chuỗi thẩm quyền, gồm phạm vi cấp phát biểu diễn bằng mặt nạ bit, thời hạn uỷ quyền, uỷ quyền nhiều cấp có ràng buộc và quy tắc thu hồi, được viết thành quy tắc trong hợp đồng thông minh để trạng thái thẩm quyền trở thành dữ liệu công khai. Quy trình xác minh gồm bảy bước, trong đó có bước đối chiếu nội dung văn bằng với giá trị băm đã neo.
+
+Hệ thống thử nghiệm gồm ba mô-đun hợp đồng Move đã xuất bản trên mạng thử nghiệm Movement, hai cài đặt độc lập của tầng chỉ mục và một ví không lưu ký chạy trong trình duyệt. Sáu thí nghiệm đánh giá cho thấy: mở ví với PBKDF2 600.000 vòng mất khoảng 85\,ms; giá trị băm nội dung không muối trên chuỗi không khôi phục được với kẻ chỉ có dữ liệu trên chuỗi, nhưng khôi phục được điểm và năm tốt nghiệp trong khoảng 16\,ms với kẻ đã biết định danh chứng thực; một chỉ mục còn thiếu làm thời gian xác minh tăng tuyến tính theo kích thước dữ liệu, và thêm chỉ mục giảm hai bậc ở $10^5$ bản ghi; tách lõi CPU cho bộ sinh tải chỉ giảm độ phân tán của phép đo ở tuyến tính toán nặng; và ở chế độ on-chain, một lần xác minh tốn khoảng $(k+3)$ vòng gọi fullnode, mỗi vòng khoảng 330\,ms.
+
+Khoá luận rút ra hai nguyên tắc thiết kế có phạm vi rộng hơn bài toán văn bằng: thao tác thu hồi phải có điều kiện lỏng hơn thao tác cấp, và một thao tác không thể hoàn tác phải được bên bị ảnh hưởng chứng minh điều kiện bằng hành động của chính họ. Các giới hạn được nêu rõ: kiến trúc giảm mức phơi nhiễm dữ liệu cá nhân nhưng không bảo đảm quyền xoá; mỗi bên phát hành ký bằng một khoá duy nhất; và kết luận là về tính khả thi kỹ thuật, không về tính khả dụng.
+
+\vspace{0.5cm}
+\textit{\textbf{Từ khoá:}} \textit{Quản trị niềm tin, Văn bằng số, Định danh phi tập trung, Định danh tự chủ, Sổ đăng ký tin cậy, Hợp đồng thông minh.}
+}

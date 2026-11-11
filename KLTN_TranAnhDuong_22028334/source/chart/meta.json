@@ -1,0 +1,16 @@
+{
+  "startedAt": "2026-10-13T14:30:43.508Z",
+  "node": "v24.15.0",
+  "repeats": 15,
+  "sweep": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64
+  ],
+  "probeDid": "did:vnu:holder:0xf8c31a19972277e4c98499212059734ced67d5fb3d74a78eba6ec5ef7acbff58",
+  "finishedAt": "2026-10-13T14:32:04.363Z"
+}

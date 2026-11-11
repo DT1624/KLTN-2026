@@ -1,0 +1,80 @@
+% Chương 6: Kết luận (bản rút gọn)
+\chapter{KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN}
+\label{chap:ket-luan}
+
+\section{Trả lời các câu hỏi nghiên cứu}
+\label{sec:tra-loi}
+
+Bảng \ref{tab:v2-trace} hợp nhất các hệ ký hiệu dùng trong báo cáo (câu hỏi, khoảng trống, yêu cầu, mục thiết kế, bằng chứng) thành các đường truy vết. Bảng cũng là cách kiểm tra rằng không yêu cầu nào được nêu rồi bỏ lửng.
+
+\input{source/v2/table/traceability}
+
+\textbf{CH1: kiến trúc cho xác minh độc lập.} Kiến trúc ở Chương \ref{chap:kien-truc} trả lời câu hỏi này bằng cách phân chia dữ liệu theo nguyên tắc: những gì cần bất biến và đọc tự do thì nằm trên chuỗi, nội dung đầy đủ nằm ngoài chuỗi. Quy trình bảy bước kiểm đồng thời ba thuộc tính tin cậy và hoàn tất mà không cần nơi cấp tham gia. Kết quả cụ thể nhất là bước 6, đối chiếu nội dung với giá trị băm đã neo, được chứng minh là cần thiết: bộ kiểm sửa nội dung cho thấy bước này hỏng trong khi bước kiểm trạng thái vẫn đạt, nghĩa là một quy trình thiếu nó sẽ chấp nhận văn bằng đã bị sửa. Thí nghiệm F bổ sung một điều kiện mà bản trước chưa định lượng: ở chế độ on-chain, thời gian xác minh bị chi phối gần như hoàn toàn bởi số vòng gọi tới fullnode, khoảng $(k+3)$ vòng với mẫu gọi hiện tại.
+
+\textbf{CH2: khung quản trị cho chuỗi thẩm quyền.} Khung quản trị biểu diễn phạm vi bằng mặt nạ bit với phép kiểm chi phí hằng số, thời hạn uỷ quyền là một trường thật được đối chiếu với dấu thời gian chuỗi, uỷ quyền nhiều cấp có ba ràng buộc do hợp đồng thi hành, và toàn bộ trạng thái là dữ liệu công khai trên chuỗi. Điểm khác biệt so với các hệ thống đã khảo sát nằm ở nơi đặt sổ đăng ký: khi sổ đăng ký là cơ sở dữ liệu của một tổ chức, sự phụ thuộc vào trung gian chỉ được dời từ tầng chứng thực lên tầng quản trị. Gói hợp đồng đã sửa nay đã được xuất bản lại trên mạng thử nghiệm, nên các quy tắc này không còn chỉ tồn tại trong mã nguồn. Một chỗ còn hở được phát hiện khi viết lại báo cáo: thu hồi thẩm quyền ở cấp trên chưa tự động lan xuống bên phát hành cấp dưới.
+
+\textbf{CH3: tính khả thi kỹ thuật.} Câu trả lời khẳng định về tính đúng đắn chức năng và chi phí phía máy khách, và có điều kiện về hiệu năng. Về tính đúng đắn, phần lớn phép kiểm trên hợp đồng dựng một hành vi vi phạm và khẳng định nó bị từ chối đúng mã lỗi; mọi kịch bản trong mô hình đe doạ đều bị chặn đúng nguyên nhân. Về chi phí phía máy khách, mở ví mất khoảng 85\,ms và một lần ký dưới nửa mili giây. Về hiệu năng, câu trả lời phụ thuộc vào hai điều kiện mà bản trước không thấy: một chỉ mục còn thiếu làm thời gian xác minh tăng tuyến tính theo kích thước dữ liệu (thêm chỉ mục giảm hai bậc), và ở chế độ on-chain thì độ trễ mạng chiếm ưu thế tuyệt đối.
+
+\section{Đánh giá lại các đóng góp}
+
+Mô hình uỷ quyền nhiều cấp và hai nguyên tắc thiết kế giữ nguyên mức ``mới'' đã tuyên bố ở Mục \ref{sec:dong-gop}; thực nghiệm không làm thay đổi điều đó. Đóng góp tích hợp giữ nguyên, và việc xuất bản lại gói hợp đồng làm nó mạnh hơn so với bản trước. Đóng góp kiểm chứng được mở rộng với sáu thí nghiệm, trong đó hai kết quả đáng chú ý nhất lại là hai kết quả \emph{chỉnh lại} chính báo cáo trước.
+
+Kết quả thứ nhất là thí nghiệm B. Bản trước cho rằng giá trị băm nội dung không muối là một máy xác nhận và để lập luận ở đó. Thí nghiệm cho thấy bức tranh có hai mặt: với kẻ chỉ có dữ liệu trên chuỗi, định danh chứng thực ngẫu nhiên đóng vai trò muối và tấn công không khả thi; với kẻ đã biết định danh đó, thuộc tính có không gian nhỏ bị khôi phục trong vài chục mili giây. Điều này quan trọng hơn vẻ ngoài của nó, vì định danh chứng thực xuất hiện trong liên kết chia sẻ và trong nhật ký, và vì nó đặt ra một điều kiện tiên quyết cho mọi hướng phát triển tiết lộ chọn lọc sau này.
+
+Kết quả thứ hai là thí nghiệm E. Bản trước quy độ phân tán của phép đo cho việc bộ sinh tải chạy chung máy với hệ thống. Tách lõi CPU làm giảm rõ rệt độ phân tán ở tuyến tính toán nặng nhưng không ở tuyến nhẹ, nên giả thuyết đó chỉ đúng một phần. Yếu tố có ảnh hưởng lớn hơn là số mẫu mỗi lượt.
+
+\section{Bài học về phương pháp}
+
+Quá trình thực hiện để lại một số bài học về cách đánh giá một hệ thống loại này, và chúng có giá trị độc lập với kết quả cụ thể.
+
+\textit{Một phép kiểm đạt chưa chắc đạt vì lý do đúng.} Phép kiểm ``mã giao dịch bịa bị từ chối'' từng đạt nhờ một phép kiểm định dạng chặn trước. Từ đó mọi phép kiểm trường hợp vi phạm đều khẳng định mã lỗi cụ thể, và hợp đồng có mã lỗi riêng cho từng loại vi phạm.
+
+\textit{Thứ có trong mã chưa chắc đang chạy.} Một hàm đối chiếu toàn vẹn không ai gọi, một bảng nhật ký không ai ghi, một nhánh hết hạn không bao giờ được thực thi, một tập lệnh kiểm thử in ``tất cả đạt'' bất kể kết quả: cả bốn trông như đang bảo vệ hệ thống trong khi không. Cách phát hiện luôn giống nhau: viết một phép kiểm được thiết kế để làm bước đó thất bại, rồi xem nó có thất bại thật không.
+
+\textit{Một phép đo chỉ có nghĩa khi đã kiểm độ lặp lại.} Bảng p95 của bản trước bị loại sau khi chạy lại cho kết quả khác hẳn. Bản này đi thêm một bước: kiểm một giả thuyết về nguồn nhiễu thay vì chỉ nêu nó, và chạy lại cả thí nghiệm D để xác nhận kết luận không phụ thuộc vào một lượt chạy.
+
+\textit{Đo ở chỗ thiết kế giả định là ổn.} Truy vấn thiếu chỉ mục, giá trị băm có thể khôi phục, mẫu gọi chuỗi tuần tự đều nằm ở những chỗ không ai nghi ngờ vì dữ liệu thử nghiệm nhỏ và chế độ chạy thử không chạm tới chúng. Muốn thấy chúng, phải thay đổi chính những biến mà các phép đo trước giữ cố định.
+
+\section{Hạn chế}
+\label{sec:han-che}
+
+\textbf{Niềm tin gốc không phi tập trung hoàn toàn.} Hệ thống dùng một nguồn niềm tin gốc. Như Mục \ref{sec:khung-quan-tri} đã phân tích, thẩm quyền của nguồn gốc đến từ sự công nhận pháp lý bên ngoài hệ thống, không cơ chế mật mã nào thay được. Ambati và cộng sự mô tả tự chủ như một phổ, và các hệ thống do nhà nước bảo đảm được mô tả chính xác hơn là ``hướng người dùng'' \cite{Ambati2026}. Hệ thống này nằm ở đúng vị trí đó.
+
+\textbf{Gánh nặng quản lý khoá.} Mất cả cụm từ ghi nhớ lẫn thiết bị thì không có đường khôi phục. Khoá trong trình duyệt được bảo vệ khi ví đóng, không được bảo vệ khi ví mở. Quan trọng hơn, chưa có đánh giá nào với người dùng thật về việc họ có sao lưu và bảo vệ khoá đúng cách hay không. Khoá luận kết luận về tính khả thi kỹ thuật, không về tính khả dụng.
+
+\textbf{Một khoá cho mỗi bên phát hành.} Khoá của một trường bị lộ cho phép cấp chứng thực hợp lệ trong toàn bộ phạm vi của trường cho tới khi bị thu hồi. Đây là lớp tấn công mà cả hai phân tích an toàn trong lĩnh vực đều chỉ ra \cite{Baldi2019, Zonneveld2026}.
+
+\textbf{Thu hồi không lan truyền theo chuỗi uỷ quyền.} Hàm kiểm thẩm quyền chỉ đọc bản ghi của chính bên phát hành. Thu hồi một trường không vô hiệu hoá các khoa mà trường đã uỷ quyền; ràng buộc về thời hạn chỉ giới hạn thiệt hại theo thời gian. Trường hợp thời hạn bằng không trong uỷ quyền lại được hợp đồng xử lý đúng nhưng chưa có phép kiểm riêng.
+
+\textbf{Quyền xoá dữ liệu.} Kiến trúc giảm mức phơi nhiễm nhưng không bảo đảm quyền xoá, vì giá trị băm không muối trên chuỗi vẫn là dữ liệu cá nhân theo cách giải thích hiện hành \cite{EDPB2025}, và thí nghiệm B cho thấy nó khôi phục được trong một số điều kiện. Nội dung chứng thực trên IPFS chưa được mã hoá.
+
+\textbf{Điểm chưa tuân thủ chuẩn.} Phương thức \texttt{did:vnu} chưa đăng ký với W3C; phép chuẩn hoá dùng JSON thay vì RDF \cite{W3C_RDFC2024}; bằng chứng lưu tách rời thay vì nhúng; trạng thái theo bản ghi thay vì danh sách bit \cite{W3C_BitstringStatusList2025}; ngữ cảnh dùng phiên bản 1.1 của mô hình dữ liệu thay vì 2.0.
+
+\textbf{Phạm vi đánh giá.} Các phép đo chạy trên một máy ảo bốn luồng; dữ liệu độn tối đa $10^5$ bản ghi; đường ghi lên chuỗi không được đo vì không gửi giao dịch thật; mẫu gọi song song tới fullnode không đo sạch được do hạn mức của fullnode công khai.
+
+\section{Hướng phát triển}
+\label{sec:huong-phat-trien}
+
+\textbf{Sửa ngay các điểm mà thực nghiệm chỉ ra.} Ba thay đổi có chi phí thấp và lợi ích đã đo được: thêm chỉ mục trên \texttt{on\_chain\_vc\_id} (một dòng trong lược đồ, giảm hai bậc thời gian xác minh ở $10^5$ bản ghi); song song hoá bước 5 của quy trình xác minh và vòng lặp kiểm trạng thái trong tuyến danh sách văn bằng ở cài đặt Go; và thêm một trường muối ngẫu nhiên 128 bit vào nội dung chứng thực, giữ bí mật cùng nội dung, để định danh chứng thực không còn là thứ duy nhất ngăn tấn công từ điển.
+
+\textbf{Lan truyền thu hồi theo chuỗi uỷ quyền.} Bổ sung vào hàm kiểm thẩm quyền một bước kiểm bên đã phê duyệt khi bên phát hành là cấp dưới. Vì chuỗi tối đa hai cấp, chi phí chỉ là thêm một lần đọc bản ghi; kèm theo là phép kiểm cho trường hợp thời hạn bằng không.
+
+\textbf{Mô hình quản trị nhiều tổ chức.} Chuyển từ một gốc sang sổ đăng ký do nhiều tổ chức cùng quản trị qua chữ ký đa bên, chữ ký ngưỡng hoặc biểu quyết trên chuỗi. Nhờ phân lớp, thay đổi chỉ đụng tới lớp quản trị. Áp dụng giao thức truy vấn sổ đăng ký đã chuẩn hoá \cite{ToIP_TRQP2026}; mô hình uỷ quyền ở Mục \ref{sec:uy-quyen} có thể là một điểm dữ liệu cho phần đặc tả còn hoãn.
+
+\textbf{Tích hợp hạ tầng số quốc gia.} Nền tảng blockchain quốc gia \cite{NDAChain2025} phù hợp về mô hình cấp phép, và hệ thống định danh điện tử công dân cung cấp bước liên kết giữa định danh phi tập trung với một con người thật, bước mà hệ thống hiện phải giả định đã hoàn tất. Thông tư 10/2026/TT-BGDĐT \cite{TT10_2026} đã tạo cơ sở pháp lý cho hướng này.
+
+\textbf{Chữ ký nhiều bên cho cấp phát.} Yêu cầu nhiều chữ ký hoặc chữ ký ngưỡng cho thao tác cấp phát, phù hợp với thực tiễn hành chính nơi cấp một văn bằng vốn cần nhiều cấp phê duyệt.
+
+\textbf{Quyền riêng tư.} Theo thứ tự: mã hoá nội dung trước khi ghim; thay giá trị băm bằng cam kết có khoá mà khoá huỷ được khi có yêu cầu xoá; rồi mới bổ sung tiết lộ chọn lọc ở mức thuộc tính qua SD-JWT \cite{RFC9901} hoặc BBS \cite{Looker_BBS2025}. Thí nghiệm B cho thấy thứ tự này bắt buộc: chừng nào giá trị băm của toàn bộ nội dung còn neo công khai mà không muối, việc ẩn một thuộc tính có không gian giá trị nhỏ chỉ là hình thức.
+
+\textbf{Danh sách bit trạng thái và hạ tầng đọc riêng.} Chuyển sang Bitstring Status List để giảm chi phí thu hồi và khôi phục quyền riêng tư theo nhóm; vận hành fullnode hoặc bộ lập chỉ mục sự kiện riêng để đường xác minh on-chain không phụ thuộc vào hạn mức của fullnode công khai.
+
+\textbf{Nghiên cứu người dùng.} Đánh giá quy trình tạo ví, sao lưu và khôi phục với nhóm người dùng thật, kết hợp các cơ chế khôi phục như khôi phục qua mạng xã hội.
+
+\section{Kết luận chung}
+
+Khoá luận xuất phát từ một nhận định về bản chất bài toán: vấn đề của văn bằng hiện nay không phải thiếu công cụ phát hiện văn bằng giả mà là chi phí của một lần kiểm chứng quá cao, đến mức xác minh trở thành ngoại lệ. Từ đó khoá luận đề xuất một kiến trúc nhúng thông tin kiểm chứng vào chính văn bằng và neo nó trên một hạ tầng công khai bất biến, rồi bổ sung phần mà các hệ thống hiện có còn để trống: một khung quản trị trong đó chuỗi thẩm quyền được viết thành mã thi hành và trở thành dữ liệu ai cũng tra được. Hai phân tích an toàn trên hai hệ thống đã triển khai, cách nhau bảy năm, cùng chỉ về một nguyên nhân gốc là thiếu cơ chế ràng buộc danh tính pháp lý của tổ chức với danh tính số của bên phát hành \cite{Baldi2019, Zonneveld2026}. Cả hai hệ thống đều có chữ ký hợp lệ và giá trị băm neo đúng cách; khoảng trống thuộc về quản trị chứ không thuộc về mật mã.
+
+Kết quả thực nghiệm cho thấy hướng tiếp cận khả thi về kỹ thuật trong các giới hạn đã nêu. Ba nguyên tắc thiết kế (bất đối xứng giữa cấp và thu hồi, chuyển quyền gốc hai bước, cấp lại vai trò kèm phiên bản) đều được phát hiện bằng cách dựng kịch bản làm hệ thống thất bại, và đều áp dụng được ngoài bài toán văn bằng. Bộ thí nghiệm mở rộng trong bản báo cáo này cho thấy thêm một điều về phương pháp: những phát hiện có giá trị nhất đến từ việc đo những thứ mà thiết kế \emph{giả định} là ổn (một truy vấn ``chắc chắn nhanh'', một giá trị băm ``chắc chắn không đọc được'', một nguồn nhiễu ``chắc chắn đã biết''), chứ không đến từ việc đo lại những thứ đã biết là ổn.
+
+Hệ thống hiện ở mức kiểm chứng khái niệm. Phần có giá trị lâu dài hơn chính hệ thống là mô hình quản trị thẩm quyền và các nguyên tắc đi kèm. Khi văn bằng số đã có giá trị pháp lý và hạ tầng số quốc gia đang hình thành, phần này có thể đóng góp vào việc xây dựng hạ tầng văn bằng số cho giáo dục đại học Việt Nam.

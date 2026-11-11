@@ -1,0 +1,18 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/chain.json
+\begin{table}[H]
+\centering
+\caption{Chi phí phía chuỗi đo trên mạng thử nghiệm Movement (chỉ đọc và mô phỏng)}
+\label{tab:v2-chain}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{6.6cm}|r|r|}
+\hline
+\textbf{Phép đo} & \textbf{p50} & \textbf{p95} \\ \hline
+Một vòng \texttt{GET /v1/} (ms, 40 mẫu) & 324 & 508 \\ \hline
+Một lời gọi view \texttt{is\_active\_issuer} (ms) & 333 & 492 \\ \hline
+\multicolumn{3}{|l|}{\textbf{Gas qua mô phỏng} (đơn vị gas $\times$ giá 100 octa)} \\ \hline
+\texttt{did\_registry::register\_did} & \multicolumn{2}{r|}{425 đơn vị $=$ 0{,}000425 MOVE} \\ \hline
+\texttt{authority::propose\_root} & \multicolumn{2}{r|}{119 đơn vị $=$ 0{,}000119 MOVE} \\ \hline
+\end{tabular}
+\end{table}

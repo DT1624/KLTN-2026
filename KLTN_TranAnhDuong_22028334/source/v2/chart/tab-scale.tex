@@ -1,0 +1,18 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/scale.json
+\begin{table}[H]
+\centering
+\caption{Kế hoạch thực thi của truy vấn trạng thái theo \texttt{on\_chain\_vc\_id} (EXPLAIN ANALYZE)}
+\label{tab:v2-explain}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|r|r|l|r|r|}
+\hline
+\textbf{$N$} & \textbf{Bảng (MB)} & \textbf{Kiểu quét} & \textbf{Dòng bị lọc bỏ} & \textbf{Thời gian (ms)} \\ \hline
+0 & 0{,}1 & Seq Scan & 7 & 0{,}048 \\ \hline
+1.000 & 1{,}9 & Seq Scan & 1.007 & 0{,}319 \\ \hline
+10.000 & 18{,}2 & Seq Scan & 10.007 & 4{,}405 \\ \hline
+100.000 & 180{,}8 & Seq Scan & 100.007 & 48{,}674 \\ \hline
+100.000 (có chỉ mục) & 180{,}8 & Index Scan & 0 & 0{,}129 \\ \hline
+\end{tabular}
+\end{table}

@@ -1,0 +1,215 @@
+% Chương 5: Đánh giá thực nghiệm (bản rút gọn, bộ thí nghiệm mở rộng)
+\chapter{ĐÁNH GIÁ THỰC NGHIỆM}
+\label{chap:danh-gia}
+
+Chương này đánh giá hệ thống theo câu hỏi CH3. Phần đầu trình bày thiết kế đánh giá và kết quả kiểm chứng chức năng. Phần chính gồm sáu thí nghiệm định lượng, mỗi thí nghiệm nhắm vào một câu hỏi mà bản báo cáo trước để ngỏ hoặc trả lời chưa đúng mức. Chương kết thúc bằng phần thảo luận và các mối đe doạ đối với tính hợp lệ của kết quả.
+
+\section{Thiết kế đánh giá}
+\label{sec:thiet-ke-dg}
+
+Bản báo cáo trước đánh giá hiệu năng bằng bốn thí nghiệm tải với tổng 905.160 yêu cầu trên các tuyến đọc. Kết quả bền nhất của đợt đo đó là không có lỗi chức năng nào. Phát hiện quan trọng nhất lại mang tính phương pháp: ở 120 mẫu mỗi lượt, hệ số biến thiên (CV) của phân vị 95 giữa các lượt lặp là 45--205\%, nên bảng p95 theo tuyến không phản ánh đặc tính của hệ thống. Đợt đo đó để lại bốn câu hỏi chưa có lời đáp: độ phân tán đến từ đâu; hệ thống hành xử thế nào khi dữ liệu lớn lên, vì mọi phép đo chỉ chạy trên vài trăm bản ghi; các lựa chọn bảo mật như số vòng PBKDF2 hay giá trị băm không muối tốn bao nhiêu và bảo vệ được bao nhiêu; và chế độ on-chain thực sự tốn bao nhiêu thời gian.
+
+Bộ thí nghiệm trong chương này được thiết kế để trả lời bốn câu hỏi đó (Bảng \ref{tab:v2-eval-design}). Ba nguyên tắc được giữ xuyên suốt. Một là ưu tiên phép đo thuần tính toán (A, B, C) khi có thể, vì chúng ít nhiễu hơn nhiều so với phép đo qua HTTP và cho mốc để đọc các thí nghiệm khác. Hai là mọi phép đo qua HTTP chạy trên CSDL và cổng cách ly, tạo mới mỗi lượt và xoá khi xong, để kết quả không phụ thuộc trạng thái dữ liệu phát triển. Ba là mọi thí nghiệm có khả năng cho kết quả ``xấu'' đều được giữ nguyên kết quả đó: thí nghiệm E được thiết kế để kiểm một giả thuyết của bản trước và đã bác bỏ một phần giả thuyết ấy.
+
+\input{source/v2/table/eval-design}
+
+\input{source/v2/table/eval-env}
+
+Toàn bộ dữ liệu thô được lưu dạng JSON; biểu đồ và bảng trong chương được sinh tự động từ dữ liệu đó, với số liệu nhúng thẳng trong mã nguồn báo cáo. Sáu thí nghiệm ứng với các tập lệnh trong thư mục \texttt{scripts/eval/} của mã nguồn, được điều phối bởi một tập lệnh duy nhất. Tập lệnh này dựng môi trường cách ly, chạy, vẽ biểu đồ, rồi trả hệ thống về đúng trạng thái trước khi chạy: xoá CSDL đánh giá, trả lại cấu hình CPU của container, xoá tệp trạng thái chứa khoá của tài khoản thử, và xoá container nếu trước đó chưa có.
+
+\section{Tính đúng đắn chức năng và khả năng phát hiện gian lận}
+\label{sec:dg-chuc-nang}
+
+\input{source/v2/table/test-results}
+
+Bảng \ref{tab:v2-test-results} tổng hợp lần chạy gần nhất của toàn bộ bộ kiểm thử trong môi trường cách ly. Ba đặc điểm của chiến lược kiểm thử cần được nêu. Thứ nhất, phần lớn phép kiểm trên hợp đồng là phép kiểm trường hợp vi phạm: chúng dựng một thao tác sai quy tắc và khẳng định nó bị từ chối \emph{với đúng mã lỗi}, vì một quy tắc chỉ được coi là hoạt động khi có phép kiểm cho thấy nó chặn được điều nó tuyên bố chặn. Thứ hai, cùng một bộ kiểm thử đầu cuối được chạy lên cả hai cài đặt tầng chỉ mục, thay vì mỗi bên có một bộ kiểm viết theo chính hành vi của nó. Thứ ba, bản thân bộ điều khiển kiểm thử cũng được kiểm. Tập lệnh chạy kiểm thử ban đầu dẫn đầu ra qua một lệnh lọc dòng cuối, và vì mã thoát của đường ống là mã thoát của lệnh cuối, nó in ``tất cả đạt'' bất kể kết quả. Lỗi bị phát hiện khi một bộ báo 52/53 mà dòng tổng kết vẫn xanh.
+
+Bộ đối chiếu tầng chuỗi với fullnode thật nay đạt trọn vẹn. Ở bản trước, phép đối chiếu giao diện chương trình trên chuỗi với mã nguồn là phép duy nhất thất bại, vì gói trên chuỗi là bản cũ. Sau khi gói được xuất bản lại, phép này đạt: hàm cấp phát trên chuỗi nhận bảy tham số như mã nguồn. Mô phỏng \texttt{register\_did} với đúng cách mã hoá tham số của giao diện chạy tới thân hàm và thành công.
+
+Khả năng phát hiện gian lận được đánh giá theo yêu cầu N6: mỗi hành vi trong Bảng \ref{tab:v2-threat} phải bị chặn, và thông điệp từ chối phải khớp đúng nguyên nhân thật. Hai bộ kiểm được xây riêng cho mục đích này. \textit{Bộ kiểm sửa nội dung} cấp một chứng thực và xác minh để thấy cả bảy bước đều đạt; sửa một trường trong nội dung chứng thực ngay trong chỉ mục, đúng kịch bản T7; rồi xác minh lại và khẳng định hai điều: bước 6 \emph{thất bại}, còn bước 5 \emph{vẫn đạt}. Khẳng định thứ hai là phần quan trọng, vì nó chứng minh một quy trình chỉ theo dõi trạng thái sẽ bỏ sót loại tấn công này. Quá trình xây bộ kiểm làm lộ thêm một vấn đề: hàm đối chiếu nội dung với chuỗi đã có trong mã nguồn bản TypeScript từ đầu với một cái tên nghe như đang bảo vệ tính toàn vẹn, nhưng không tuyến nào gọi tới nó, còn bản Go thì không có hàm này. \textit{Bộ kiểm chế độ nghiêm ngặt} chạy với \texttt{VERIFY\_ONCHAIN=true} và chứng minh hệ thống vẫn chặn mã giao dịch bịa và vẫn từ chối bên tự khai là bên phát hành. Bộ này cần thiết vì phần lớn kiểm thử tự động chạy ở chế độ không phụ thuộc chuỗi.
+
+\section{Thí nghiệm A: chi phí mật mã phía máy khách}
+\label{sec:tn-crypto}
+
+Ví không lưu ký đặt mọi phép mật mã của chủ thể vào trình duyệt, nên câu hỏi đầu tiên là chúng có đủ nhanh không. Thí nghiệm đo đúng các thư viện mà giao diện dùng, mỗi phép lặp bảy lượt. PBKDF2 và AES-GCM được gọi qua Web Cryptography API của Node.js, cùng giao diện lập trình với trình duyệt nhưng dựa trên OpenSSL; con số trong trình duyệt có thể khác, nên kết quả nên được đọc như bậc độ lớn.
+
+\input{source/v2/chart/tab-crypto}
+
+\input{source/v2/chart/fig-crypto}
+
+\textbf{Chi phí của người dùng.} Ký một thông điệp đăng nhập mất khoảng 0,4\,ms, chuẩn hoá và băm một văn bằng 631 byte mất khoảng 43\,µs, khôi phục khoá từ cụm từ ghi nhớ mất dưới 8\,ms. Phép đắt nhất là dẫn xuất khoá khi mở ví: 85\,ms với 600.000 vòng. Như vậy yêu cầu N12 (mở ví dưới một giây, một lần ký dưới 10\,ms) được thoả mãn với khoảng dư hơn một bậc. Hình \ref{fig:v2-crypto}a cho thấy thời gian dẫn xuất tăng tuyến tính gần như hoàn hảo theo số vòng: từ 10.000 tới 2.000.000 vòng, thời gian trên mỗi vòng dao động trong khoảng 0,14--0,16\,µs, và hệ số biến thiên giữa các lượt chỉ 3--7\%. Phép đo thuần CPU ổn định hơn hẳn phép đo qua HTTP.
+
+\textbf{Giá trị an toàn mua được.} Mục đích của 600.000 vòng là làm mỗi lần đoán mật khẩu trở nên đắt với kẻ đã lấy được bản mã của ví. Với cùng phần cứng và cùng cài đặt, mỗi lõi CPU chỉ thử được khoảng $1000/85 \approx 12$ mật khẩu mỗi giây. Một mật khẩu tám ký tự gồm chữ thường và chữ số có $36^8 \approx 2{,}8 \cdot 10^{12}$ khả năng, tương đương khoảng 7.500 năm trên một lõi. Bảng \ref{tab:v2-password} mở rộng phép tính này cho một số kiểu mật khẩu thường gặp.
+
+\begin{table}[H]
+\centering
+\caption{Thời gian vét cạn mật khẩu ví trên một lõi CPU, với PBKDF2 600.000 vòng (khoảng 11,7 lần thử mỗi giây)}
+\label{tab:v2-password}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{6.2cm}|r|r|}
+\hline
+\textbf{Kiểu mật khẩu} & \textbf{Số khả năng} & \textbf{Thời gian} \\ \hline
+Nằm trong 100.000 mật khẩu phổ biến nhất & $10^5$ & 2,4 giờ \\ \hline
+6 chữ số & $10^6$ & 1 ngày \\ \hline
+8 chữ thường & $2{,}1 \cdot 10^{11}$ & 563 năm \\ \hline
+8 ký tự gồm chữ thường và chữ số & $2{,}8 \cdot 10^{12}$ & 7.600 năm \\ \hline
+4 từ ngẫu nhiên trong từ điển 2.048 từ & $1{,}8 \cdot 10^{13}$ & 47.000 năm \\ \hline
+10 ký tự gồm chữ hoa, chữ thường, chữ số & $8{,}4 \cdot 10^{17}$ & $2{,}3 \cdot 10^{9}$ năm \\ \hline
+\end{tabular}
+\end{table}
+
+Dòng đầu tiên mới là dòng quan trọng nhất. Với mật khẩu phổ biến, 600.000 vòng chỉ kéo dài cuộc tấn công thành vài giờ trên một lõi; số vòng lặp không bù được cho một mật khẩu yếu. Giao diện đã chặn phần lớn các dòng phía trên của bảng bằng quy tắc khi tạo ví: mật khẩu dài ít nhất 10 ký tự và có ít nhất ba trong bốn loại ký tự. Quy tắc dựa trên thành phần ký tự như vậy vẫn cho qua những mật khẩu kiểu \texttt{Password123}, vốn có mặt trong mọi danh sách mật khẩu phổ biến; đối chiếu với một danh sách như thế là bước bổ sung rẻ và đáng làm. Các con số trên cũng không nên được đọc như mức an toàn tuyệt đối, vì phần cứng chuyên dụng chạy PBKDF2 nhanh hơn CPU nhiều bậc. Điều nó cho thấy là đánh đổi tuyến tính: tăng gấp đôi số vòng thì cả người dùng lẫn kẻ tấn công đều chịu gấp đôi thời gian. Ở mức 85\,ms, người dùng gần như không nhận ra độ trễ, nên 600.000 vòng là một điểm hợp lý. Nâng lên 2.000.000 vòng vẫn dưới 300\,ms, nghĩa là hệ thống còn dư địa nếu cần.
+
+\textbf{Một phát hiện phụ về thư viện.} Hình \ref{fig:v2-crypto}b cho thấy SHA3-256 viết bằng JavaScript thuần đạt khoảng 18\,MB/s, còn bản OpenSSL đạt 300--500\,MB/s với đầu vào từ 1\,KB trở lên, nhanh hơn khoảng 25 lần. Kiểm chữ ký Ed25519 bằng JavaScript thuần mất 1,5\,ms, chậm hơn ký gần bốn lần. Với ví, điều này không đáng kể vì mỗi thao tác chỉ băm vài văn bằng. Nhưng nó giải thích vì sao tầng dịch vụ dùng thư viện gốc của môi trường chạy, và nó trở nên quan trọng ở thí nghiệm B: kẻ tấn công sẽ dùng bản nhanh nhất.
+
+\section{Thí nghiệm B: giá trị băm không muối như một máy xác nhận}
+\label{sec:tn-oracle}
+
+Mục \ref{sec:blockchain} đã nêu rằng giá trị băm nội dung trên chuỗi buộc phải không có muối để bên xác minh tính lại được, và vì vậy nó là một ``máy xác nhận''. Bản trước dừng ở lập luận. Thí nghiệm này chạy tấn công thật: dựng ứng viên theo đúng khuôn văn bằng mà giao diện sinh ra, chuẩn hoá, băm bằng SHA3-256 của OpenSSL và so với giá trị băm mục tiêu. Không gian giá trị dựa trên dữ liệu thật của ĐHQGHN: 483 chương trình đào tạo, điểm trung bình từ 0,00 tới 4,00 với bước 0,01 (401 giá trị), năm tốt nghiệp từ 2000 tới 2026 (27 giá trị). Thời điểm phát hành được giả định nằm trong cửa sổ 60 giây quanh thời điểm giao dịch trên chuỗi (60.000 giá trị mili giây), và mã sinh viên có cấu trúc khoảng $10^5$ giá trị.
+
+Có một chi tiết quyết định kết quả. Nội dung được băm chứa định danh chứng thực, một UUID ngẫu nhiên 122 bit, còn trên chuỗi chỉ có giá trị băm của định danh đó. Với kẻ chỉ đọc chuỗi, định danh này đóng vai trò như một muối. Kẻ đã biết định danh thì không gặp trở ngại ấy. Vì vậy thí nghiệm phân biệt các mô hình kẻ tấn công theo những gì họ đã biết trước (Bảng \ref{tab:v2-oracle}).
+
+\input{source/v2/chart/tab-oracle}
+
+\input{source/v2/chart/fig-oracle}
+
+Tốc độ đo được là khoảng 290.000 ứng viên mỗi giây trên một luồng và 780.000 trên bốn luồng; mức tăng dưới tuyến tính vì bốn luồng chỉ ứng với hai lõi vật lý. Hai kịch bản A1 và A2 được chạy thật tới khi khớp, mỗi kịch bản trên 20 mục tiêu ngẫu nhiên. Kẻ biết mọi trường trừ điểm và năm tốt nghiệp khôi phục đúng cả hai giá trị trong \textbf{20/20} trường hợp, trung vị 16\,ms và chậm nhất 36\,ms. Kịch bản B, biết định danh chứng thực cùng người học và đơn vị nhưng chưa biết chương trình, điểm, năm và thời điểm phát hành, có không gian $3{,}1 \cdot 10^{11}$ và cần khoảng 5,5 ngày trên máy thử nghiệm. Con số này xa với một người tò mò nhưng gần với một đối thủ có máy chủ nhiều lõi hoặc phần cứng chuyên dụng. Từ kịch bản C trở đi, tấn công không còn khả thi.
+
+Kết quả này dẫn tới ba nhận định.
+
+\emph{Thứ nhất, nhận định của bản trước cần được phát biểu lại.} Với kẻ chỉ có dữ liệu trên chuỗi (kịch bản D), giá trị băm không phải máy xác nhận theo nghĩa thực tế: không gian $10^{53}$ vượt xa mọi khả năng tính toán. Rủi ro tồn tại với những ai đã biết định danh chứng thực. Định danh này không được thiết kế như một bí mật: nó nằm trong bản trình bày, trong phản hồi của tuyến xem trước liên kết chia sẻ và trong nhật ký kiểm toán. Bên xác minh từng nhận một bản trình bày đương nhiên đã thấy nội dung, nên với họ không có gì mới để lộ. Nhưng một người chỉ nhìn thấy liên kết chia sẻ, hay một người đọc được nhật ký, thì có thể khôi phục thuộc tính văn bằng mà không cần xem văn bằng.
+
+\emph{Thứ hai, nó đặt điều kiện tiên quyết cho tiết lộ chọn lọc.} Giả sử sau này hệ thống cho phép người học ẩn điểm trung bình khi trình bày. Nếu giá trị băm của toàn bộ nội dung vẫn được neo không muối, bên xác minh, vốn đã biết mọi trường còn lại kể cả định danh, sẽ khôi phục điểm bị ẩn trong vài mili giây (kịch bản A1). Đây là lý do SD-JWT gắn một muối riêng cho từng trường \cite{RFC9901}. Mọi hướng tiết lộ chọn lọc phải đi kèm thay đổi cách neo, không thể thêm vào sau.
+
+\emph{Thứ ba, biện pháp khắc phục rẻ.} Thêm một trường muối ngẫu nhiên 128 bit vào nội dung chứng thực và giữ nó cùng nội dung (không đưa lên chuỗi, không đưa vào nhật ký) sẽ đưa kịch bản A1 lên $10^{41}$ ứng viên (kịch bản E). Thay đổi này không tốn thêm chi phí xác minh, vì bên xác minh nhận muối cùng nội dung và tính lại giá trị băm như cũ.
+
+\section{Thí nghiệm C: trạng thái theo bản ghi so với danh sách bit}
+\label{sec:tn-statuslist}
+
+Mục \ref{sec:danh-doi} ghi nhận lựa chọn lưu trạng thái theo từng bản ghi trên chuỗi thay vì Bitstring Status List của W3C. Thí nghiệm này đo kích thước thật của danh sách bit sau khi nén, với vị trí thu hồi ngẫu nhiên, để định lượng đánh đổi đó.
+
+\input{source/v2/chart/fig-statuslist}
+
+Với danh sách tối thiểu 131.072 vị trí theo đặc tả, khi chưa có thu hồi nào, bản nén chỉ còn 51 byte. Ở tỉ lệ thu hồi 1\% (1.311 chứng thực), bản nén khoảng 1,9\,KB; ở 10\%, khoảng 9\,KB, vẫn nhỏ hơn bản chưa nén 16\,KB. Kích thước tăng gần tuyến tính theo số chứng thực bị thu hồi chứ không theo tổng số chứng thực, và GZIP chỉ lớn hơn cận dưới entropy $\log_2\binom{n}{k}$ khoảng 1,2--1,5 lần. Với danh sách một triệu vị trí, ở 1\% thu hồi bản nén khoảng 14\,KB.
+
+Đặt cạnh mô hình theo bản ghi, đánh đổi trở nên cụ thể. Với danh sách bit, bên xác minh tải một tệp vài KB \emph{một lần} và trả lời được trạng thái của mọi chứng thực trong danh sách mà bên phát hành không biết họ đang tra chứng thực nào. Với mô hình theo bản ghi, mỗi lần xác minh là một lời gọi view nêu đích danh số hiệu chứng thực, và mỗi lần thu hồi là một giao dịch riêng. Ở quy mô thử nghiệm, sự khác biệt này không đáng kể. Ở quy mô một trường cấp hàng chục nghìn văn bằng mỗi năm, nó là khác biệt giữa một tệp tĩnh cache được với hàng chục nghìn lời gọi để lại dấu vết. Thí nghiệm F cho thấy thêm rằng mỗi lời gọi view tốn khoảng 330\,ms.
+
+\section{Thí nghiệm D: hành vi khi dữ liệu tăng lên}
+\label{sec:tn-scale}
+
+Mọi phép đo của bản trước chạy trên vài trăm bản ghi, và phần hợp lệ ngoại tại khi đó chỉ có thể nói rằng kết quả ``không suy rộng được''. Thí nghiệm này đo thật. Dữ liệu được độn thêm theo bốn bậc, từ gần như không có tới $10^5$ bản ghi, mỗi bản ghi gồm một thực thể, một DID Document và một chứng thực với nội dung đúng khuôn của giao diện, rải cho 12 đơn vị cấp. Bảng chứng thực ở bậc lớn nhất chiếm khoảng 181\,MB. Phép đo chạy ở một yêu cầu đồng thời để đo \emph{thời gian phục vụ} thuần, không lẫn thời gian xếp hàng. Bốn tuyến được đo: phân giải DID, danh sách văn bằng trong ví và xác minh bản trình bày với 1 và 8 văn bằng.
+
+\input{source/v2/chart/fig-scale}
+
+Hình \ref{fig:v2-scale} cho thấy hai nhóm hành vi tách bạch. Phân giải DID gần như không đổi theo dữ liệu, giữ ở khoảng 0,6--2\,ms ở cả hai cài đặt, vì nó tra theo cột \texttt{did} có ràng buộc duy nhất nên có chỉ mục. Ba tuyến còn lại tăng mạnh từ bậc $10^4$: xác minh một văn bằng tăng từ khoảng 3--6\,ms lên 60\,ms, xác minh tám văn bằng từ 9--13\,ms lên 354--376\,ms, và danh sách văn bằng trong ví từ 4\,ms lên 132\,ms (TypeScript) và 215\,ms (Go). Xác minh tám văn bằng ở $10^5$ bản ghi đã vượt ngưỡng 300\,ms ngay khi chỉ có \emph{một} yêu cầu, chưa tính bất kỳ tải đồng thời nào.
+
+\input{source/v2/chart/tab-scale}
+
+Nguyên nhân được xác định bằng kế hoạch thực thi của PostgreSQL (Bảng \ref{tab:v2-explain}). Truy vấn trạng thái theo \texttt{on\_chain\_vc\_id} luôn là quét tuần tự, đọc và loại bỏ toàn bộ bảng để lấy một dòng: 0,05\,ms ở bậc nhỏ nhất, 4,4\,ms ở $10^4$ và 49\,ms ở $10^5$. Mỗi văn bằng trong bản trình bày kéo theo hai lượt quét như vậy (bước 5 và bước 6 khi chạy ở chế độ không phụ thuộc chuỗi), và tuyến danh sách văn bằng gọi phép kiểm trạng thái cho từng văn bằng. Cột này không có chỉ mục vì ở chế độ on-chain câu hỏi được trả lời bằng view function; chỉ mục chỉ trở nên cần thiết khi chỉ mục cơ sở dữ liệu thay vai trò của chuỗi.
+
+\input{source/v2/chart/fig-scale-k}
+
+Phép thử bóc tách xác nhận nguyên nhân: thêm chỉ mục trên \texttt{on\_chain\_vc\_id} ở bậc $10^5$ đưa truy vấn từ 49\,ms xuống 0,13\,ms. Xác minh tám văn bằng giảm từ 354 xuống 14,5\,ms (TypeScript, 24 lần) và từ 376 xuống 10\,ms (Go, 38 lần); danh sách văn bằng trong ví giảm từ 132 xuống 4\,ms và từ 215 xuống 4\,ms. Hình \ref{fig:v2-scale-k} cho thấy thêm độ dốc theo số văn bằng: không có chỉ mục, mỗi văn bằng thêm vào tốn khoảng 40\,ms; có chỉ mục, khoảng 1\,ms. Kết quả ở $10^5$ bản ghi có chỉ mục gần như trở về mức của bậc nhỏ nhất.
+
+Chênh lệch giữa hai cài đặt ở tuyến danh sách văn bằng cũng có nguyên nhân rõ trong mã. Bản TypeScript kiểm trạng thái tám văn bằng song song (\texttt{Promise.all}), còn bản Go kiểm tuần tự trong một vòng lặp. Khi mỗi lượt kiểm là một lần quét 49\,ms, bản tuần tự chậm hơn khoảng 1,6 lần dù Go nhanh hơn TypeScript ở hầu hết các tuyến khác. Ở chế độ on-chain, cùng vòng lặp đó sẽ là tám vòng gọi tới fullnode nối tiếp nhau.
+
+\textbf{Mô hình chi phí.} Từ độ dốc theo $k$ có thể viết một mô hình đơn giản cho thời gian xác minh khi thiếu chỉ mục: $T(k, N) \approx T_0 + k \cdot c \cdot t_s(N)$, trong đó $T_0$ là phần không phụ thuộc dữ liệu (vài mili giây), $c$ là số lượt quét cho mỗi văn bằng và $t_s(N)$ là thời gian một lượt quét. Với $c = 2$ và độ dốc đo được khoảng 40\,ms mỗi văn bằng, $t_s(10^5) \approx 20$\,ms. Con số này thấp hơn 49\,ms mà EXPLAIN ANALYZE báo, vì chế độ đo của EXPLAIN tự nó thêm chi phí ghi thời gian cho từng dòng được đọc. Mô hình cho thấy hai điều. Một là chi phí tỉ lệ với \emph{tích} của số văn bằng trong bản trình bày và kích thước bảng, nên một người học có nhiều văn bằng sẽ là người chịu thiệt nhiều nhất khi dữ liệu toàn hệ thống lớn lên. Hai là với $t_s$ tăng tuyến tính theo $N$, ngưỡng 500\,ms của N10 sẽ bị vượt ở một yêu cầu đơn lẻ khi $k \cdot N$ vào khoảng $10^6$, ví dụ tám văn bằng trên bảng 150.000 bản ghi. Đây là quy mô mà một trường thành viên đạt được sau vài năm vận hành.
+
+\textbf{Độ lặp lại.} Thí nghiệm D được chạy hai lượt độc lập, mỗi lượt dựng lại CSDL từ đầu. Ở bậc $10^5$, trung vị xác minh một văn bằng là 52 và 62\,ms (TypeScript), 80 và 60\,ms (Go); thời gian quét là 31 và 49\,ms; mức cải thiện khi thêm chỉ mục cho xác minh tám văn bằng là 19--39 lần ở lượt đầu và 24--38 lần ở lượt sau. Từng con số dao động tới 1,6 lần giữa hai lượt, nhưng mọi kết luận ở trên (tuyến nào phẳng, tuyến nào tăng, nguyên nhân là quét tuần tự, chỉ mục cải thiện hơn một bậc) đều giống nhau ở cả hai. Đây là mức độ lặp lại phù hợp để rút ra kết luận về \emph{hình dạng} hành vi, chưa đủ để báo một con số tuyệt đối.
+
+\section{Thí nghiệm E: nguồn nhiễu của phép đo}
+\label{sec:tn-isolation}
+
+Bản trước quy độ phân tán lớn của phép đo cho việc bộ sinh tải chạy chung máy với hệ thống. Giả thuyết này kiểm được: nếu đúng, tách bộ sinh tải sang lõi CPU riêng phải làm CV giảm rõ rệt. Máy thử nghiệm có hai lõi vật lý, mỗi lõi hai luồng, nên cách tách sạch nhất có thể là đặt hai backend và PostgreSQL vào cặp luồng \{0,1\}, bộ sinh tải vào cặp \{2,3\}. Container PostgreSQL được ghim bằng \texttt{docker update} và trả lại cấu hình cũ sau khi đo. Mỗi cấu hình đo mười lượt, mỗi lượt 1.000 yêu cầu ở 8 yêu cầu đồng thời; tổng cộng 122.400 yêu cầu, không lỗi nào.
+
+\input{source/v2/chart/fig-isolation}
+
+\input{source/v2/chart/tab-isolation}
+
+Kết quả không ủng hộ giả thuyết một cách rõ ràng. Ở tuyến xác minh, tuyến nặng nhất về tính toán, CV giảm khoảng một nửa: từ 25\% xuống 13\% ở bản TypeScript và từ 63\% xuống 26\% ở bản Go. Ở các tuyến nhẹ, CV không giảm, thậm chí tăng nhẹ, và thông lượng của bản TypeScript giảm 10--20\% vì backend lúc này chỉ còn một lõi vật lý dùng chung với PostgreSQL. Khoảng tin cậy bootstrap 95\% của CV (thanh lỗi trong Hình \ref{fig:v2-isolation}) rộng và chồng lấn nhau ở hầu hết các cấu hình. Với mười lượt, ngay cả mức giảm ở tuyến xác minh cũng chỉ vừa chạm ngưỡng tách biệt.
+
+Kết luận đúng mức là: chạy chung máy là \emph{một} nguồn nhiễu, đáng kể với tuyến tính toán nặng, nhưng không phải nguồn chi phối. Nguồn còn lại nằm ở những thứ không kiểm soát được từ bên trong máy ảo, như cách bộ ảo hoá của WSL2 lập lịch vCPU trên máy chủ, thu gom rác của môi trường chạy và tiến trình nền của PostgreSQL. Một quan sát quan trọng hơn là so sánh với bản trước: ở 120 mẫu mỗi lượt, CV của p95 là 45--205\%; ở 1.000 mẫu mỗi lượt, ngay cả cấu hình không ghim CPU cũng chỉ còn 6--63\%. Số mẫu mỗi lượt có ảnh hưởng lớn hơn việc tách lõi CPU.
+
+Kết luận về số mẫu khớp với một thí nghiệm của đợt đo trước mà khi đó chưa được khai thác hết. Thí nghiệm ấy giữ nguyên mức đồng thời và thay đổi số mẫu mỗi lượt từ 60 tới 4.000, mỗi mức lặp 12 lượt (Bảng \ref{tab:bench-samplesize}). CV trung bình của p95 giảm gần như đơn điệu từ 128,6\% ở 60 mẫu xuống 41,3\% ở 4.000 mẫu, đồng thời giá trị p95 đo được cũng giảm theo. Với 60 mẫu, phân vị 95 là giá trị thứ 57 trong dãy đã sắp xếp, nên chỉ vài yêu cầu đầu tiên chậm vì chi phí thiết lập kết nối là đủ đẩy p95 lên: mẫu nhỏ không chỉ nhiễu mà còn lệch cao. Đặt hai thí nghiệm cạnh nhau, có thể sắp xếp các nguồn nhiễu theo mức ảnh hưởng: số mẫu mỗi lượt lớn nhất, tách lõi CPU đứng sau và chỉ đáng kể với tuyến tính toán nặng, phần còn lại thuộc môi trường ảo hoá.
+
+\input{source/chart/tab-samplesize}
+
+Về giá trị tuyệt đối, ở 8 yêu cầu đồng thời, p95 của mọi cấu hình ở cả hai thiết lập đều dưới 18\,ms, thấp hơn ngưỡng 500\,ms của yêu cầu N10 hơn một bậc. Ở mức tải này N10 được thoả mãn với khoảng dư lớn, và kết luận này đứng vững dù CV có là 6\% hay 60\%. Bản Go cho thông lượng cao hơn bản TypeScript khoảng 1,7--2 lần ở tuyến phân giải và xác minh, nhất quán với kết quả của bản trước về tuyến \texttt{/auth/me}.
+
+\textbf{Hành vi khi tăng tải, theo dữ liệu đợt trước.} Bộ thí nghiệm mới chỉ đo ở 1 và 8 yêu cầu đồng thời. Để có hình dung về mức tải cao hơn, Hình \ref{fig:bench-sweep} trình bày lại lượt quét của đợt đo trước, từ 1 tới 64 yêu cầu đồng thời, năm lượt mỗi điểm. Với hiểu biết về nhiễu có được từ thí nghiệm E, chỉ có thể đọc được xu hướng chung từ biểu đồ: thông lượng tăng khi mức đồng thời đi từ 1 lên khoảng 4--16 rồi đi ngang, còn p95 tăng theo mức đồng thời đúng như hành vi xếp hàng. Vùng tô (khoảng giữa lượt nhỏ nhất và lớn nhất) rộng tới mức điểm bão hoà của từng tuyến không xác định được. Ở 64 yêu cầu đồng thời, có lượt đo của tuyến \texttt{/auth/me} bản TypeScript vượt ngưỡng 500\,ms (lớn nhất 1.114,6\,ms), nhưng con số này không lặp lại giữa các lượt. Cũng cần nhớ rằng đợt đo đó chạy trên dữ liệu nhỏ: theo thí nghiệm D, nếu dữ liệu lớn mà thiếu chỉ mục, tuyến xác minh sẽ vượt ngưỡng ngay từ một yêu cầu, trước khi tải đồng thời kịp đóng vai trò gì.
+
+\input{source/v2/chart/fig-sweep-old}
+
+\section{Thí nghiệm F: chi phí phía chuỗi}
+\label{sec:tn-chain}
+
+Các thí nghiệm D và E chạy ở chế độ không phụ thuộc chuỗi. Ở chế độ triển khai thật, các câu hỏi về trạng thái và thẩm quyền được trả lời bằng view function trên fullnode. Thí nghiệm F đo chi phí đó trên mạng thử nghiệm Movement mà không ghi gì lên chuỗi: chỉ gọi view và mô phỏng giao dịch.
+
+\input{source/v2/chart/tab-chain}
+
+Một vòng gọi view nhìn từ máy thử nghiệm mất trung vị 333\,ms, phân vị 95 là 492\,ms (Bảng \ref{tab:v2-chain}). Phần lớn thời gian là độ trễ mạng: một yêu cầu \texttt{GET} đơn giản nhất cũng mất 324\,ms. Con số này lớn hơn \emph{hai bậc} so với thời gian của cả một lần xác minh ở chế độ chỉ mục đã có chỉ mục (vài mili giây).
+
+Đọc mã của bước xác minh cho thấy mẫu gọi hiện tại: một view để phân giải DID của người trình bày; $k$ view \emph{nối tiếp} để kiểm trạng thái từng văn bằng (bước 5 là một vòng lặp tuần tự); rồi hai lượt song song cho bước 6 và bước 7. Tổng cộng $k + 3$ vòng nối tiếp. Nếu song song hoá bước 5 và gộp ba bước cuối vào một lượt thì chỉ còn hai vòng.
+
+\input{source/v2/chart/fig-chain}
+
+Hình \ref{fig:v2-chain} đặt kết quả đo cạnh hai mô hình. Với $k = 1$ và $k = 2$, mẫu gọi hiện tại đo được 1,26 và 1,86 giây, khớp với mô hình $(k+3) \times \mathrm{RTT}$ trong phạm vi khoảng 20\%. Ở $k = 4$ và $k = 8$, con số đo được (3,3 và 6,9 giây) vượt mô hình. Cùng lượt đo đó, fullnode bắt đầu từ chối một phần lời gọi vì vượt hạn mức, và thời gian phản hồi của những lời gọi còn lại cũng kéo dài, nên mô hình một RTT cố định không còn đúng. Mẫu song song hoá đáng lẽ chỉ tốn khoảng $2 \times 333 = 666$\,ms bất kể $k$, nhưng đo thật lại không đạt được: ở $k = 1$ và $k = 2$ nó không nhanh hơn mẫu tuần tự, còn ở $k = 4$ và $k = 8$ có 59/130 và 167/250 lời gọi bị từ chối vì vượt hạn mức. Fullnode công khai không phục vụ các lời gọi đồng thời từ cùng một máy khách theo cách song song thật sự, nên con số ``song song hoá'' trên biểu đồ không phải hiệu năng của mẫu gọi đó mà là hiệu năng của hạn mức.
+
+Từ đây có hai kết luận. Một là ở chế độ on-chain, thời gian xác minh do số vòng gọi mạng quyết định: một bản trình bày tám văn bằng tốn vài giây, trong khi mọi phép tính cục bộ cộng lại chưa tới 20\,ms. Song song hoá bước 5 là cải tiến rẻ nhất và giảm thời gian theo tỉ lệ thuận với $k$. Hai là cải tiến đó chỉ phát huy được khi hệ thống đọc từ một fullnode hoặc bộ lập chỉ mục riêng, không chịu hạn mức của điểm truy cập công khai. Đây là chi phí vận hành mà một triển khai thật phải tính tới.
+
+Về phía ghi, mô phỏng cho thấy đăng ký một định danh tốn 425 đơn vị gas, đề cử quyền gốc tốn 119 đơn vị, với giá 100 octa mỗi đơn vị, tức khoảng 0,0004 và 0,0001 MOVE. Đường ghi không được đo độ trễ vì đo thật đòi hỏi gửi giao dịch thật lên chuỗi công khai.
+
+\section{Tổng hợp: ngân sách thời gian của một lần xác minh}
+\label{sec:ngan-sach}
+
+Ghép kết quả của ba thí nghiệm A, D và F cho ra một bức tranh về việc thời gian của một lần xác minh thực sự đi đâu (Bảng \ref{tab:v2-budget}).
+
+\begin{table}[H]
+\centering
+\caption{Ngân sách thời gian của một lần xác minh theo thành phần và chế độ vận hành (trung vị, mili giây)}
+\label{tab:v2-budget}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{7.4cm}|r|r|p{1.6cm}|}
+\hline
+\textbf{Thành phần} & \textbf{$k=1$} & \textbf{$k=8$} & \textbf{Nguồn} \\ \hline
+Chuẩn hoá và băm nội dung văn bằng (JS thuần) & 0,04 & 0,34 & TN A \\ \hline
+Kiểm một chữ ký Ed25519 (JS thuần, cận trên) & 1,5 & 1,5 & TN A \\ \hline
+Toàn tuyến, chế độ chỉ mục, dữ liệu nhỏ & 3--6 & 9--13 & TN D \\ \hline
+Toàn tuyến, chế độ chỉ mục, $10^5$ bản ghi, có chỉ mục & 4--7 & 10--15 & TN D \\ \hline
+Toàn tuyến, chế độ chỉ mục, $10^5$ bản ghi, thiếu chỉ mục & 60--62 & 354--376 & TN D \\ \hline
+Vòng gọi view, mẫu hiện tại, $(k+3) \times 333$\,ms & 1.332 & 3.663 & TN F, mô hình \\ \hline
+Vòng gọi view, mẫu hiện tại, đo thật & 1.263 & 6.876 & TN F \\ \hline
+Vòng gọi view, song song hoá, fullnode riêng, $2 \times 333$\,ms & 666 & 666 & TN F, mô hình \\ \hline
+\end{tabular}
+\end{table}
+
+Bảng cho thấy ba bậc độ lớn tách bạch. Phép mật mã tốn cỡ micro giây tới một mili giây, nên không bao giờ là điểm nghẽn. Truy cập cơ sở dữ liệu tốn vài mili giây khi có chỉ mục, nhưng có thể nhảy lên hàng trăm mili giây chỉ vì một chỉ mục còn thiếu. Vòng gọi mạng tới chuỗi tốn hàng trăm tới hàng nghìn mili giây. Hệ quả cho việc tối ưu khá rõ: ở chế độ on-chain, mọi công sức tối ưu phép tính cục bộ đều vô nghĩa nếu chưa giảm số vòng gọi mạng; ở chế độ chỉ mục, việc đầu tiên là bảo đảm mọi truy vấn trên đường xác minh đều có chỉ mục. Mỗi kết luận này chỉ rút ra được khi đặt các thí nghiệm cạnh nhau. Từng thí nghiệm riêng lẻ chỉ cho thấy một bậc của bức tranh.
+
+Bảng cũng giải thích vì sao bản báo cáo trước không thấy những vấn đề này. Mọi phép đo khi đó chạy ở chế độ chỉ mục, với dữ liệu nhỏ, trên các tuyến chỉ đọc một bản ghi, tức là đúng ở dòng thứ ba của bảng, nơi mọi thứ đều nhanh. Hai dòng có vấn đề chỉ xuất hiện khi thay đổi đúng hai biến mà đợt đo cũ giữ cố định: kích thước dữ liệu và chế độ vận hành.
+
+\section{Thảo luận}
+\label{sec:thao-luan}
+
+\subsection{Những gì kết quả cho phép phát biểu}
+
+\textit{Về logic phân quyền:} các quy tắc đã đặc tả không bị vi phạm trong những kịch bản được kiểm, và mỗi rào chắn đều có phép kiểm được viết để làm nó thất bại. Đây không phải chứng minh tính đúng đắn; kiểm thử là bằng chứng phủ định có phạm vi hữu hạn.
+
+\textit{Về phát hiện gian lận:} mọi hành vi trong mô hình đe doạ bị chặn đúng nguyên nhân, và bước 6 được chứng minh là cần thiết. Mô hình đe doạ do chính nghiên cứu định nghĩa, nên đây là điều kiện cần chứ chưa đủ.
+
+\textit{Về chi phí phía máy khách:} các phép mật mã của ví rẻ hơn ngưỡng cảm nhận của người dùng ít nhất một bậc, và chi phí của PBKDF2 tăng tuyến tính, dự đoán được. Đây là kết luận có độ tin cậy cao nhất của chương, vì là phép đo thuần CPU có CV dưới 7\%.
+
+\textit{Về hiệu năng:} ở chế độ chỉ mục với dữ liệu nhỏ và tải vừa phải, p95 thấp hơn ngưỡng hơn một bậc. Kết luận này cần hai điều kiện đi kèm mà bản trước không có: dữ liệu lớn đòi hỏi chỉ mục đã xác định ở thí nghiệm D, và ở chế độ on-chain, độ trễ mạng quyết định thời gian xác minh.
+
+\textit{Về quyền riêng tư:} giá trị băm không muối trên chuỗi không lộ thông tin với kẻ chỉ đọc chuỗi, nhưng lộ với kẻ đã biết định danh chứng thực, và điều này chặn mọi hướng tiết lộ chọn lọc nếu không thay đổi cách neo.
+
+\subsection{Các mối đe doạ đối với tính hợp lệ}
+
+\textbf{Hợp lệ về cấu trúc khái niệm.} Mô hình đe doạ tự định nghĩa nên ``chặn được toàn bộ'' đo tính nhất quán giữa thiết kế và kiểm chứng chứ không đo mức an toàn; chưa có kiểm thử xâm nhập độc lập. Bộ đối chiếu hai cài đặt chỉ kiểm được những gì nó biết: nó từng báo đạt toàn bộ trong khi có tuyến chỉ tồn tại ở một bên. Ở thí nghiệm B, không gian giá trị là giả định có căn cứ chứ không phải dữ liệu thật của người học; nếu kẻ tấn công biết thêm (chẳng hạn mã sinh viên công khai trên một danh sách), không gian còn nhỏ hơn.
+
+\textbf{Hợp lệ nội tại.} Ở thí nghiệm D, quan hệ nhân quả giữa chỉ mục còn thiếu và độ trễ được xác lập bằng ba nguồn độc lập: kế hoạch thực thi, phép thử thêm chỉ mục và đọc mã. Ở thí nghiệm E, mười lượt chưa đủ để tách các khác biệt nhỏ, và kết luận được phát biểu đúng ở mức đó. Ở thí nghiệm F, mẫu gọi song song bị hạn mức của fullnode làm méo, nên không được dùng để kết luận về hiệu năng của chính mẫu gọi.
+
+\textbf{Hợp lệ ngoại tại.} Mọi phép đo HTTP chạy trên một máy ảo bốn luồng; thí nghiệm A đo PBKDF2 qua OpenSSL chứ không trong trình duyệt thật; độ trễ ở thí nghiệm F phụ thuộc vị trí mạng của máy thử nghiệm so với fullnode. Dữ liệu ở thí nghiệm D được sinh tự động, đúng khuôn nhưng có phân bố đều hơn dữ liệu thật.
+
+\textbf{Hợp lệ của kết luận.} Kết luận được chống đỡ tốt: các quy tắc phân quyền hoạt động như thiết kế trong các kịch bản được kiểm; bước 6 là cần thiết; chi phí ví thấp; chỉ mục còn thiếu gây ra độ trễ tăng tuyến tính và thêm chỉ mục khắc phục được; giá trị băm khôi phục được khi biết định danh chứng thực. Kết luận được chống đỡ vừa phải: mô hình khả thi về kỹ thuật trong bối cảnh nhiều cơ sở, dựa trên một hệ thống chạy được nhưng trong điều kiện mô phỏng. Kết luận không được chống đỡ: mọi phát biểu về tính khả dụng, mức độ chấp nhận, chi phí vận hành thật, hành vi ở quy mô sản xuất, và độ trễ của đường ghi.

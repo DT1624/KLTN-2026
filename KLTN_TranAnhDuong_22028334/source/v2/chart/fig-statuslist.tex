@@ -1,0 +1,25 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/statuslist.json
+% 10 hạt giống mỗi điểm, gzip mức 9
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.9\textwidth, height=6.2cm, xmode=log, ymode=log,
+    xlabel={Tỉ lệ chứng thực bị thu hồi (\%)}, ylabel={Kích thước (KB)},
+    legend pos=north west, legend cell align=left, grid=both, grid style={gray!18}, label style={font=\small}, tick label style={font=\footnotesize},
+    legend style={font=\scriptsize, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40}]
+    \addplot[color=blue!70!black, mark=*, mark size=1.5pt, thick] coordinates {(0.01,0.098) (0.05,0.216) (0.1,0.333) (0.5,1.067) (1,1.838) (2,3.106) (5,5.870) (10,8.828)};
+    \addlegendentry{Danh sách 131.072 vị trí, sau GZIP}
+    \addplot[color=blue!70!black, densely dotted, thick] coordinates {(0.01,0.023) (0.05,0.100) (0.1,0.183) (0.5,0.726) (1,1.293) (2,2.263) (5,4.582) (10,7.503)};
+    \addlegendentry{\quad cận dưới entropy}
+    \addplot[color=red!70!black, mark=square*, mark size=1.5pt, thick] coordinates {(0.01,0.454) (0.05,1.328) (0.1,2.283) (0.5,8.190) (1,14.226) (2,23.937) (5,45.490) (10,69.672)};
+    \addlegendentry{Danh sách 1.048.576 vị trí, sau GZIP}
+    \addplot[color=red!70!black, densely dotted, thick] coordinates {(0.01,0.188) (0.05,0.794) (0.1,1.460) (0.5,5.813) (1,10.341) (2,18.104) (5,36.658) (10,60.031)};
+    \addlegendentry{\quad cận dưới entropy}
+    \addplot[color=gray!70!black, dashed, thick] coordinates {(0.01,16) (10,16)};
+    \addlegendentry{131.072 vị trí, chưa nén (16 KB)}
+\end{axis}
+\end{tikzpicture}
+\caption{Kích thước danh sách trạng thái dạng bit theo tỉ lệ thu hồi, với vị trí thu hồi ngẫu nhiên}
+\label{fig:v2-statuslist}
+\end{figure}

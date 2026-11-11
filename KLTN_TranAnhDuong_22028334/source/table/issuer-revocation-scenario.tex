@@ -1,0 +1,81 @@
+\begin{longtable}{|p{3.4cm}|p{10.3cm}|}
+\caption{Đặc tả kịch bản thu hồi thẩm quyền của bên phát hành}
+\label{tab:issuer-revocation-scenario} \\
+
+\hline
+\textbf{Mục} & \textbf{Nội dung} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mục} & \textbf{Nội dung} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Mã kịch bản & KB5 \\
+\hline
+
+Tác nhân chính & Quản trị viên gốc hoặc quản trị viên \\
+\hline
+
+Thành phần tham gia &
+Ví của người quản trị, mô-đun \cbox{authority}, tầng chỉ mục, dịch vụ xác minh \\
+\hline
+
+Mục đích &
+Đình chỉ hoặc thu hồi thẩm quyền cấp phát của một đơn vị, sao cho các lần xác minh sau đó phát hiện được trạng thái này \\
+\hline
+
+Điều kiện tiên quyết &
+Người thực hiện là quản trị viên gốc hoặc quản trị viên đang hoạt động; đơn vị bị xử lý có bản ghi thẩm quyền \\
+\hline
+
+Phân biệt ba thao tác &
+\begin{itemize}[leftmargin=*, nosep]
+    \item \textbf{Đình chỉ}: trạng thái chuyển sang tạm đình chỉ. Quyền vẫn còn trong bản ghi, chỉ bị khóa. Vai trò trong chỉ mục \textbf{không đổi}
+    \item \textbf{Kích hoạt lại}: đưa trạng thái từ tạm đình chỉ trở về đang hoạt động
+    \item \textbf{Thu hồi}: trạng thái chuyển sang đã thu hồi. Vai trò trong chỉ mục hạ xuống chủ thể, nhưng đơn vị vẫn giữ định danh và các văn bằng của riêng mình
+\end{itemize} \\
+\hline
+
+Luồng thực hiện chính &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item Người quản trị chọn đơn vị, chọn thao tác và nhập lý do
+    \item Ví ký giao dịch gọi hàm tương ứng trên mô-đun \cbox{authority}
+    \item Hợp đồng cập nhật trạng thái, ghi lý do và dấu thời gian, rồi phát sự kiện
+    \item Tầng chỉ mục xác minh giao dịch, cập nhật vai trò nếu cần và ghi nhật ký kiểm toán
+    \item Từ thời điểm này, bước thứ bảy của quy trình xác minh phát hiện trạng thái mới
+\end{enumerate} \\
+\hline
+
+Hệ quả đối với các chứng thực đã cấp &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Các chứng thực do đơn vị đó cấp \textbf{vẫn hợp lệ về mặt kỹ thuật}: chữ ký vẫn đúng, nội dung vẫn khớp giá trị băm đã neo
+    \item Nhưng chúng \textbf{bị từ chối ở bước kiểm thẩm quyền}, và báo cáo xác minh nêu rõ nguyên nhân là thẩm quyền của bên phát hành chứ không phải lỗi nội dung
+    \item Đơn vị \textbf{vẫn thu hồi được} các chứng thực mình đã cấp, theo nguyên tắc bất đối xứng ở Mục 3.4.5
+\end{itemize} \\
+\hline
+
+Luồng ngoại lệ &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Người thực hiện không có quyền $\rightarrow$ hợp đồng từ chối
+    \item Kích hoạt lại một đơn vị không ở trạng thái tạm đình chỉ $\rightarrow$ từ chối với mã lỗi tương ứng
+    \item Thu hồi một đơn vị đã bị thu hồi $\rightarrow$ từ chối, tránh ghi hai bản ghi cho cùng một thao tác
+\end{itemize} \\
+\hline
+
+Kết quả sau cùng &
+Trạng thái mới tra cứu được công khai trên chuỗi; bản ghi cũ giữ nguyên làm dấu vết; thao tác có mã giao dịch và một dòng nhật ký \\
+\hline
+
+Tính chất được kiểm chứng &
+F3, F10, F12, N1, N2 --- và nguyên tắc bất đối xứng ở Mục 3.4.5 \\
+\hline
+
+\end{longtable}

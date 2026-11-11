@@ -1,0 +1,22 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/oracle.json
+% 11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz, 4 luồng
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[xbar, width=0.92\textwidth, height=6.2cm, bar width=9pt,
+    symbolic y coords={A1,A2,B,C,D,E}, ytick=data, y dir=reverse,
+    xlabel={$\log_{10}$ thời gian vét cạn toàn bộ không gian (giây), 4 luồng}, xmin=-4, xmax=50, clip=false,
+    nodes near coords, nodes near coords style={font=\scriptsize}, point meta=explicit symbolic,
+    grid=both, grid style={gray!18}, label style={font=\small}, tick label style={font=\footnotesize},
+    legend style={font=\scriptsize, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40}, ymajorgrids=false]
+    \addplot[fill=red!45!white, draw=red!60!black] coordinates {(-3.22,A1) [1\,ms] (-1.79,A2) [16\,ms] (5.67,B) [5{,}5 ngày] (10.67,C) [$10^{3}$ năm] (47.40,D) [$10^{40}$ năm] (35.31,E) [$10^{28}$ năm]};
+    \draw[gray!70, densely dashed] ({axis cs:0.00,A1} |- {rel axis cs:0,0}) -- ({axis cs:0.00,A1} |- {rel axis cs:0,1}) node[above, font=\scriptsize, text=gray!60!black] {1 giây};
+    \draw[gray!70, densely dashed] ({axis cs:4.94,A1} |- {rel axis cs:0,0}) -- ({axis cs:4.94,A1} |- {rel axis cs:0,1}) node[above, font=\scriptsize, text=gray!60!black] {1 ngày};
+    \draw[gray!70, densely dashed] ({axis cs:7.50,A1} |- {rel axis cs:0,0}) -- ({axis cs:7.50,A1} |- {rel axis cs:0,1}) node[above, font=\scriptsize, text=gray!60!black] {1 năm};
+    \draw[gray!70, densely dashed] ({axis cs:17.64,A1} |- {rel axis cs:0,0}) -- ({axis cs:17.64,A1} |- {rel axis cs:0,1}) node[above, font=\scriptsize, text=gray!60!black] {tuổi vũ trụ};
+\end{axis}
+\end{tikzpicture}
+\caption{Thời gian để vét cạn không gian ứng viên của từng mô hình kẻ tấn công, ngoại suy từ tốc độ băm đo thật; A1 và A2 được chạy thật tới khi khớp}
+\label{fig:v2-oracle}
+\end{figure}

@@ -1,0 +1,21 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/isolation.json
+% 10 lượt × 1000 yêu cầu, 8 đồng thời; khoảng tin cậy bootstrap 95%
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[ybar, width=0.95\textwidth, height=6.0cm, bar width=10pt, ymin=0, ymax=80,
+    symbolic x coords={g0,g1,g2,g3,g4,g5}, xtick=data, xticklabels={{TS /did/resolve},{TS /auth/me},{TS xác minh},{Go /did/resolve},{Go /auth/me},{Go xác minh}},
+    x tick label style={font=\scriptsize, align=center, text width=1.9cm},
+    ylabel={CV của p95 giữa các lượt (\%)}, legend pos=north east, grid=both, grid style={gray!18}, label style={font=\small}, tick label style={font=\footnotesize},
+    legend style={font=\scriptsize, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40}, xmajorgrids=false,
+    error bars/error bar style={black!70}]
+    \addplot[fill=gray!40, draw=gray!60!black, error bars/.cd, y dir=both, y explicit] coordinates {(g0,44.98) -= (0,29.63) += (0,8.17) (g1,18.95) -= (0,14.22) += (0,6.91) (g2,25.32) -= (0,12.75) += (0,6.77) (g3,23.61) -= (0,19.00) += (0,7.21) (g4,6.19) -= (0,2.60) += (0,1.50) (g5,63.44) -= (0,54.80) += (0,9.89)};
+    \addlegendentry{Bộ sinh tải dùng chung CPU}
+    \addplot[fill=blue!45, draw=blue!60!black, error bars/.cd, y dir=both, y explicit] coordinates {(g0,41.87) -= (0,15.66) += (0,10.00) (g1,29.34) -= (0,20.63) += (0,9.09) (g2,12.70) -= (0,5.41) += (0,2.66) (g3,31.11) -= (0,11.58) += (0,7.60) (g4,6.47) -= (0,3.57) += (0,1.50) (g5,25.79) -= (0,20.91) += (0,4.75)};
+    \addlegendentry{Ghim CPU: dịch vụ \{0,1\}, bộ sinh tải \{2,3\}}
+\end{axis}
+\end{tikzpicture}
+\caption{Độ phân tán của p95 giữa 10 lượt đo lặp lại, khi bộ sinh tải dùng chung và khi tách lõi CPU; thanh lỗi là khoảng tin cậy bootstrap 95\% của CV}
+\label{fig:v2-isolation}
+\end{figure}

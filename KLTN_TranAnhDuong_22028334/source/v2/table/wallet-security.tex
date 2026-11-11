@@ -1,0 +1,19 @@
+\begin{table}[H]
+\centering
+\caption{Mô hình bảo vệ khoá của ví không lưu ký}
+\label{tab:v2-wallet}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{3.2cm}|p{10.2cm}|}
+\hline
+\textbf{Lớp bảo vệ} & \textbf{Cách thực hiện} \\ \hline
+Sinh khoá & Ed25519 từ cụm 12 từ BIP-39 sinh bằng nguồn ngẫu nhiên mật mã của trình duyệt \\ \hline
+Lưu trữ & Chỉ bản mã nằm trong IndexedDB của thiết bị; khoá dạng rõ không bao giờ được ghi xuống \\ \hline
+Mã hoá & AES-256-GCM, khoá dẫn xuất bằng PBKDF2-HMAC-SHA256 600.000 vòng, muối 16 byte riêng mỗi ví \\ \hline
+Mật khẩu & Ít nhất 10 ký tự, ít nhất ba trong bốn loại ký tự \\ \hline
+Thời gian trong bộ nhớ & Khoá dạng rõ chỉ tồn tại khi ví mở; tự khoá sau 15 phút không thao tác \\ \hline
+Đăng nhập & Thách thức -- đáp ứng với số dùng một lần; không mật khẩu nào qua mạng \\ \hline
+Sao lưu & Tệp kho khoá xuất ra vẫn ở dạng đã mã hoá \\ \hline
+Dữ liệu dịch vụ giữ & Địa chỉ, khoá công khai, định danh, vai trò, nhãn; không băm mật khẩu, không khoá riêng, không cụm từ \\ \hline
+\end{tabular}
+\end{table}

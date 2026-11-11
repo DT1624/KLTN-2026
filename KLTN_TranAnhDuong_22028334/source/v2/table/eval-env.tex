@@ -1,0 +1,15 @@
+\begin{table}[H]
+\centering
+\caption{Môi trường đo}
+\label{tab:v2-eval-env}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{4.0cm}|p{9.4cm}|}
+\hline
+Bộ xử lý & Intel Core i7-11800H; máy ảo WSL2 được cấp 4 vCPU, tương ứng 2 lõi vật lý $\times$ 2 luồng (\{0,1\} và \{2,3\} là hai cặp luồng anh em) \\ \hline
+Bộ nhớ & Khoảng 3,9\,GB cho toàn bộ máy ảo \\ \hline
+Phần mềm & Node.js 24.15, Go 1.23, PostgreSQL 16 trong Docker \\ \hline
+Cách ly & CSDL riêng \texttt{vnu\_trust\_eval} tạo mới và xoá sau mỗi lượt; cổng riêng 4020/4021; \texttt{VERIFY\_ONCHAIN=false} với D và E \\ \hline
+Mạng (TN F) & Fullnode công khai \texttt{testnet.movementnetwork.xyz}, mã chuỗi 250 \\ \hline
+\end{tabular}
+\end{table}

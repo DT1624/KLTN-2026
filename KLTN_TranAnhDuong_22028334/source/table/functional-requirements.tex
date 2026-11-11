@@ -1,0 +1,79 @@
+\begin{longtable}{|c|p{2.6cm}|p{4.4cm}|p{4.8cm}|p{1.3cm}|}
+\caption{Danh sách yêu cầu chức năng\label{tab:functional-requirements}} \\
+\hline
+\textbf{Mã} & \textbf{Yêu cầu} & \textbf{Mô tả} & \textbf{Tiêu chí kiểm chứng} & \textbf{Kịch bản} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Mã} & \textbf{Yêu cầu} & \textbf{Mô tả} & \textbf{Tiêu chí kiểm chứng} & \textbf{Kịch bản} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+F1 & Đăng ký định danh
+& Mọi thực thể sinh khóa phía máy khách, dựng DID Document và đăng ký định danh kèm giá trị băm lên chuỗi
+& Phân giải định danh thành công; giá trị băm tính lại khớp giá trị đã neo trên chuỗi
+& KB1 \\ \hline
+
+F2 & Xoay vòng khóa và giữ lịch sử phiên bản
+& Chủ sở hữu cập nhật DID Document bằng chữ ký của khóa hiện tại; các phiên bản trước vẫn truy xuất được
+& Cập nhật tăng số phiên bản; chứng thực cấp bằng khóa cũ vẫn xác minh được
+& KB1 \\ \hline
+
+F3 & Quản lý vòng đời thẩm quyền
+& Cơ quan quản trị phê duyệt bên phát hành kèm phạm vi và thời hạn, cập nhật phạm vi, đình chỉ và thu hồi
+& Phê duyệt thành công; thu hồi có hiệu lực ngay trong lần xác minh tiếp theo; mọi thao tác có mã giao dịch trên chuỗi
+& KB2, KB5 \\ \hline
+
+F4 & Ủy quyền nhiều cấp có ràng buộc
+& Bên phát hành có bit ủy quyền phê duyệt được bên phát hành cấp dưới trong phạm vi hẹp hơn
+& Phạm vi vượt tập cha bị từ chối; thời hạn vượt thời hạn cha bị từ chối; bit ủy quyền không truyền tiếp
+& KB2 \\ \hline
+
+F5 & Chuyển quyền gốc hai bước
+& Quản trị viên gốc đề cử; người được đề cử tự ký để tiếp nhận; đề cử có thể bị hủy trước khi tiếp nhận
+& Quyền chỉ chuyển sau khi người được đề cử ký; địa chỉ không được đề cử ký nhận sẽ thất bại
+& KB2 \\ \hline
+
+F6 & Cấp phát chứng thực
+& Bên phát hành dựng chứng thực theo mô hình dữ liệu W3C, ký bằng khóa riêng và ghi bản ghi neo lên chuỗi
+& Chứng thực hợp lệ về cấu trúc; chữ ký Ed25519 kiểm tra được; loại văn bằng ngoài phạm vi bị từ chối tại hợp đồng
+& KB3 \\ \hline
+
+F7 & Lưu trữ an toàn phía chủ thể
+& Khóa riêng được mã hóa và chỉ lưu dạng bản mã trên thiết bị của chủ thể
+& Bản mã AES-256-GCM \cite{NIST_SP800_38D}; không gói tin nào gửi lên dịch vụ chứa khóa riêng hoặc mật khẩu
+& KB1 \\ \hline
+
+F8 & Trình bày có chọn lọc
+& Chủ thể dựng bản trình bày từ tập chứng thực mình chọn và ký bằng khóa riêng
+& Bản trình bày chỉ chứa các chứng thực được chọn; chữ ký của chủ thể kiểm tra được
+& KB4 \\ \hline
+
+F9 & Xác minh tính toàn vẹn và quyền sở hữu
+& Bên xác minh kiểm tra chữ ký của bên phát hành, chữ ký của chủ thể, và đối chiếu nội dung với giá trị băm đã neo
+& Phát hiện được nội dung bị sửa sau khi cấp; phát hiện được bản trình bày do thực thể khác ký
+& KB4, KB7 \\ \hline
+
+F10 & Xác minh thẩm quyền độc lập
+& Bên xác minh tra cứu trạng thái thẩm quyền của bên phát hành trực tiếp từ chuỗi
+& Xác minh hoàn tất khi dịch vụ của bên phát hành không hoạt động; phát hiện bên phát hành đã bị thu hồi hoặc hết hạn ủy quyền
+& KB4, KB5 \\ \hline
+
+F11 & Quản lý trạng thái chứng thực
+& Thu hồi, đình chỉ và kích hoạt lại chứng thực; trạng thái phản ánh ngay trong mọi lần xác minh sau đó
+& Chứng thực bị thu hồi bị từ chối; chứng thực hợp lệ vẫn đạt; đơn vị hết hạn ủy quyền vẫn thu hồi được chứng thực mình đã cấp
+& KB6, KB7 \\ \hline
+
+F12 & Dấu vết kiểm toán
+& Mọi thao tác thay đổi trạng thái đều được ghi nhận kèm chủ thể thực hiện, đối tượng và thời điểm
+& Nhật ký trả về đúng các thao tác đã thực hiện với cùng bộ tên hành động ở mọi cài đặt của tầng dịch vụ
+& KB2, KB6 \\ \hline
+
+\end{longtable}

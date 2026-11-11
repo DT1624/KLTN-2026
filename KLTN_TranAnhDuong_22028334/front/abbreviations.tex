@@ -1,0 +1,74 @@
+% Danh sách thuật ngữ
+\mychapter{DANH MỤC THUẬT NGỮ VÀ TỪ VIẾT TẮT}
+
+\renewcommand{\arraystretch}{1.3}
+
+\begin{longtable}{p{0.14\textwidth} p{0.33\textwidth} p{0.46\textwidth}}
+
+\textbf{Thuật ngữ} & \textbf{Tên đầy đủ} & \textbf{Giải thích} \\
+\endfirsthead
+
+\textbf{Thuật ngữ} & \textbf{Tên đầy đủ} & \textbf{Giải thích} \\
+\endhead
+
+AES-GCM & Advanced Encryption Standard -- Galois/Counter Mode & Chế độ mã hóa khối có xác thực: vừa bảo đảm tính bí mật vừa phát hiện được việc sửa bản mã. \\
+
+BIP-39 & Bitcoin Improvement Proposal 39 & Chuẩn biểu diễn hạt giống mật mã thành một dãy từ dễ ghi, dùng để khôi phục ví trên thiết bị khác. \\
+
+CID & Content Identifier & Định danh nội dung trong hệ thống lưu trữ định địa chỉ theo nội dung; chính là giá trị băm của nội dung. \\
+
+DID & Decentralized Identifier & Định danh phi tập trung: định danh mà quyền kiểm soát thuộc về chủ thể giữ khóa mật mã tương ứng, không phụ thuộc nhà cung cấp trung gian. \\
+
+DID Document & Decentralized Identifier Document & Tài liệu kỹ thuật gắn với một DID, chứa khóa công khai và các phương thức xác thực. \\
+
+DID Resolution & DID Resolution & Quá trình chuyển từ một DID sang DID Document tương ứng. \\
+
+Ed25519 & Edwards-curve Digital Signature Algorithm & Lược đồ chữ ký số tất định trên đường cong Edwards25519, không cần nguồn ngẫu nhiên tại thời điểm ký. \\
+
+Holder & Holder & Chủ thể: bên nhận và lưu giữ chứng thực, đồng thời quyết định việc chia sẻ. Trong giáo dục là người học. \\
+
+IPFS & InterPlanetary File System & Hệ thống lưu trữ phân tán định địa chỉ theo nội dung, dùng làm lớp lưu trữ ngoài chuỗi. \\
+
+Issuer & Issuer & Bên phát hành: tổ chức có thẩm quyền tạo và ký chứng thực. Trong giáo dục là cơ sở đào tạo. \\
+
+JSON-LD & JavaScript Object Notation for Linked Data & Định dạng biểu diễn dữ liệu liên kết, cho phép gắn ngữ nghĩa thống nhất cho từng thuộc tính. \\
+
+Move & Move & Ngôn ngữ hợp đồng thông minh hướng tài nguyên, trong đó hệ thống kiểu ngăn việc nhân bản hoặc hủy trạng thái ngoài ý muốn. \\
+
+PBKDF2 & Password-Based Key Derivation Function 2 & Hàm dẫn xuất khóa từ mật khẩu, với số vòng lặp cấu hình được nhằm làm mỗi lần thử mật khẩu trở nên đắt. \\
+
+SD-JWT & Selective Disclosure JWT & Chuẩn cho phép tiết lộ chọn lọc từng thuộc tính bên trong một chứng thực mà chữ ký vẫn kiểm chứng được. \\
+
+SHA3-256 & Secure Hash Algorithm 3, 256 bit & Hàm băm mật mã theo cấu trúc bọt biển, dùng để tính giá trị neo của tài liệu và chứng thực. \\
+
+SLIP-0010 & SatoshiLabs Improvement Proposal 10 & Chuẩn dẫn xuất khóa phân cấp, mở rộng cho họ khóa Ed25519. \\
+
+SSI & Self-Sovereign Identity & Định danh tự chủ: mô hình trong đó chủ thể trực tiếp sở hữu và kiểm soát định danh của mình. \\
+
+ToIP & Trust over IP & Kiến trúc tham chiếu cho hệ sinh thái định danh phi tập trung, gồm một chồng kỹ thuật và một chồng quản trị song song. \\
+
+Trust Anchor & Trust Anchor & Điểm neo niềm tin: nơi công bố dữ liệu cần tính bất biến và khả năng đọc không cần cấp phép. \\
+
+Trust Registry & Trust Registry & Sổ đăng ký tin cậy: cơ chế lưu và công bố trạng thái thẩm quyền của các bên phát hành. \\
+
+TRQP & Trust Registry Query Protocol & Giao thức chuẩn hóa để truy vấn dữ liệu có thẩm quyền từ các sổ đăng ký tin cậy. \\
+
+VC & Verifiable Credential & Chứng thực có thể xác minh: cấu trúc dữ liệu biểu diễn các tuyên bố về một chủ thể theo cách kiểm chứng được bằng mật mã. \\
+
+Verifier & Verifier & Bên xác minh: tổ chức hoặc cá nhân cần kiểm chứng tính hợp lệ của chứng thực được trình bày. \\
+
+VP & Verifiable Presentation & Bản trình bày có thể xác minh: cấu trúc do chủ thể dựng và ký, đóng gói các chứng thực được chọn để trình bày. \\
+
+W3C & World Wide Web Consortium & Tổ chức chuẩn hóa web, ban hành các đặc tả về DID và chứng thực có thể xác minh. \\
+
+ZKP & Zero-Knowledge Proof & Chứng minh không tiết lộ thông tin: cho phép chứng minh một vị từ đúng mà không tiết lộ giá trị gốc. \\
+
+Máy xác nhận & Confirmation oracle & Một giá trị công khai cho phép bất kỳ ai kiểm tra một dữ liệu dự đoán có khớp hay không, dù không tiết lộ dữ liệu gốc. Giá trị băm không có muối trên chuỗi có tính chất này. \\
+
+Sổ ghi chỉ-thêm & Append-only log & Cấu trúc dữ liệu chỉ cho phép thêm bản ghi, kèm bằng chứng mật mã về tính nhất quán; là phương án thay thế blockchain trong nhiều kịch bản neo dữ liệu. \\
+
+Mặt nạ bit & Bitmask & Cách biểu diễn một tập hữu hạn bằng các bit của một số nguyên; dùng ở đây để biểu diễn phạm vi loại văn bằng được phép cấp. \\
+
+Bất đối xứng cấp -- thu hồi & Issue--revoke asymmetry & Nguyên tắc thiết kế: thao tác thu hồi phải có điều kiện tiên quyết lỏng hơn thao tác cấp. \\
+
+\end{longtable}

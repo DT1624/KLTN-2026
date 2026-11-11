@@ -1,0 +1,19 @@
+[package]
+name = "vnu-contracts"
+version = "1.0.0"
+authors = []
+
+[addresses]
+vnu = "_"
+root_admin = "_"
+
+[dev-addresses]
+vnu = "0xabcde"
+root_admin = "0x12345"
+
+[dependencies.AptosFramework]
+git = "https://github.com/movementlabsxyz/aptos-core.git"
+rev = "movement"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]

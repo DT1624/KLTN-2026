@@ -1,0 +1,40 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://credentials.vnu.edu.vn/contexts/academic/v1"
+  ],
+  "id": "https://credentials.uet.vnu.edu.vn/vc/2024/bachelor/QT20200012345",
+  "type": ["VerifiableCredential", "BachelorDegreeCredential"],
+  "issuer": {
+    "id": "did:vnu:0xbb01...",
+    "name": "Trường Đại học Công nghệ, ĐHQGHN"
+  },
+  "validFrom": "2024-06-15T00:00:00Z",
+  "credentialSubject": {
+    "id": "did:vnu:0xdd01...",
+    "degree": {
+      "type": "BachelorOfEngineering",
+      "name": "Kỹ sư Khoa học Máy tính",
+      "gpa": "3.62",
+      "graduationDate": "2024-06-10",
+      "honors": "Khá"
+    },
+    "alumniOf": {
+      "id": "did:vnu:0xbb01...",
+      "name": "Trường Đại học Công nghệ, ĐHQGHN"
+    }
+  },
+  "credentialStatus": {
+    "id": "ipfs://bafybeig.../status-list-2024#12345",
+    "type": "StatusList2021Entry",
+    "statusListIndex": "12345",
+    "statusListCredential": "ipfs://bafybeig.../status-list-2024"
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2024-06-15T09:00:00Z",
+    "verificationMethod": "did:vnu:0xbb01...#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z58DAdFfa9SkqZMVP..."
+  }
+}

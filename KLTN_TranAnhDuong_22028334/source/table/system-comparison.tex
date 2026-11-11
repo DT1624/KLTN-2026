@@ -1,0 +1,123 @@
+% Sáu cột ở cỡ chữ thường thì tràn lề phải ~20pt và chữ bị giãn rất xấu.
+% Thu nhỏ cỡ chữ, giảm đệm cột và canh trái các ô thay vì bỏ bớt cột.
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{2.8cm}|>{\raggedright\arraybackslash}p{2.4cm}|>{\raggedright\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}p{2.3cm}|>{\raggedright\arraybackslash}p{2.3cm}|}
+\caption{So sánh mô hình đề xuất với các hệ thống và kiến trúc tham chiếu}
+\label{tab:system-comparison} \\
+
+\hline
+\textbf{Tiêu chí} & \textbf{Blockcerts} & \textbf{EDC / EBSI} & \textbf{Open Badges 3.0} & \textbf{Trust over IP} & \textbf{Mô hình đề xuất} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Tiêu chí} & \textbf{Blockcerts} & \textbf{EDC / EBSI} & \textbf{Open Badges 3.0} & \textbf{Trust over IP} & \textbf{Mô hình đề xuất} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Xác minh độc lập với bên phát hành
+& Có
+& Phụ thuộc hạ tầng khu vực
+& Có
+& Theo thiết kế
+& Có
+\\ \hline
+
+Sổ đăng ký thẩm quyền
+& Không có
+& Có, do tổ chức vận hành
+& Không có
+& Mô tả khái niệm
+& Có, là trạng thái hợp đồng trên chuỗi công khai
+\\ \hline
+
+Biểu diễn phạm vi cấp phát
+& Không
+& Theo lĩnh vực và địa bàn
+& Không
+& Mô tả khái niệm
+& Mặt nạ bit theo loại văn bằng
+\\ \hline
+
+Thời hạn ủy quyền
+& Không
+& Theo chu kỳ kiểm định
+& Không
+& Mô tả khái niệm
+& Trường thời hạn trong bản ghi, hợp đồng tự đối chiếu
+\\ \hline
+
+Ủy quyền nhiều cấp
+& Không
+& Có, qua tổ chức kiểm định
+& Không
+& Hoãn ở đặc tả truy vấn v2.0
+& Có, với ba ràng buộc thi hành bởi hợp đồng
+\\ \hline
+
+Thu hồi thẩm quyền
+& Không
+& Có
+& Không
+& Mô tả khái niệm
+& Có, trạng thái cập nhật trên chuỗi
+\\ \hline
+
+Cơ chế thu hồi chứng thực
+& Danh sách do bên phát hành tự giữ
+& Tập trung
+& Tùy triển khai
+& Không quy định
+& Trạng thái theo từng bản ghi trên chuỗi
+\\ \hline
+
+Đối chiếu nội dung với bản neo khi xác minh
+& Có
+& Có
+& Tùy triển khai
+& Không quy định
+& Có, là một bước riêng trong quy trình
+\\ \hline
+
+Phân biệt loại thất bại khi xác minh
+& Không
+& Không rõ
+& Không
+& Không quy định
+& Có, báo cáo theo từng bước
+\\ \hline
+
+Chủ thể kiểm soát khóa
+& Một phần
+& Không
+& Tùy triển khai
+& Theo thiết kế
+& Ví không lưu ký
+\\ \hline
+
+Tuân thủ chuẩn W3C DID / VC
+& Một phần
+& Một phần
+& Có ở lớp chứng thực
+& Tham chiếu chuẩn
+& Tuân thủ, trừ phép chuẩn hóa và cơ chế trạng thái
+\\ \hline
+
+Cơ sở pháp lý đi kèm
+& Không
+& Có, theo khung eIDAS
+& Không
+& Không
+& Chưa có; hành lang pháp lý trong nước đã hình thành
+\\ \hline
+
+\end{longtable}
+\endgroup

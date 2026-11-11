@@ -1,0 +1,20 @@
+\begin{table}[H]
+\centering
+\caption{Phân tách thẩm quyền theo thao tác}
+\label{tab:v2-role}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{4.4cm}|p{3.4cm}|p{5.6cm}|}
+\hline
+\textbf{Thao tác} & \textbf{Vai trò được phép} & \textbf{Cơ sở} \\ \hline
+Cấp, thu hồi quyền quản trị viên; cấp bit uỷ quyền & Chỉ quản trị viên gốc & Hai quyền có hệ quả rộng nhất phải tập trung ở gốc \\ \hline
+Phê duyệt bên phát hành & Gốc, quản trị viên & Thao tác thường xuyên, cần phân cấp \\ \hline
+Phê duyệt bên phát hành cấp dưới & Bên phát hành có bit uỷ quyền & Ba ràng buộc ở Mục \ref{sec:uy-quyen} \\ \hline
+Đề cử, huỷ đề cử quyền gốc & Chỉ quản trị viên gốc & Gốc hiện tại quyết định người kế nhiệm \\ \hline
+Ký nhận quyền gốc & Địa chỉ đang được đề cử & Không chặn theo vai trò; rào chắn là điều kiện trùng địa chỉ trong hợp đồng \\ \hline
+Cấp phát chứng thực & Bên phát hành còn hiệu lực, loại trong phạm vi & Điều kiện chặt nhất hệ thống \\ \hline
+Thu hồi, đình chỉ chứng thực & Bên đã cấp chứng thực đó & Chỉ cần quyền sở hữu (Mục \ref{sec:bat-doi-xung}) \\ \hline
+Kích hoạt lại chứng thực & Gốc, quản trị viên & Bên phát hành tự ngưng rồi tự bật thì việc ngưng mất giá trị kiểm toán \\ \hline
+Tự đình chỉ, tự mở định danh & Chủ định danh & Ghi lại ai đã đặt trạng thái để phân biệt với bị quản trị viên khoá \\ \hline
+\end{tabular}
+\end{table}

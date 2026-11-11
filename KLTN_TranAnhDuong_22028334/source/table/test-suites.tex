@@ -1,0 +1,76 @@
+\begin{longtable}{|p{3.3cm}|c|p{8.4cm}|}
+\caption{Chín bộ kiểm thử và tính chất mà mỗi bộ nhằm chứng minh}
+\label{tab:test-suites} \\
+
+\hline
+\textbf{Bộ kiểm thử} & \textbf{Số phép} & \textbf{Tính chất được chứng minh} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Bộ kiểm thử} & \textbf{Số phép} & \textbf{Tính chất được chứng minh} \\
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+Kiểm thử đơn vị hợp đồng
+& 126
+& Logic phân quyền đúng đắn. Trong đó 83 phép dựng một thao tác vi phạm và khẳng định nó bị từ chối với đúng mã lỗi dự kiến
+\\ \hline
+
+Đối chiếu tên hàm hợp đồng
+& 19
+& Tên hàm khớp nhau giữa ba nơi gọi: mã Move, hai cài đặt tầng chỉ mục, và tầng chuỗi của giao diện
+\\ \hline
+
+Kiểm thử đầu cuối
+& 19 $\times$ 2
+& Các luồng chính hoạt động đầu cuối. Cùng một bộ chạy lên cả hai cài đặt qua biến môi trường chỉ địa chỉ dịch vụ
+\\ \hline
+
+Kiểm thử luồng nghiệp vụ
+& 31 $\times$ 2
+& Toàn bộ vòng đời văn bằng và các luồng quản trị, bao gồm nội dung thực của nhật ký kiểm toán
+\\ \hline
+
+Đối chiếu hai cài đặt
+& 59
+& Hai cài đặt trả cùng kết quả và cùng mã trạng thái cho cùng một yêu cầu, kể cả với dữ liệu vào không hợp lệ
+\\ \hline
+
+Phát hiện nội dung bị sửa
+& 7 $\times$ 2
+& Bước đối chiếu nội dung với giá trị băm đã neo phát hiện được nội dung bị sửa sau khi cấp, trong khi bước kiểm trạng thái vẫn đạt
+\\ \hline
+
+Kiểm thử chế độ nghiêm ngặt
+& 6
+& Ở chế độ phụ thuộc chuỗi, hệ thống vẫn chặn mã giao dịch bịa đặt và vẫn từ chối bên tự khai là bên phát hành
+\\ \hline
+
+Kiểm thử ví
+& 17
+& Khóa riêng không rời khỏi trình duyệt: kiểm toàn bộ gói tin gửi lên dịch vụ, không gói nào chứa khóa riêng hay mật khẩu
+\\ \hline
+
+Kiểm thử khôi phục thiết bị khác
+& 17
+& Khôi phục bằng cụm từ ghi nhớ cho đúng cặp khóa và địa chỉ; biết địa chỉ mà không có khóa thì đăng nhập thất bại
+\\ \hline
+
+Đối chiếu tầng chuỗi với nút đầy đủ
+& 12
+& Cách mã hóa tham số và thứ tự tham số của giao diện đúng với hợp đồng trên chuỗi thật, kiểm bằng tuyến mô phỏng nên không ghi gì lên chuỗi
+\\ \hline
+
+Phép đo tải
+& 905.160 yêu cầu
+& Hệ thống không sinh lỗi chức năng dưới tải; đồng thời lượng hoá chính độ tin cậy của phép đo (Mục 4.9)
+\\ \hline
+
+\end{longtable}

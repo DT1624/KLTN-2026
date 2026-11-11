@@ -1,0 +1,19 @@
+\begin{table}[H]
+\centering
+\caption{Biểu diễn phạm vi thẩm quyền bằng mặt nạ bit}
+\label{tab:vc-type-mask}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|c|c|p{4.6cm}|p{5.2cm}|}
+\hline
+\textbf{Bit} & \textbf{Giá trị} & \textbf{Loại chứng thực} & \textbf{Ghi chú} \\
+\hline
+0 & 1  & Bằng cử nhân / kỹ sư & \\ \hline
+1 & 2  & Bằng thạc sĩ & \\ \hline
+2 & 4  & Bằng tiến sĩ & \\ \hline
+3 & 8  & Bảng điểm, kết quả học tập & \\ \hline
+4 & 16 & Chứng nhận vi mô, chứng chỉ ngắn hạn & \\ \hline
+5 & 32 & Chứng thực ủy quyền & Chỉ quản trị viên gốc được cấp bit này; cho phép đơn vị phê duyệt bên phát hành cấp dưới \\ \hline
+\end{tabular}
+\end{table}
+
+\noindent Phạm vi thẩm quyền của một đơn vị là phép hợp các giá trị tương ứng. Ví dụ, một trường được phép cấp bằng cử nhân, bằng thạc sĩ và bảng điểm có phạm vi $M = 1 \vee 2 \vee 8 = 11$. Phép kiểm tra {``}đơn vị này có được cấp loại $T$ hay không{''} rút về điều kiện $M \wedge T \neq 0$, còn phép kiểm tra {``}phạm vi $A$ là tập con của phạm vi $B$ hay không{''} rút về điều kiện $A \wedge \neg B = 0$. Cả hai đều có chi phí không đổi, không phụ thuộc số loại văn bằng trong phạm vi.

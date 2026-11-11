@@ -1,0 +1,24 @@
+% SINH TỰ ĐỘNG bởi vnu-trust/scripts/eval/plot.mjs — đừng sửa tay.
+% Nguồn: .bench/eval/chain.json
+% fullnode https://testnet.movementnetwork.xyz/v1
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.85\textwidth, height=6.0cm, xtick={1,2,4,8}, xlabel={Số văn bằng trong bản trình bày $k$}, ylabel={Thời gian các vòng gọi view (ms)},
+    ymin=0, legend pos=north west, legend cell align=left, grid=both, grid style={gray!18}, label style={font=\small}, tick label style={font=\footnotesize},
+    legend style={font=\scriptsize, fill=white, fill opacity=0.85, text opacity=1, draw=gray!40}]
+    \addplot[color=red!70!black, mark=*, thick] coordinates {(1,1263) (2,1863) (4,3274) (8,6876)};
+    \addlegendentry{Mẫu gọi hiện tại, đo thật}
+    \addplot[color=red!70!black, densely dotted, thick, domain=1:8, samples=8] {(x+3)*333.4};
+    \addlegendentry{Mô hình $(k+3)\times$RTT, RTT $=333$\,ms}
+    \addplot[color=blue!70!black, mark=square*, thick] coordinates {(1,1837) (2,2012) (4,1952) (8,3272)};
+    \addlegendentry{Song song hoá, đo thật}
+    \addplot[color=blue!70!black, densely dotted, thick, domain=1:8, samples=2] {2*333.4};
+    \addlegendentry{Mô hình $2\times$RTT}
+    \node[font=\scriptsize, blue!60!black, anchor=north] at (axis cs:4,1952) {\shortstack{59/130\\bị chặn}};
+    \node[font=\scriptsize, blue!60!black, anchor=north] at (axis cs:8,3272) {\shortstack{167/250\\bị chặn}};
+\end{axis}
+\end{tikzpicture}
+\caption{Chi phí vòng gọi tới fullnode công khai của bước xác minh ở chế độ on-chain: mẫu gọi hiện tại so với mẫu song song hoá; nhãn ghi số lời gọi bị fullnode từ chối vì vượt hạn mức}
+\label{fig:v2-chain}
+\end{figure}

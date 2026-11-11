@@ -1,0 +1,21 @@
+% Abstract Viet - Tóm tắt bằng Tiếng Việt
+\mychapter{TÓM TẮT}
+
+{\fsize{12pt}
+\textbf{Tóm tắt:} Khóa luận đề xuất một kiến trúc định danh số và một khung quản trị niềm tin cho bài toán văn bằng số trong môi trường giáo dục đa tổ chức, với Đại học Quốc gia Hà Nội làm trường hợp nghiên cứu. Vấn đề xuất phát không phải từ việc thiếu công cụ phát hiện văn bằng giả, mà từ một đặc điểm kiến trúc của mô hình hiện hành: thông tin xác thực nằm ở cơ sở cấp phát thay vì nằm trong bản thân văn bằng, nên chi phí của một lần kiểm chứng tỉ lệ thuận với số lần kiểm chứng. Hệ quả là việc xác minh trở thành ngoại lệ thay vì thao tác mặc định.
+
+Trên cơ sở mô hình \textbf{định danh tự chủ} (Self-Sovereign Identity --- SSI), nghiên cứu sử dụng \textbf{định danh phi tập trung} (Decentralized Identifier --- DID), \textbf{chứng thực có thể xác minh} (Verifiable Credential --- VC) và \textbf{ví định danh số} theo các chuẩn mở của W3C, kết hợp mô hình lưu trữ trên chuỗi và ngoài chuỗi.
+
+Đóng góp trọng tâm nằm ở lớp mà các hệ thống hiện có còn để trống. Mật mã học giải quyết được niềm tin kỹ thuật nhưng không trả lời được câu hỏi tổ chức ký văn bằng có thẩm quyền cấp loại văn bằng đó hay không. Khoảng trống này không mang tính lý thuyết: hai phân tích an toàn trên hai hệ thống chứng nhận văn bằng đã triển khai cho thấy nó là một lớp lỗ hổng khai thác được, và cả hai hệ thống bị tấn công đều có chữ ký số hợp lệ cùng giá trị băm neo đúng cách. Nghiên cứu vì vậy đặc tả chuỗi thẩm quyền --- phạm vi cấp phát biểu diễn bằng mặt nạ bit, thời hạn ủy quyền, ràng buộc cho ủy quyền nhiều cấp và quy tắc thu hồi --- thành các quy tắc trong hợp đồng thông minh, để trạng thái thẩm quyền trở thành dữ liệu công khai mà bất kỳ bên nào cũng tra cứu được, thay vì một bản ghi do một tổ chức kiểm soát. Quy trình xác minh gồm bảy bước, trong đó có bước đối chiếu nội dung văn bằng với giá trị băm đã neo --- bước mà các hệ thống chỉ theo dõi trạng thái không có, nên bỏ sót trường hợp nội dung bị sửa sau khi cấp.
+
+Hệ thống thử nghiệm được triển khai trên một mạng công khai sử dụng máy ảo Move, với ba mô-đun hợp đồng, hai cài đặt độc lập của tầng chỉ mục và một ví không lưu ký chạy hoàn toàn trong trình duyệt. Trong 126 phép kiểm trên hợp đồng, 83 phép dựng một thao tác vi phạm và khẳng định nó bị từ chối với đúng mã lỗi dự kiến. Phép đo tải gồm bốn thí nghiệm với tổng 905.160 yêu cầu cho thấy hệ thống không sinh lỗi chức năng nào, và trung vị độ trễ ở mức tải vừa phải thấp hơn ngưỡng đặt ra một đến hai bậc; đồng thời chính phép đo cho thấy độ trễ phần đuôi không đo được đáng tin cậy khi bộ sinh tải chạy cùng máy với hệ thống. Phát biểu chính xác của kết quả là các quy tắc đã đặc tả không bị vi phạm trong những kịch bản được kiểm --- không phải một chứng minh về tính đúng đắn.
+
+Nghiên cứu cũng rút ra ba nguyên tắc thiết kế có phạm vi áp dụng rộng hơn bài toán văn bằng: thao tác thu hồi phải có điều kiện tiên quyết lỏng hơn thao tác cấp; một thao tác không thể hoàn tác phải được bên bị ảnh hưởng chứng minh điều kiện bằng hành động của chính họ; và việc khôi phục một vai trò đã bị thu hồi phải đi kèm cơ chế phiên bản để không mất dấu vết kiểm toán.
+
+Bốn giới hạn được nêu rõ. Kiến trúc tách dữ liệu trên chuỗi và ngoài chuỗi \emph{giảm} mức phơi nhiễm dữ liệu cá nhân nhưng không \emph{bảo đảm} quyền xóa, vì giá trị băm không có muối trên chuỗi vẫn là dữ liệu cá nhân theo cách giải thích hiện hành. Mỗi bên phát hành ký bằng một khóa duy nhất, nên khóa bị lộ là cấp được chứng thực hợp lệ trong toàn bộ phạm vi thẩm quyền. Yêu cầu về ngưỡng độ trễ phần đuôi không kiểm chứng được trên môi trường đo hiện có. Và khóa luận kết luận về tính khả thi kỹ thuật, không về tính khả dụng --- hai câu hỏi không suy ra được từ nhau.
+
+Trong phạm vi khóa luận, {``}văn bằng{''} được hiểu là tập hợp các minh chứng học thuật của người học, gồm bằng cấp, bảng điểm, chứng chỉ và các kết quả học tập khác. {``}Văn bằng số{''} là dạng số của các minh chứng này và được mô hình hóa trong kiến trúc SSI dưới dạng chứng thực có thể xác minh.
+
+\vspace{0.5cm}
+\textit{\textbf{Từ khóa:}} \textit{Quản trị niềm tin, Văn bằng số, Định danh phi tập trung, Định danh tự chủ, Sổ đăng ký tin cậy, Hợp đồng thông minh.}
+}

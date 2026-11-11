@@ -1,0 +1,238 @@
+% Chương 1: Giới thiệu
+\chapter{GIỚI THIỆU}
+
+\section{Bối cảnh}
+
+\subsection{Nhu cầu kiểm chứng văn bằng trong môi trường số}
+
+Văn bằng đại học là một tuyên bố của cơ sở đào tạo về năng lực của người học, và giá trị của tuyên bố đó phụ thuộc vào khả năng người khác kiểm chứng được nó. Trong suốt thời kỳ mà thị trường lao động còn bị giới hạn trong phạm vi địa phương, việc kiểm chứng diễn ra không thường xuyên và được thực hiện bằng các phương tiện hành chính: một công văn hỏi, một bản sao công chứng, một lần đối chiếu sổ gốc. Quy mô nhỏ cho phép quy trình thủ công vận hành được.
+
+Hai thay đổi đã làm mất đi điều kiện đó. Thứ nhất, tuyển dụng dịch chuyển lên các nền tảng trực tuyến và sang hình thức làm việc từ xa, khiến hồ sơ ứng viên đi xa khỏi nơi phát hành văn bằng. Thứ hai, số lượng người học và số lượng văn bằng tăng nhanh. Hệ quả là tần suất kiểm chứng tăng theo cấp số, trong khi năng lực xử lý của bộ phận lưu trữ tại từng cơ sở đào tạo gần như không đổi.
+
+Số liệu của chính cơ quan quản lý cho thấy quy mô này không còn nhỏ. Từ tháng 01/2017 đến hết tháng 11/2023, Cục Quản lý chất lượng (Bộ Giáo dục và Đào tạo) đã tiếp nhận 37.436 hồ sơ đề nghị công nhận văn bằng do cơ sở giáo dục nước ngoài cấp và công nhận 35.662 hồ sơ, tức khoảng 1.774 hồ sơ (4,7\%) không được công nhận. Đây chỉ là một luồng xác minh hẹp --- văn bằng nước ngoài sử dụng tại Việt Nam --- và đã phát sinh trung bình hơn 5.000 hồ sơ mỗi năm.
+
+Đáng chú ý hơn con số tuyệt đối là đặc tính của quy trình. Theo Thông tư 13/2021/TT-BGDĐT \cite{TT13_2021}, thời hạn giải quyết hồ sơ công nhận văn bằng là 20 ngày làm việc, và tối đa 45 ngày làm việc trong trường hợp phải xác minh thông tin với cơ sở giáo dục hoặc đơn vị xác thực nước ngoài. Chi phí xác minh giấy tờ được quy định tại Thông tư 164/2016/TT-BTC \cite{TT164_2016} ở mức 250.000 đồng mỗi văn bằng đối với chương trình liên kết đào tạo thực hiện tại Việt Nam và 500.000 đồng mỗi văn bằng đối với văn bằng do cơ sở nước ngoài cấp sau khi hoàn thành chương trình ở nước ngoài, chưa kể chi phí dịch thuật và công chứng.
+
+Khoảng thời gian tính bằng tuần và mức phí tính theo từng lần tra cứu không phải là hệ quả của sự chậm trễ hành chính. Chúng là hệ quả trực tiếp của một đặc điểm kiến trúc: trong mô hình hiện hành, thông tin xác thực không nằm trong bản thân văn bằng mà nằm ở cơ sở đã phát hành nó. Bên xác minh buộc phải hỏi lại nơi phát hành, và vì vậy thời gian cùng chi phí tỉ lệ thuận với số lần hỏi. Mọi cải tiến chỉ nhằm rút ngắn thời gian trả lời đều giữ nguyên quan hệ tỉ lệ này.
+
+\subsection{Hành lang pháp lý và quy mô hệ thống giáo dục đại học Việt Nam}
+
+Về mặt chính sách, Việt Nam đã hình thành tương đối đầy đủ cơ sở pháp lý cho việc số hóa văn bằng. Quyết định 749/QĐ-TTg năm 2020 \cite{QD749_2020} xác lập Chương trình Chuyển đổi số quốc gia, trong đó giáo dục là một trong các lĩnh vực ưu tiên. Quyết định 131/QĐ-TTg ngày 25/01/2022 \cite{QD131_2022} cụ thể hóa định hướng này thành đề án tăng cường ứng dụng công nghệ thông tin và chuyển đổi số trong giáo dục giai đoạn 2022--2025. Luật Giao dịch điện tử số 20/2023/QH15 \cite{LuatGDDT2023} công nhận giá trị pháp lý của thông điệp dữ liệu và chữ ký điện tử.
+
+Bước chuyển có ý nghĩa nhất đối với đề tài này diễn ra năm 2026. Thông tư 10/2026/TT-BGDĐT ban hành ngày 26/02/2026, có hiệu lực từ 15/04/2026 \cite{TT10_2026}, lần đầu định danh chính thức khái niệm văn bằng số và chứng chỉ số, đồng thời quy định văn bằng số có giá trị pháp lý như văn bằng giấy. Thông tư cũng xác định thông tin trích xuất từ cơ sở dữ liệu văn bằng, chứng chỉ có giá trị pháp lý như thông tin trong sổ gốc, và việc tra cứu trên nền tảng định danh điện tử có thể thay thế bản sao từ sổ gốc. Như vậy, rào cản pháp lý --- vốn thường được nêu như lý do chính trì hoãn triển khai văn bằng số --- đã được tháo bỏ.
+
+Song hành với việc công nhận văn bằng số, một ràng buộc mới cũng xuất hiện. Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15, được Quốc hội thông qua ngày 26/06/2025 và có hiệu lực từ 01/01/2026 \cite{LuatBVDLCN2025}, quy định trách nhiệm cụ thể trong thu thập, lưu trữ và chia sẻ dữ liệu cá nhân. Với hệ thống văn bằng số, điều này chuyển một yêu cầu trước đây mang tính khuyến nghị thành ràng buộc kiến trúc: thông tin học thuật của người học không thể được lưu trữ hoặc công khai tùy ý, và mọi thiết kế đặt dữ liệu cá nhân lên một hạ tầng công khai bất biến đều phải được xem xét lại.
+
+Về quy mô, hệ thống giáo dục đại học Việt Nam đã đạt tới mức mà sai số của quy trình thủ công trở nên đáng kể. Thống kê năm 2024 ghi nhận 243 cơ sở giáo dục đại học (176 công lập và 67 ngoài công lập) với quy mô 2.355.711 sinh viên và 601.966 sinh viên tuyển mới \cite{MOET_Stats2025}. Đến tháng 8/2025, số người học bậc đại học đã vượt 2,5 triệu, cùng khoảng 139.000 học viên thạc sĩ và gần 64.000 nghiên cứu sinh. Quy hoạch mạng lưới cơ sở giáo dục đại học theo Quyết định 452/QĐ-TTg \cite{QD452_2025} đặt mục tiêu quy mô trên 3 triệu người học vào năm 2030.
+
+Có thể thấy một sự lệch pha. Chính sách đã cho phép văn bằng số, quy mô dữ liệu đã đủ lớn để đòi hỏi tự động hóa, nhưng cơ chế xác minh tại phần lớn cơ sở đào tạo vẫn dựa trên công văn, thư điện tử hoặc tra cứu nội bộ. Khoảng cách giữa khung pháp lý và năng lực triển khai kỹ thuật chính là không gian mà nghiên cứu này hướng tới.
+
+\subsection{Giới hạn kiến trúc của mô hình xác minh hiện hành}
+
+Để xác định đúng vấn đề cần giải quyết, cần phân biệt hai loại hạn chế: hạn chế do triển khai chưa đầy đủ và hạn chế nằm trong chính cấu trúc của mô hình. Loại thứ nhất có thể khắc phục bằng đầu tư thêm; loại thứ hai thì không.
+
+Việt Nam đã có các nền tảng dữ liệu tập trung ở cấp hệ thống. Hệ thống Cơ sở dữ liệu về Giáo dục Đại học (HEMIS) quản lý dữ liệu vĩ mô của ngành, từ thông tin người học, đội ngũ giảng viên đến chương trình đào tạo; hệ thống lưu trữ văn bằng quốc gia cung cấp giao diện dịch vụ công để đối soát thông tin bằng cấp. Mức độ triển khai giữa các đơn vị tuy chưa đồng đều và kiến trúc dữ liệu tại mỗi cơ sở còn khác nhau, nhưng đây đều là những hạn chế thuộc loại thứ nhất.
+
+Hạn chế thuộc loại thứ hai nằm ở chỗ khác. Trong mô hình tập trung, điều mà bên xác minh thực sự tin không phải là dữ liệu mà là tổ chức vận hành cơ sở dữ liệu. Một bản ghi trả về từ cổng tra cứu chỉ đáng tin trong chừng mực người ta tin rằng cổng đó không bị can thiệp, rằng dữ liệu không bị sửa, và rằng tổ chức vận hành còn tồn tại. Niềm tin được đặt vào bên trung gian, không vào bằng chứng. Ba hệ quả kéo theo từ đặc điểm này đều không thể khắc phục bằng cách số hóa thêm:
+
+\begin{itemize}
+    \item \textbf{Không kiểm chứng được độc lập.} Bên xác minh không có cách nào tự khẳng định tính đúng đắn của dữ liệu mà không hỏi lại bên vận hành. Khi bên vận hành không phản hồi --- ngoài giờ làm việc, hồ sơ thất lạc, hoặc đơn vị cấp phát đã sáp nhập, giải thể --- văn bằng trở nên không thể kiểm chứng dù hoàn toàn hợp lệ.
+    \item \textbf{Không liên thông được ở mức định danh.} Mỗi cơ sở cấp cho người học một mã định danh riêng. Người học tham gia nhiều chương trình tại nhiều đơn vị sẽ có nhiều hồ sơ rời rạc, và không có cơ chế kỹ thuật nào cho phép tổng hợp chúng thành một bằng chứng thống nhất.
+    \item \textbf{Không biểu diễn được thẩm quyền.} Cơ sở dữ liệu trả lời câu hỏi {``}bản ghi này có tồn tại không{''}, nhưng không trả lời câu hỏi {``}đơn vị tạo ra bản ghi này có thẩm quyền cấp loại văn bằng đó không{''}. Trong một hệ thống nhiều cơ sở, đây mới là câu hỏi quyết định.
+\end{itemize}
+
+Vụ việc tại Trường Đại học Đông Đô minh họa rõ hệ quả của hạn chế thứ ba. Hàng trăm văn bằng đã được cấp trái phép và một số được sử dụng trong hồ sơ cán bộ, công chức. Các văn bằng đó tồn tại thật trong hệ thống của cơ sở cấp phát và vượt qua được mọi phép kiểm tra theo kiểu {``}bản ghi có tồn tại không{''}. Khuyết điểm không nằm ở tính toàn vẹn dữ liệu mà nằm ở chỗ hệ thống không có cơ chế nào ràng buộc hành vi cấp phát với phạm vi thẩm quyền đã được công nhận.
+
+Ở quy mô quốc tế, hiện tượng tổ chức cấp bằng không qua đào tạo đã tồn tại lâu và có quy mô kinh tế đáng kể; Ezell và Bear mô tả đây là một ngành công nghiệp hàng tỷ đô la với hơn một triệu văn bằng giả đã được bán \cite{EzellBear2012}. Dữ liệu từ dịch vụ xác minh văn bằng của Vương quốc Anh (Prospects Hedd) cho thấy cả hai mặt của vấn đề: hơn hai triệu yêu cầu xác minh đã được xử lý từ năm 2011, hơn 300 cơ sở mạo danh đại học đã bị phát hiện, nhưng tỷ lệ nhà tuyển dụng thực sự đối chiếu bằng cấp với cơ quan cấp phát chỉ ở khoảng 20\% \cite{Prospects_Hedd2026}. Con số cuối cùng đáng chú ý nhất: khi quy trình xác minh đủ tốn kém, phần lớn các bên liên quan sẽ chọn không xác minh. Gian lận tồn tại được không phải vì không thể phát hiện mà vì chi phí phát hiện quá cao so với lợi ích của từng lần kiểm tra riêng lẻ.
+
+Từ đó có thể phát biểu lại vấn đề một cách chính xác hơn: bài toán không phải là phát hiện văn bằng giả, mà là giảm chi phí của một lần kiểm chứng xuống mức mà việc xác minh trở thành hành vi mặc định thay vì ngoại lệ. Một mô hình đáp ứng được yêu cầu này phải cho phép kiểm chứng mà không cần hỏi ai, và đó là yêu cầu về kiến trúc chứ không phải về quy trình.
+
+\subsection{Hướng tiếp cận dựa trên bằng chứng mật mã}
+
+Các nghiên cứu và triển khai trong khoảng một thập kỷ qua cho thấy một chuyển dịch nhất quán về hướng tiếp cận: thay vì số hóa tài liệu rồi tìm cách bảo vệ nó, hệ thống số hóa chính bằng chứng về tính xác thực của dữ liệu. Chữ ký số gắn liền với nội dung cho phép phát hiện mọi thay đổi và truy về khóa đã ký; hàm băm mật mã cho phép đối chiếu nội dung với một cam kết đã công bố trước; sổ cái phân tán cho phép công bố cam kết đó theo cách không thể sửa lại. Khi ba thành phần này được kết hợp, bên xác minh có thể tự kiểm tra bằng toán học thay vì phải tin vào một tổ chức.
+
+Trên nền tảng đó, Tổ chức World Wide Web Consortium (W3C) đã chuẩn hóa hai khối kiến trúc cốt lõi. Đặc tả Decentralized Identifiers (DID) \cite{W3C_DIDCore2022} định nghĩa một dạng định danh mà quyền kiểm soát thuộc về chủ thể giữ khóa mật mã tương ứng, không phụ thuộc nhà cung cấp trung gian. Đặc tả Verifiable Credentials Data Model, đạt trạng thái Recommendation ở phiên bản 2.0 ngày 15/05/2025 \cite{W3C_VCDM2025}, định nghĩa cấu trúc dữ liệu cho các tuyên bố có thể xác minh bằng mật mã. Hai đặc tả này đã trở thành nền chung cho nhiều hệ thống triển khai ở quy mô quốc gia và khu vực, trong đó đáng chú ý là hạ tầng văn bằng số của Liên minh Châu Âu \cite{EDC_ELM} và dự án Blockcerts khởi nguồn từ MIT Media Lab \cite{Blockcerts2016}.
+
+Tuy vậy, chuẩn hóa ở tầng dữ liệu không tự giải quyết toàn bộ bài toán. Một chữ ký số hợp lệ chứng minh rằng dữ liệu không bị thay đổi sau khi ký và rằng nó được tạo bởi chủ sở hữu một khóa cụ thể. Nó không chứng minh được rằng chủ sở hữu khóa đó có thẩm quyền cấp loại văn bằng tương ứng. Trong một hệ sinh thái mà bất kỳ ai cũng có thể sinh khóa, tạo DID và phát hành chứng thực hợp lệ về mặt kỹ thuật, câu hỏi {``}nên tin bên phát hành nào{''} vẫn còn nguyên và nằm ngoài phạm vi của mật mã học.
+
+Khảo sát hệ thống gần đây xác nhận đây là một khoảng trống của cả lĩnh vực chứ không riêng một hệ thống nào. Rà soát 63 bài báo giai đoạn 2018--2023 về quản trị trong kiểm định giáo dục trên nền blockchain, De Alwis và cộng sự kết luận rằng các công trình hiện có hầu như không đề xuất một khung quản trị nào, trong khi ở mô hình truyền thống, chính khung quản trị mới là thứ bảo đảm tính xác thực của văn bằng \cite{DeAlwis2025}. Các khảo sát về định danh tự chủ cũng chỉ ra rằng vấn đề thiết lập niềm tin ở mức hệ sinh thái --- ai công nhận ai, theo quy trình nào --- là một trong những nội dung ít được giải quyết nhất \cite{Schardong2022, Sedlmeir2021}.
+
+Chính khoảng trống giữa niềm tin mật mã và niềm tin thể chế là điểm xuất phát của khóa luận này.
+
+\section{Bài toán nghiên cứu}
+
+\subsection{Bối cảnh nghiên cứu: Đại học Quốc gia Hà Nội}
+
+Để phân tích bài toán ở mức đủ cụ thể, nghiên cứu sử dụng Đại học Quốc gia Hà Nội (ĐHQGHN) làm trường hợp nghiên cứu. Lựa chọn này dựa trên đặc điểm cấu trúc của ĐHQGHN hơn là trên quy mô: đây là một thực thể pháp nhân duy nhất bao gồm nhiều cơ sở đào tạo hoạt động tương đối độc lập về quản lý. Tính đến năm 2026, ĐHQGHN gồm 9 trường đại học thành viên và 3 trường trực thuộc, triển khai 483 chương trình đào tạo \cite{VNU_Report2026}. Bản tin của ĐHQGHN ghi nhận con số 63.283 người học; cần lưu ý rằng phạm vi của con số này --- quy mô tại một thời điểm hay tổng lũy kế của một nhiệm kỳ --- không được nêu rõ trong nguồn, nên nó được dẫn ở đây như một chỉ dấu về bậc độ lớn chứ không như một số liệu chính xác.
+
+Lập luận của nghiên cứu không phụ thuộc vào con số đó. Điều quan trọng là \emph{cấu trúc}: mười hai đơn vị đào tạo hoạt động tương đối độc lập về quản lý nhưng cùng cấp phát văn bằng dưới thẩm quyền dẫn xuất từ một thực thể cấp trên. Cấu trúc này tồn tại bất kể quy mô người học là sáu mươi nghìn hay sáu trăm nghìn, và chính nó --- không phải quy mô --- là thứ tạo ra bài toán được nghiên cứu.
+
+Cấu hình này tái hiện đúng bài toán cần nghiên cứu ở dạng thu nhỏ. Mỗi trường thành viên vận hành hệ thống quản lý đào tạo riêng và cấp phát văn bằng dưới thẩm quyền của mình, nhưng thẩm quyền đó lại được dẫn xuất từ một thực thể cấp trên. Đồng thời, ĐHQGHN có chính sách khuyến khích học song ngành, chuyển đổi tín chỉ và liên kết đào tạo giữa các trường thành viên, nên người học thường xuyên có quan hệ học thuật với nhiều đơn vị. Nói cách khác, cả vấn đề về chuỗi thẩm quyền và vấn đề về liên thông định danh đều tồn tại trong một phạm vi có thể quan sát và kiểm chứng được.
+
+ĐHQGHN được dùng như một bối cảnh để thiết kế và kiểm chứng, không phải như giới hạn của mô hình. Cấu trúc {``}một thực thể gốc ủy quyền cho nhiều đơn vị cấp phát{''} là cấu trúc chung của hệ thống giáo dục Việt Nam ở cấp quốc gia, trong đó Bộ Giáo dục và Đào tạo giữ vai trò tương tự ĐHQGHN trong phạm vi hẹp hơn. Vì vậy kiến trúc đề xuất được thiết kế để có thể nâng lên một cấp mà không thay đổi bản chất.
+
+\subsection{Ba vấn đề cốt lõi}
+
+Từ phân tích ở Mục 1.1 và đặc điểm bối cảnh ở trên, bài toán được phân tách thành ba vấn đề tương ứng với ba tầng khác nhau của hệ thống. Cách phân tách này có ý nghĩa thực tiễn: mỗi vấn đề đòi hỏi một loại giải pháp khác nhau, và giải quyết một vấn đề không tự động giải quyết các vấn đề còn lại.
+
+\noindent \textbf{Vấn đề thứ nhất --- xác minh phụ thuộc vào sự hợp tác của bên cấp phát.}
+
+Hiện tại, khi một nhà tuyển dụng hoặc cơ sở giáo dục nước ngoài cần xác minh một văn bằng do trường thành viên của ĐHQGHN cấp, họ phải gửi yêu cầu đến phòng đào tạo của trường và chờ xác nhận. Quy trình này đặt điều kiện cần cho việc xác minh là sự hiện diện và hợp tác của bên cấp phát. Điều kiện đó không phải lúc nào cũng thỏa mãn, và quan trọng hơn, nó không thể được bảo đảm trong dài hạn --- văn bằng có giá trị suốt đời của người học, trong khi một đơn vị hành chính thì không.
+
+Vấn đề ở đây mang tính kiến trúc, không phải tính quy trình. Mọi nỗ lực rút ngắn thời gian phản hồi đều giữ nguyên sự phụ thuộc. Điều cần thay đổi là chuyển vị trí của thông tin xác thực: từ chỗ nằm ở cơ sở cấp phát sang chỗ nằm trong bản thân văn bằng và trong một hạ tầng công bố mà bất kỳ bên nào cũng truy cập được.
+
+\noindent \textbf{Vấn đề thứ hai --- thiếu định danh liên thông cho người học.}
+
+Khi một sinh viên học đồng thời tại hai trường thành viên, họ có hai mã sinh viên và hai hồ sơ học tập độc lập. Để minh chứng toàn bộ kết quả học tập, sinh viên phải thực hiện hai lần xác minh tại hai đơn vị riêng biệt; không có cơ chế kỹ thuật nào cho phép tổng hợp bằng chứng từ nhiều nguồn vào một lần trình bày duy nhất.
+
+Nguyên nhân là sự thiếu vắng một định danh bền vững và nhất quán đại diện cho người học xuyên suốt hành trình học thuật. Mã sinh viên là định danh cục bộ: nó chỉ có nghĩa trong hệ thống đã cấp ra nó, và mất hiệu lực khi người học rời khỏi hệ thống đó. Nghiên cứu về nền tảng tín chỉ liên trường EduCTX của Turkanović và cộng sự \cite{Turkanovic2018} cho thấy đây là thách thức mang tính hệ thống, xuất hiện ở hầu hết môi trường giáo dục đa cơ sở chứ không riêng ĐHQGHN.
+
+\noindent \textbf{Vấn đề thứ ba --- không có cơ chế biểu diễn và kiểm chứng thẩm quyền cấp phát.}
+
+Giả định rằng ĐHQGHN triển khai một hệ thống ký số văn bằng nội bộ. Khi đó bên xác minh có thể kiểm tra chữ ký và khẳng định nội dung không bị thay đổi. Nhưng vẫn còn một câu hỏi mà mật mã học không trả lời được: tổ chức đã ký văn bằng này có được phép cấp loại văn bằng đó hay không, và sự cho phép đó còn hiệu lực vào thời điểm cấp hay không.
+
+Để trả lời, cần một lớp quản trị nằm trên lớp kỹ thuật --- một cơ chế cho phép thực thể gốc ủy quyền cho các đơn vị cấp phát cụ thể, giới hạn phạm vi ủy quyền, thu hồi khi cần, và quan trọng nhất là cho phép bất kỳ bên thứ ba nào kiểm chứng trạng thái ủy quyền đó một cách độc lập. Lớp này không tồn tại trong các hệ thống đang vận hành ở ĐHQGHN, và như đã nêu, cũng chưa được giải quyết đầy đủ trong phần lớn các hệ thống định danh tự chủ hiện có.
+
+\subsection{Phát biểu bài toán}
+
+Ba vấn đề trên có quan hệ phụ thuộc: không có định danh bền vững thì không thể gắn thẩm quyền vào một thực thể cụ thể; không có cơ chế kiểm chứng thẩm quyền thì xác minh độc lập chỉ xác nhận được tính toàn vẹn chứ không xác nhận được tính hợp lệ. Vì vậy chúng cần được giải quyết như một bài toán thống nhất.
+
+Bài toán nghiên cứu được phát biểu như sau:
+
+\begin{quote}
+\textit{Xây dựng một kiến trúc văn bằng số cho môi trường giáo dục đa tổ chức, trong đó thông tin học thuật có thể được xác minh độc lập bằng bằng chứng mật mã mà không cần liên hệ với cơ sở cấp phát; người học sở hữu một định danh bền vững dùng chung được giữa các cơ sở; và thẩm quyền cấp phát của mỗi tổ chức được thiết lập, giới hạn, thu hồi cùng kiểm chứng thông qua một cơ chế quản trị minh bạch, có thể tra cứu công khai.}
+\end{quote}
+
+\section{Câu hỏi và mục tiêu nghiên cứu}
+
+\subsection{Câu hỏi nghiên cứu}
+
+Bài toán trên được triển khai thành ba câu hỏi nghiên cứu, mỗi câu hỏi tương ứng với một vấn đề đã xác định:
+
+\begin{itemize}
+    \item \textbf{CH1.} Kiến trúc nào cho phép cấp phát, lưu trữ, trình bày và xác minh văn bằng số theo chuẩn mở, sao cho bên xác minh kiểm chứng được nguồn gốc, tính toàn vẹn và trạng thái hiệu lực của văn bằng mà không cần tương tác với cơ sở cấp phát?
+    \item \textbf{CH2.} Khung quản trị niềm tin nào biểu diễn được chuỗi thẩm quyền trong một hệ sinh thái giáo dục nhiều cơ sở --- bao gồm ủy quyền có phạm vi, ủy quyền nhiều cấp, giới hạn thời hạn và thu hồi --- sao cho mọi thay đổi thẩm quyền đều để lại dấu vết kiểm chứng được và có thể tra cứu độc lập?
+    \item \textbf{CH3.} Mô hình đề xuất có khả thi về mặt kỹ thuật trong điều kiện vận hành thực tế hay không, xét trên các tiêu chí: tính đúng đắn của logic phân quyền, khả năng phát hiện các kịch bản gian lận, và hiệu năng xử lý của các tuyến xác minh?
+\end{itemize}
+
+\subsection{Mục tiêu nghiên cứu}
+
+Ba mục tiêu được xác lập tương ứng với ba câu hỏi, sắp xếp theo quan hệ phụ thuộc từ hạ tầng đến ứng dụng. Mỗi mục tiêu gắn với một tiêu chí hoàn thành có thể quan sát được, nhằm tránh tình trạng kết luận dựa trên đánh giá định tính.
+
+\noindent \textbf{Mục tiêu 1 --- Thiết kế kiến trúc định danh và văn bằng số phi tập trung.}
+
+Xây dựng kiến trúc kỹ thuật hỗ trợ toàn bộ vòng đời văn bằng số theo chuẩn W3C DID và Verifiable Credentials, trên nền một hạ tầng neo trạng thái bất biến. Kiến trúc phải bảo đảm ba thuộc tính: xác thực nguồn gốc, toàn vẹn nội dung và trạng thái hiệu lực theo thời gian, tất cả đều kiểm chứng được độc lập.
+
+\textit{Tiêu chí hoàn thành:} hệ thống thực hiện trọn vòng đời từ đăng ký định danh đến xác minh và thu hồi; quy trình xác minh phân biệt được lỗi toàn vẹn với lỗi trạng thái và báo rõ bước nào không đạt.
+
+\noindent \textbf{Mục tiêu 2 --- Đề xuất khung quản trị niềm tin cho hệ sinh thái đa tổ chức.}
+
+Xây dựng lớp quản trị nằm trên lớp kỹ thuật, biểu diễn chuỗi thẩm quyền từ thực thể gốc xuống các đơn vị cấp phát, kèm cơ chế giới hạn phạm vi, giới hạn thời hạn, ủy quyền lại và thu hồi. Toàn bộ trạng thái thẩm quyền phải tra cứu được công khai và mọi thay đổi phải lưu dấu vết không thể xóa.
+
+\textit{Tiêu chí hoàn thành:} logic phân quyền được đặc tả bằng mã thi hành và kiểm chứng bằng một bộ kiểm thử bao phủ cả các trường hợp hợp lệ và các trường hợp vi phạm thẩm quyền; mỗi quy tắc phân quyền có ít nhất một phép kiểm chứng minh nó thực sự chặn được hành vi vi phạm.
+
+\noindent \textbf{Mục tiêu 3 --- Hiện thực hóa và đánh giá mô hình thực nghiệm.}
+
+Xây dựng một hệ thống hoạt động được, triển khai trên một mạng blockchain công khai, bao phủ các kịch bản sử dụng của toàn bộ vòng đời văn bằng, và đánh giá hệ thống đó trên ba phương diện: tính đúng đắn chức năng, khả năng phát hiện gian lận và hiệu năng.
+
+\textit{Tiêu chí hoàn thành:} các kịch bản sử dụng chạy thành công đầu cuối; các kịch bản gian lận được định nghĩa trước đều bị phát hiện và lý do từ chối khớp với nguyên nhân thật; kết quả đo hiệu năng được thu thập bằng công cụ và phương pháp mô tả rõ, cho phép lặp lại.
+
+\section{Phạm vi nghiên cứu}
+
+Nghiên cứu được giới hạn theo ba chiều để bảo đảm chiều sâu phân tích.
+
+\noindent \textbf{Về lĩnh vực.} Đối tượng là văn bằng và chứng chỉ trong giáo dục đại học, bao gồm bằng tốt nghiệp các trình độ, bảng điểm và các minh chứng học thuật tương đương. Các loại chứng nhận trong giáo dục phổ thông, đào tạo nghề và các lĩnh vực ngoài giáo dục không thuộc phạm vi, dù kiến trúc được thiết kế không chứa giả định nào ngăn việc mở rộng sang các lĩnh vực đó.
+
+\noindent \textbf{Về công nghệ.} Nghiên cứu sử dụng các chuẩn mở về định danh phi tập trung và chứng thực có thể xác minh, kết hợp với các nguyên thủy mật mã đã được tiêu chuẩn hóa. Các kỹ thuật chứng minh không tiết lộ thông tin ở mức nâng cao --- cụ thể là chữ ký BBS cho phép tiết lộ chọn lọc ở mức thuộc tính trong cùng một chứng thực, và các giao thức chứng minh vị từ trên dữ liệu được ký --- không được triển khai trong giai đoạn này. Cơ sở của quyết định này được trình bày tại Mục 3.8 và giới hạn tương ứng được thừa nhận tại Mục 5.3.
+
+\noindent \textbf{Về mức độ triển khai.} Hệ thống được xây dựng ở mức thử nghiệm kiểm chứng khái niệm (proof-of-concept) nhằm chứng minh tính khả thi kỹ thuật, không phải hệ thống sẵn sàng cho môi trường sản xuất. Việc tích hợp với hệ thống quản lý đào tạo hiện hữu của các trường thành viên được mô phỏng thay vì thực hiện. Nghiên cứu không bao gồm kiểm thử tải ở quy mô lớn, không bao gồm triển khai trên mạng chính (mainnet), và không bao gồm nghiên cứu trải nghiệm người dùng với nhóm người dùng thật.
+
+\section{Phương pháp nghiên cứu}
+
+\subsection{Khung phương pháp}
+
+Nghiên cứu này tạo ra một hiện vật --- một kiến trúc và một hệ thống hiện thực hóa kiến trúc đó --- nhằm giải quyết một vấn đề đã được xác định trong thực tiễn. Dạng nghiên cứu này thuộc phạm trù khoa học thiết kế (design science), trong đó tri thức được tạo ra thông qua việc thiết kế và đánh giá hiện vật, khác với khoa học hành vi là xây dựng và kiểm định lý thuyết giải thích \cite{Hevner2004}.
+
+Quy trình thực hiện tuân theo sáu bước của phương pháp nghiên cứu khoa học thiết kế do Peffers và cộng sự đề xuất \cite{Peffers2007}: xác định vấn đề và động lực nghiên cứu; xác lập mục tiêu của giải pháp; thiết kế và phát triển hiện vật; trình diễn hiện vật trong bối cảnh sử dụng; đánh giá; và truyền đạt kết quả. Việc chọn khung phương pháp này có một hệ quả thực tiễn quan trọng: nó đòi hỏi tiêu chí đánh giá phải được xác lập \emph{trước} khi thiết kế, chứ không được chọn sau khi đã có kết quả. Các tiêu chí hoàn thành ở Mục 1.3.2 và bộ yêu cầu hệ thống ở Mục 3.1 giữ đúng vai trò đó.
+
+\subsection{Các bước thực hiện}
+
+\noindent \textbf{Bước 1 --- Xác định vấn đề.} Phân tích đặc điểm của môi trường giáo dục đa tổ chức thông qua văn bản chính sách, số liệu thống kê ngành, các chuẩn kỹ thuật hiện hành và khảo sát các hệ thống văn bằng số tiêu biểu. Kết quả là việc phân tách bài toán thành ba vấn đề ở ba tầng khác nhau và xác định khoảng trống về quản trị niềm tin. Nội dung thuộc Chương 1.
+
+\noindent \textbf{Bước 2 --- Xác lập mục tiêu của giải pháp.} Tổng hợp cơ sở lý thuyết về định danh tự chủ, chứng thực có thể xác minh, mật mã ứng dụng và mô hình niềm tin trong hệ thống phân tán; từ đó chuyển ba vấn đề thành ba câu hỏi nghiên cứu kèm tiêu chí đánh giá. Nội dung thuộc Chương 2.
+
+\noindent \textbf{Bước 3 --- Thiết kế và phát triển.} Xây dựng kiến trúc phân lớp và khung quản trị niềm tin, trong đó mỗi quyết định thiết kế được đánh giá theo tác động tới khả năng kiểm chứng độc lập, khả năng liên thông và mức độ phụ thuộc vào trung gian. Các đánh đổi được ghi nhận tường minh thay vì bỏ qua. Nội dung thuộc Chương 3.
+
+\noindent \textbf{Bước 4 --- Trình diễn.} Hiện thực hóa kiến trúc thành một hệ thống hoạt động gồm hợp đồng thông minh, tầng chỉ mục và dịch vụ, ví định danh phía trình duyệt cùng giao diện theo vai trò; triển khai trên mạng thử nghiệm công khai và chạy các kịch bản sử dụng bao phủ toàn bộ vòng đời văn bằng. Nội dung thuộc Chương 4, Mục 4.1--4.6.
+
+\noindent \textbf{Bước 5 --- Đánh giá.} Đánh giá theo ba phương diện. Tính đúng đắn của logic phân quyền được kiểm chứng bằng bộ kiểm thử đơn vị trên hợp đồng thông minh, trong đó phần lớn là các phép kiểm trường hợp vi phạm, bởi một rào chắn chỉ được coi là hoạt động khi có phép kiểm cho thấy nó thực sự chặn được điều nó tuyên bố chặn. Khả năng phát hiện gian lận được kiểm chứng bằng các kịch bản tấn công được dựng chủ động, bao gồm sửa nội dung văn bằng sau khi cấp và khai báo tham chiếu giao dịch không tồn tại. Hiệu năng được đo bằng công cụ sinh tải với tham số và phương pháp mô tả rõ, báo cáo cả giá trị trung vị và phân vị 95. Nội dung thuộc Chương 4, Mục 4.7--4.9.
+
+\noindent \textbf{Bước 6 --- Truyền đạt.} Đối chiếu kết quả thu được với ba câu hỏi nghiên cứu, phân tách rõ những gì đã được chứng minh và những gì chưa, và xác định hướng phát triển. Nội dung thuộc Chương 5.
+
+Một lưu ý về phương pháp đánh giá: nghiên cứu phân biệt nghiêm ngặt giữa phép kiểm chứng minh được một tính chất và phép kiểm chỉ xác nhận rằng hệ thống không báo lỗi. Trong thiết kế hệ thống an toàn, một bước kiểm tra luôn cho kết quả đạt còn tệ hơn việc không có bước kiểm tra đó, vì nó tạo cảm giác an toàn không có cơ sở. Vì vậy mỗi rào chắn được bổ sung vào hệ thống đều kèm theo một phép kiểm được thiết kế để làm nó thất bại; chỉ khi phép kiểm đó thực sự thất bại đúng như dự kiến thì rào chắn mới được coi là đã hoạt động.
+
+\section{Đóng góp của khóa luận và mức độ của từng đóng góp}
+
+Phần này nêu các đóng góp kèm \emph{mức độ} của chúng. Việc xếp mức là có chủ đích: một đóng góp mang tính tích hợp có giá trị khác với một đóng góp mới về mặt khái niệm, và việc trình bày chúng ngang hàng sẽ làm người đọc đánh giá sai cả hai. Các mức dưới đây là mức \emph{tuyên bố} ở thời điểm đặt mục tiêu; sau khi có kết quả thực nghiệm, Mục 5.2 đối chiếu lại và một đóng góp đã bị hạ mức. Bốn mức được dùng là: \textbf{mới} (đề xuất một cơ chế chưa có trong tài liệu đã khảo sát), \textbf{tích hợp} (kết hợp các thành phần đã có thành một kiến trúc nhất quán, với phần đóng góp nằm ở cách kết hợp), \textbf{kiểm chứng} (cung cấp bằng chứng thực nghiệm cho một tuyên bố đã có), và \textbf{bối cảnh} (ánh xạ một mô hình tổng quát vào một bối cảnh cụ thể).
+
+\subsection{Mức 1 --- Đóng góp mới}
+
+\noindent \textbf{Mô hình ủy quyền nhiều cấp có ràng buộc được thi hành bởi hợp đồng.}
+
+Việc một bên phát hành ủy quyền tiếp cho đơn vị cấp dưới là nhu cầu có trong thực tiễn quản trị giáo dục nhưng chưa được giải quyết ở tầng chuẩn hóa: đặc tả về giao thức truy vấn sổ đăng ký tin cậy hiện hoãn loại truy vấn này sang phiên bản sau \cite{ToIP_TRQP2026}. Nghiên cứu đề xuất một cách biểu diễn cụ thể gồm ba ràng buộc --- phạm vi phải là tập con của phạm vi bên ủy quyền, thời hạn không vượt thời hạn bên ủy quyền, và quyền ủy quyền không được truyền tiếp --- và hiện thực hóa cả ba thành điều kiện trong hợp đồng, nên chúng không thể bị bỏ qua bằng cách gọi trực tiếp hợp đồng.
+
+\noindent \textbf{Hai nguyên tắc thiết kế rút ra từ việc dựng kịch bản thất bại.}
+
+Nguyên tắc thứ nhất: \emph{thao tác thu hồi phải có điều kiện tiên quyết lỏng hơn thao tác cấp}, vì một đơn vị đã hết hạn ủy quyền vẫn phải thu hồi được văn bằng do chính mình cấp. Nguyên tắc thứ hai: \emph{một thao tác không thể hoàn tác phải được bên bị ảnh hưởng chứng minh điều kiện bằng hành động của chính họ}, nên việc chuyển quyền quản trị gốc phải gồm hai bước. Cả hai được phát hiện bằng cách dựng kịch bản làm hệ thống thất bại, không phải suy ra từ lý thuyết, và cả hai có phạm vi phát biểu rộng hơn bài toán văn bằng.
+
+Cần nói rõ giới hạn của mức này: {``}mới{''} ở đây có nghĩa là không tìm thấy trong tài liệu đã khảo sát ở Chương 2, chứ không phải một khẳng định về tính mới tuyệt đối. Khảo sát được thực hiện trên các chuẩn hiện hành, các hệ thống tiêu biểu và các khảo sát hệ thống gần đây \cite{Krul2024, Turco2026, Ambati2026}, nhưng không phải một rà soát hệ thống đầy đủ.
+
+\subsection{Mức 2 --- Đóng góp tích hợp}
+
+\noindent \textbf{Một kiến trúc gắn kết lớp chứng thực với lớp quản trị thẩm quyền.}
+
+Các thành phần được sử dụng --- định danh phi tập trung, chứng thực có thể xác minh, sổ đăng ký tin cậy, mô hình lưu trữ kết hợp trên chuỗi và ngoài chuỗi --- đều đã có. Phần đóng góp nằm ở cách kết hợp: thẩm quyền và trạng thái chứng thực được neo trên cùng một hạ tầng, nên một lần truy vấn trả lời được cả hai câu hỏi mà quy trình xác minh cần; và lớp quản trị được thiết kế để thay đổi được độc lập với ba lớp dưới.
+
+\noindent \textbf{Quy trình xác minh phân biệt loại thất bại.}
+
+Quy trình bảy bước báo cáo kết quả theo từng bước thay vì trả một kết luận nhị phân, và bổ sung bước đối chiếu nội dung chứng thực với giá trị băm đã neo. Giá trị của bước này không nằm ở độ phức tạp kỹ thuật --- nó chỉ là một phép băm và một phép so sánh --- mà ở việc chỉ ra rằng một quy trình thiếu nó sẽ chấp nhận chứng thực đã bị sửa nội dung, và chứng minh điều đó bằng một kịch bản cụ thể.
+
+\subsection{Mức 3 --- Đóng góp kiểm chứng}
+
+\noindent \textbf{Một bộ chứng cứ phủ định cho logic phân quyền.}
+
+Trong 126 phép kiểm trên hợp đồng, 83 phép dựng một thao tác vi phạm và khẳng định nó bị từ chối \emph{với đúng mã lỗi dự kiến}. Điều kiện cuối quan trọng hơn vẻ ngoài của nó: nếu không khẳng định mã lỗi, một phép kiểm có thể cho kết quả đạt vì một phép kiểm định dạng nào đó đã chặn trước, trong khi quy tắc cần kiểm chưa từng được thực thi --- tình huống đã thực sự xảy ra trong quá trình phát triển và được mô tả tại Mục 4.8.3.
+
+\noindent \textbf{Một phương pháp kiểm chứng tính tương đương giữa các cài đặt độc lập.}
+
+Tầng chỉ mục được hiện thực hóa hai lần bằng hai ngôn ngữ trên cùng một hợp đồng giao diện, kèm bộ đối chiếu kiểm rằng cùng một yêu cầu cho cùng kết quả và cùng mã trạng thái. Cách làm này biến đặc tả giao diện từ một tài liệu thành một tính chất kiểm chứng được.
+
+Đây là đóng góp có \textbf{phạm vi hẹp nhất} trong báo cáo và cần được định vị đúng. Việc duy trì hai cài đặt là một thực hành công nghệ, không phải một kết quả nghiên cứu. Phần đáng kể là ba loại sai lệch mà phương pháp này phát hiện được --- khác biệt trong xử lý trường lạ, khác biệt trong thứ tự kiểm tra đầu vào, và một tuyến chỉ tồn tại ở một bên --- vì chúng cho thấy những gì một bộ kiểm thử thông thường không bắt được, chứ không phải vì bản thân việc viết hai cài đặt.
+
+\subsection{Mức 4 --- Đóng góp bối cảnh}
+
+Nghiên cứu ánh xạ mô hình đề xuất vào bối cảnh giáo dục đại học Việt Nam ở thời điểm mà ba điều kiện vừa hội đủ: văn bằng số đã được công nhận giá trị pháp lý \cite{TT10_2026}, quy định về bảo vệ dữ liệu cá nhân đã đặt ra ràng buộc kiến trúc \cite{LuatBVDLCN2025}, và hạ tầng số quốc gia đang hình thành \cite{NDAChain2025}. Đóng góp ở mức này là việc xác định lớp còn thiếu trong bức tranh đó và đưa ra một thiết kế cho lớp đó, cùng với việc chỉ ra rằng cấu trúc {``}một thực thể gốc ủy quyền cho nhiều đơn vị cấp phát{''} của ĐHQGHN là cấu trúc chung của hệ thống giáo dục ở cấp quốc gia.
+
+\subsection{Những gì không phải đóng góp của khóa luận}
+
+Mục này nêu rõ các giới hạn để tránh người đọc suy luận quá mức từ kết quả.
+
+\begin{itemize}
+    \item \textbf{Không phải một cơ chế mật mã mới.} Toàn bộ nguyên thủy mật mã được sử dụng đều là chuẩn đã có; nghiên cứu không đề xuất lược đồ chữ ký, hàm băm hay giao thức mật mã nào.
+    \item \textbf{Không phải một bằng chứng về tính đúng đắn.} Bộ kiểm thử cho thấy các quy tắc đã đặc tả không bị vi phạm trong những kịch bản được kiểm; nó không phải một chứng minh hình thức và không loại trừ sự tồn tại của kịch bản chưa được nghĩ tới.
+    \item \textbf{Không phải một đánh giá về mức độ tiếp nhận.} Nghiên cứu kết luận về tính khả thi kỹ thuật. Không có nghiên cứu người dùng, nên không có cơ sở để kết luận về tính khả dụng hay mức độ chấp nhận --- hai câu hỏi không suy ra được từ tính khả thi kỹ thuật \cite{SSI_Adoption2025}.
+    \item \textbf{Không phải một hệ thống sẵn sàng vận hành.} Các giới hạn về phạm vi triển khai được nêu tại Mục 1.4 và các hạn chế cụ thể tại Mục 5.3.
+    \item \textbf{Không phải một phân loại niềm tin mới.} Cách phân tầng niềm tin ở Mục 2.6.1 kế thừa từ các công trình đã có và được dùng như một lăng kính khảo sát.
+\end{itemize}
+
+\section{Cấu trúc báo cáo}
+
+\noindent \textbf{Chương 1} trình bày bối cảnh, phân tích giới hạn kiến trúc của mô hình xác minh hiện hành, phát biểu bài toán cùng ba câu hỏi nghiên cứu, xác định phạm vi, mô tả phương pháp, và nêu các đóng góp kèm mức độ của chúng.
+
+\noindent \textbf{Chương 2} xây dựng cơ sở lý thuyết và kết thúc bằng việc phân loại khoảng trống nghiên cứu. Chương gồm ba phần. Phần thứ nhất xác lập nền: thuộc tính của một văn bằng số đáng tin cậy, các mô hình quản lý định danh, hạ tầng kỹ thuật và các nguyên thủy mật mã. Phần thứ hai xem xét vai trò của blockchain theo hướng phản biện --- đối chiếu với các phương án thay thế không dùng blockchain, và xem xét ràng buộc từ quy định về bảo vệ dữ liệu cá nhân. Phần thứ ba trình bày lăng kính phân tầng niềm tin, khảo sát các hệ thống hiện có dưới lăng kính đó, và phân loại khoảng trống thành sáu tầng kèm phạm vi can thiệp của khóa luận.
+
+\noindent \textbf{Chương 3} là chương đóng góp lý thuyết trung tâm: bộ yêu cầu hệ thống, nguyên tắc thiết kế, kiến trúc phân lớp, khung quản trị niềm tin với chuỗi thẩm quyền và các nguyên tắc thiết kế kèm theo, mô hình dữ liệu, quy trình xác minh bảy bước, mô hình đe dọa, các đánh đổi thiết kế, và đối chiếu với các kiến trúc tham chiếu.
+
+\noindent \textbf{Chương 4} mô tả việc hiện thực hóa kiến trúc thành hệ thống hoạt động, lý giải các lựa chọn công nghệ, trình bày chiến lược kiểm thử và kết quả đánh giá về chức năng, an toàn và hiệu năng. Chương kết thúc bằng hai mục về giới hạn của kết quả: phần thảo luận phân tách những gì đã và chưa được chứng minh, và phần phân tích các mối đe dọa đối với tính hợp lệ của kết quả.
+
+\noindent \textbf{Chương 5} đối chiếu kết quả với các câu hỏi nghiên cứu thông qua một ma trận truy vết, đánh giá lại mức đóng góp sau khi có bằng chứng thực nghiệm, thừa nhận hạn chế, đề xuất hướng phát triển, và thảo luận trực diện sáu vấn đề mà thiết kế đặt ra nhưng chưa được trả lời đầy đủ.
