@@ -4,6 +4,7 @@ import { useAuthorityRoot } from "../hooks/useChain";
 import { RoleBadge, Mono } from "./ui";
 import BackendSwitch from "./BackendSwitch";
 import OfflineModeBanner from "./OfflineModeBanner";
+import BackupBanner from "./BackupBanner";
 
 const NAV: Record<string, { to: string; label: string }[]> = {
   holder: [{ to: "/holder", label: "Văn bằng của tôi" }],
@@ -71,6 +72,7 @@ export default function Layout() {
       </header>
 
       <OfflineModeBanner />
+      <BackupBanner />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8">
         {/* key theo địa chỉ: đổi ví là dựng lại trang, không sót trạng thái biểu mẫu của ví trước. */}

@@ -34,6 +34,7 @@ export default function IdentitiesTab() {
     <div className="space-y-6">
       <CheckAddressCard />
       <ModerateDidCard />
+      <MigrationCard />
       <ResolveDidCard />
     </div>
   );
@@ -232,6 +233,57 @@ function ResolveDidCard() {
           </Row>
           <Row label="Nguồn">{result.source === "chain" ? "Chuỗi" : "Chỉ mục CSDL"}</Row>
         </dl>
+      )}
+    </Card>
+  );
+}
+
+interface Migration { old_address: string; new_address: string; old_did: string; new_did: string; note: string; created_at: string }
+
+/**
+ * P4.2 — holder mất khoá: ghi nhận ví mới thay cho ví cũ SAU KHI đã xác minh danh
+ * tính ngoài hệ thống (phòng đào tạo, giấy tờ). Không có giao dịch: đây là hồ sơ
+ * hành chính, không phải quyền — mối nối hai ví là thông tin cá nhân nên chỉ nằm ở
+ * CSDL và nhật ký kiểm toán, không lên chuỗi.
+ *
+ * Trình tự: khoá/thu hồi DID cũ (thẻ "Kiểm duyệt DID") → người dùng lập ví mới và
+ * đăng ký DID → ghi nhận ở đây → đơn vị cấp bằng thấy ví mới ở bảng "Cấp lại".
+ */
+function MigrationCard() {
+  const [oldAddress, setOld] = useState("");
+  const [newAddress, setNew] = useState("");
+  const [note, setNote] = useState("");
+  const save = useMutation({
+    mutationFn: () => api.post<Migration>("/admin/identity-migrations", {
+      oldAddress: oldAddress.trim(), newAddress: newAddress.trim(), note: note.trim(),
+    }),
+  });
+  const ok = (a: string) => /^0x[0-9a-fA-F]{64}$/.test(a.trim());
+  return (
+    <Card title="Ghi nhận chuyển ví (holder mất khoá)"
+      subtitle="Chỉ làm sau khi đã khoá/thu hồi DID của ví cũ và xác minh danh tính người dùng.">
+      <form className="grid sm:grid-cols-2 gap-4" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <Field label="Ví cũ" value={oldAddress} onChange={setOld} mono required placeholder="0x…"
+          hint="DID của ví này phải đã bị khoá hoặc thu hồi." />
+        <Field label="Ví mới" value={newAddress} onChange={setNew} mono required placeholder="0x…"
+          hint="Ví mới phải đã đăng ký DID." />
+        <div className="sm:col-span-2">
+          <Field label="Hồ sơ xác minh (ghi vào nhật ký)" value={note} onChange={setNote} required
+            placeholder="Đối chiếu CCCD tại phòng đào tạo ngày …" />
+        </div>
+        <div className="sm:col-span-2">
+          <button className="btn-primary" type="submit"
+            disabled={save.isPending || !ok(oldAddress) || !ok(newAddress) || note.trim().length < 2}>
+            {save.isPending ? "Đang ghi…" : "Ghi nhận chuyển ví"}
+          </button>
+        </div>
+      </form>
+      {save.error && <div className="mt-4"><Alert tone="bad" title="Không ghi nhận được">{(save.error as Error).message}</Alert></div>}
+      {save.data && (
+        <div className="mt-4"><Alert tone="ok" title="Đã ghi nhận">
+          <Mono value={save.data.old_did} /> → <Mono value={save.data.new_did} />. Đơn vị cấp bằng giờ thấy
+          ví mới khi bấm "Cấp lại" trên văn bằng của ví cũ.
+        </Alert></div>
       )}
     </Card>
   );

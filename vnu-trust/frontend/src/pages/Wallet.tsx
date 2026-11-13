@@ -6,6 +6,7 @@ import { createWallet, importWallet, restoreFromMnemonic, previewFromMnemonic,
   checkPassphraseStrength, type Role, type UnlockedWallet } from "../lib/wallet";
 import { isValidMnemonic, normalizeMnemonic } from "../lib/mnemonic";
 import MnemonicPanel from "../components/MnemonicPanel";
+import { markBackup } from "../lib/backup";
 import { api } from "../lib/api";
 import { registerEntity } from "../lib/auth";
 import { ApiError } from "../lib/api";
@@ -146,6 +147,7 @@ function UnlockPanel({ keystores, onUnlock, onDeleted, onEmpty }: {
               const a = document.createElement("a");
               a.href = url; a.download = `vnu-trust-${ks.label}-${selected.slice(0, 8)}.json`;
               a.click(); URL.revokeObjectURL(url);
+              markBackup(selected, "keystoreAt"); // P4.3
             }}>
             Tải bản sao lưu
           </button>
@@ -185,6 +187,7 @@ function CreatePanel({ onDone }: { onDone: (w: UnlockedWallet) => Promise<void> 
         <MnemonicPanel
           mnemonic={created.mnemonic}
           onConfirmed={() => {
+            markBackup(created.address, "mnemonicAt"); // P4.3: đã chép và nhập lại đúng 12 từ
             void onDone(created).then(() => nav(`/${created.role}`));
           }}
         />
@@ -473,6 +476,9 @@ function PhrasePanel({ onDone }: { onDone: (w: UnlockedWallet) => Promise<void> 
                   undefined,
                   found?.did,
                 );
+                // Khôi phục được bằng 12 từ nghĩa là người dùng đang giữ chúng (P4.3).
+                markBackup(w.address, "mnemonicAt");
+                markBackup(w.address, "checkedAt");
                 await onDone(w);
                 nav(`/${w.role}`);
               } catch (e2) {

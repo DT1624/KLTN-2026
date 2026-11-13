@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Credential } from "../lib/api";
@@ -11,6 +11,8 @@ import { Card, StatusBadge, Alert, Spinner, Empty, Mono, Stat, Field, Badge } fr
 import { TabBar, useTabs } from "../components/Tabs";
 import TxProgress from "../components/ChainTx";
 import GasPanel from "../components/GasPanel";
+import ReviewPanel from "../components/ReviewPanel";
+import { openCredential, sealCredential } from "../lib/vcStore";
 import { StatusBar, MonthlyBars, BarList, type MonthPoint } from "../components/charts";
 
 interface Stats {
@@ -221,8 +223,58 @@ function DelegationPanel() {
         )}
       </Card>
       <TxProgress tx={tx} okTitle="Đã cập nhật uỷ quyền" />
+      {d.subIssuers.length > 0 && <ReviewPanel mode="parent" issuers={d.subIssuers} />}
     </div>
   );
+}
+
+export interface CredentialForm {
+  holderAddress: string; holderDid: string; studentId: string; degreeName: string;
+  faculty: string; gpa: string; year: string; vcType: number; expiresAt: string;
+}
+
+/**
+ * Dựng nội dung văn bằng + các giá trị neo lên chuỗi. Dùng chung cho cấp mới và
+ * cấp lại (C3) để hai đường cho ra cùng một cấu trúc; văn bằng cấp lại mang
+ * thêm `vnu:replaces` trỏ về văn bằng cũ — liên kết đó cũng nằm trên chuỗi.
+ */
+function buildCredential(
+  wallet: NonNullable<ReturnType<typeof useWallet>["wallet"]>,
+  form: CredentialForm,
+  replaces: string | null,
+) {
+  const vcId = `urn:uuid:${crypto.randomUUID()}`;
+  const issuedAt = new Date().toISOString();
+  const expiresIso = form.expiresAt ? new Date(form.expiresAt).toISOString() : null;
+  const expiresUnix = form.expiresAt ? Math.floor(new Date(form.expiresAt).getTime() / 1000) : 0;
+
+  const vc: Record<string, unknown> = {
+    "@context": [
+      "https://www.w3.org/2018/credentials/v1",
+      { vnu: "https://vnu.edu.vn/credentials/v1#" },
+    ],
+    id: vcId,
+    type: ["VerifiableCredential", "VNUDegreeCredential"],
+    issuer: wallet.did,
+    issuanceDate: issuedAt,
+    credentialSubject: {
+      id: form.holderDid,
+      "vnu:studentId": form.studentId,
+      "vnu:degreeName": form.degreeName,
+      "vnu:faculty": form.faculty,
+      "vnu:gpa": form.gpa,
+      "vnu:graduationYear": form.year,
+    },
+  };
+  if (expiresIso) vc.expirationDate = expiresIso;
+  if (replaces) vc["vnu:replaces"] = replaces;
+
+  return {
+    vcId, issuedAt, expiresIso, expiresUnix, vc,
+    contentHash: sha3_256Hex(vc),
+    vcIdHash: sha3_256Hex(vcId),
+    proofValue: signMessage(wallet, canonicalize(vc)),
+  };
 }
 
 function IssueCard() {
@@ -231,7 +283,7 @@ function IssueCard() {
   const tx = useChainTx();
   const [onChainId, setOnChainId] = useState<number | null>(null);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<CredentialForm>({
     holderAddress: "", holderDid: "", studentId: "", degreeName: "",
     faculty: "", gpa: "", year: String(new Date().getFullYear()), vcType: 1,
     // Để trống = văn bằng vĩnh viễn. Hợp lý với bằng tốt nghiệp, nhưng thẻ sinh
@@ -243,35 +295,8 @@ function IssueCard() {
   const issue = () => {
     if (!wallet) return;
     setOnChainId(null);
-
-    const vcId = `urn:uuid:${crypto.randomUUID()}`;
-    const issuedAt = new Date().toISOString();
-    const expiresIso = form.expiresAt ? new Date(form.expiresAt).toISOString() : null;
-    const expiresUnix = form.expiresAt ? Math.floor(new Date(form.expiresAt).getTime() / 1000) : 0;
-
-    const vc: Record<string, unknown> = {
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        { vnu: "https://vnu.edu.vn/credentials/v1#" },
-      ],
-      id: vcId,
-      type: ["VerifiableCredential", "VNUDegreeCredential"],
-      issuer: wallet.did,
-      issuanceDate: issuedAt,
-      credentialSubject: {
-        id: form.holderDid,
-        "vnu:studentId": form.studentId,
-        "vnu:degreeName": form.degreeName,
-        "vnu:faculty": form.faculty,
-        "vnu:gpa": form.gpa,
-        "vnu:graduationYear": form.year,
-      },
-    };
-    if (expiresIso) vc.expirationDate = expiresIso;
-
-    const contentHash = sha3_256Hex(vc);
-    const vcIdHash = sha3_256Hex(vcId);
-    const proofValue = signMessage(wallet, canonicalize(vc));
+    const { vcId, issuedAt, expiresIso, expiresUnix, vc, contentHash, vcIdHash, proofValue } =
+      buildCredential(wallet, form, null);
     let cid = "";
 
     void tx.run({
@@ -280,12 +305,9 @@ function IssueCard() {
         if (expiresIso && expiresIso <= issuedAt) {
           throw new Error("Thời điểm hết hạn phải sau thời điểm cấp");
         }
-        const pinned = await api.post<{ cid: string }>("/ipfs/pin", {
-          // Tên pin trung tính: Pinata lưu tên này làm siêu dữ liệu công khai với
-          // chủ tài khoản — "vc-<MSSV>" từng làm lộ mã sinh viên (P-04).
-          json: vc, name: `vc-${vcId.slice(-12)}`,
-        });
-        cid = pinned.cid;
+        // P3: nội dung KHÔNG rời trình duyệt dạng rõ — niêm phong cho holder và chính
+        // mình rồi chỉ ghim phong bì (P-04: trước đây IPFS giữ toàn văn dạng rõ).
+        cid = await sealCredential(vc, vcIdHash, form.holderAddress.trim(), wallet);
         return [
           form.holderAddress.trim(),
           u64Arg(form.vcType),
@@ -308,7 +330,7 @@ function IssueCard() {
           holderAddress: form.holderAddress.trim(),
           vcType: form.vcType,
           ipfsCid: cid,
-          vcIdHash, contentHash, proofValue, vcJson: vc,
+          vcIdHash, contentHash, proofValue,
           issuedAt, expiresAt: expiresIso,
           txHash: out.hash,
         });
@@ -384,6 +406,7 @@ function IssuedList() {
   const qc = useQueryClient();
   const tx = useChainTx();
   const [target, setTarget] = useState<Credential | null>(null);
+  const [reissuing, setReissuing] = useState<Credential | null>(null);
   const [reason, setReason] = useState("");
 
   const list = useQuery({
@@ -392,7 +415,8 @@ function IssuedList() {
   });
 
   const act = (kind: "revoke" | "suspend") => {
-    if (!target?.on_chain_vc_id) return;
+    // Số hiệu bắt đầu từ 0: kiểm `== null`, không kiểm truthy (id 0 là falsy).
+    if (target?.on_chain_vc_id == null) return;
     void tx.run({
       fn: kind === "revoke" ? ENTRY.revokeVc : ENTRY.suspendVc,
       args: [u64Arg(target.on_chain_vc_id), bytesArg(reason.trim())],
@@ -424,18 +448,23 @@ function IssuedList() {
           <tbody className="divide-y divide-ink-100">
             {list.data.map((c) => (
               <tr key={c.vc_id}>
-                <td className="py-2.5 font-medium text-ink-800">
-                  {String((c.vc_json as Record<string, Record<string, unknown>>)
-                    ?.credentialSubject?.["vnu:degreeName"] ?? "—")}
-                </td>
+                {/* P3: máy chủ chỉ giữ loại + ngày; tên đầy đủ nằm trong phong bì mã hoá. */}
+                <td className="py-2.5 font-medium text-ink-800">{maskLabel(c.vc_type)}</td>
                 <td><Mono value={c.holder_did} /></td>
                 <td className="mono text-ink-600">{c.on_chain_vc_id ?? "—"}</td>
                 <td className="text-ink-600">{new Date(c.issued_at).toLocaleDateString("vi-VN")}</td>
                 <td><StatusBadge status={c.status} /></td>
-                <td className="text-right">
+                <td className="text-right whitespace-nowrap space-x-1">
+                  {c.replaced_by_vc_id && <Badge tone="muted">đã cấp lại</Badge>}
+                  {c.status === "active" && !c.replaced_by_vc_id && c.on_chain_vc_id != null && (
+                    <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs"
+                      onClick={() => { setReissuing(c); setTarget(null); }}>
+                      Cấp lại
+                    </button>
+                  )}
                   {c.status !== "revoked" && (
                     <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs"
-                      onClick={() => { setTarget(c); setReason(""); tx.reset(); }}>
+                      onClick={() => { setTarget(c); setReissuing(null); setReason(""); tx.reset(); }}>
                       Đổi trạng thái
                     </button>
                   )}
@@ -453,7 +482,7 @@ function IssuedList() {
             <span className="mono">{target.on_chain_vc_id ?? "không có"}</span>
           </p>
 
-          {!target.on_chain_vc_id ? (
+          {target.on_chain_vc_id == null ? (
             <Alert tone="warn" title="Không thao tác trên chuỗi được">
               Bản ghi này không có số hiệu on-chain (cấp từ thời giao diện còn ghi cứng số 0), nên
               không gọi được <span className="mono">revoke_vc</span>.
@@ -482,6 +511,139 @@ function IssuedList() {
       )}
 
       <div className="mt-4"><TxProgress tx={tx} okTitle="Đã đổi trạng thái văn bằng" /></div>
+      {reissuing && <ReissuePanel old={reissuing} onClose={() => setReissuing(null)} />}
     </Card>
+  );
+}
+
+interface Migration { old_address: string; new_address: string; old_did: string; new_did: string; note: string }
+
+/**
+ * Cấp lại văn bằng (reissue_vc, C3): MỘT giao dịch cấp văn bằng mới, thu hồi văn
+ * bằng cũ với lý do "replaced" và ghi liên kết cũ → mới trên chuỗi. Người xác
+ * minh văn bằng cũ sẽ thấy "đã được thay bằng …".
+ *
+ * Holder mất khoá (P4.2): admin khoá/thu hồi DID cũ và ghi nhận ví mới; khi đó
+ * bảng này đề xuất ví mới. Hợp đồng chỉ cho đổi holder khi DID cũ không còn
+ * hoạt động — issuer không chuyển được văn bằng của một người đang dùng ví.
+ */
+function ReissuePanel({ old, onClose }: { old: Credential; onClose: () => void }) {
+  const { wallet } = useWallet();
+  const qc = useQueryClient();
+  const tx = useChainTx();
+  const [form, setForm] = useState<CredentialForm>({
+    holderAddress: old.holder_address, holderDid: old.holder_did,
+    studentId: "", degreeName: "", faculty: "", gpa: "", year: "", vcType: old.vc_type, expiresAt: "",
+  });
+  const set = (k: keyof CredentialForm, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  // P3: điền sẵn bằng cách GIẢI MÃ văn bằng cũ — issuer đã cấp là một người nhận của
+  // phong bì. Issuer cha (không phải người nhận) thì nhập lại từ hồ sơ gốc.
+  const opened = useQuery({
+    queryKey: ["issuer", "open", old.vc_id],
+    queryFn: () => openCredential(old, wallet!),
+    enabled: !!wallet, retry: false, staleTime: Infinity,
+  });
+  useEffect(() => {
+    const subj = (opened.data?.plain.credentialSubject ?? null) as Record<string, unknown> | null;
+    if (!subj) return;
+    setForm((f) => ({
+      ...f, studentId: String(subj["vnu:studentId"] ?? ""), degreeName: String(subj["vnu:degreeName"] ?? ""),
+      faculty: String(subj["vnu:faculty"] ?? ""), gpa: String(subj["vnu:gpa"] ?? ""),
+      year: String(subj["vnu:graduationYear"] ?? ""),
+    }));
+  }, [opened.data]);
+  const migration = useQuery({
+    queryKey: ["issuer", "migration", old.holder_address],
+    queryFn: () => api.get<Migration | null>(`/issuer/holders/${old.holder_address}/migration`),
+  });
+  const movedTo = migration.data ?? null;
+  const changingHolder = form.holderAddress.trim().toLowerCase() !== old.holder_address.toLowerCase();
+
+  const reissue = () => {
+    if (!wallet || old.on_chain_vc_id == null) return;
+    const built = buildCredential(wallet, form, old.vc_id);
+    let cid = "";
+    void tx.run({
+      fn: ENTRY.reissueVc,
+      args: async () => {
+        cid = await sealCredential(built.vc, built.vcIdHash, form.holderAddress.trim(), wallet);
+        return [
+          u64Arg(old.on_chain_vc_id!),
+          form.holderAddress.trim(),
+          u64Arg(form.vcType),
+          hashArg(built.vcIdHash),
+          bytesArg(cid),
+          hashArg(built.contentHash),
+          u64Arg(built.expiresUnix),
+        ];
+      },
+      index: async (out) => {
+        const r = await api.post<Credential>(`/issuer/credentials/${encodeURIComponent(old.vc_id)}/reissue`, {
+          vcId: built.vcId,
+          onChainVcId: vcIdFromEvents(out) ?? 0,
+          holderDid: form.holderDid.trim(),
+          holderAddress: form.holderAddress.trim(),
+          vcType: form.vcType,
+          ipfsCid: cid,
+          vcIdHash: built.vcIdHash, contentHash: built.contentHash, proofValue: built.proofValue,
+          issuedAt: built.issuedAt, expiresAt: built.expiresIso,
+          txHash: out.hash,
+        });
+        qc.invalidateQueries({ queryKey: ["issuer"] });
+        return r;
+      },
+    });
+  };
+
+  return (
+    <div className="mt-5 rounded-xl border border-ink-200 bg-ink-50/60 p-4 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm text-ink-700">
+          Cấp lại văn bằng <Mono value={old.vc_id} /> (số hiệu <span className="mono">{old.on_chain_vc_id}</span>).
+          Văn bằng cũ sẽ bị thu hồi với lý do <span className="mono">replaced</span> trong cùng giao dịch.
+        </p>
+        <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs" onClick={onClose}>Đóng</button>
+      </div>
+
+      {opened.isError && (
+        <Alert tone="warn" title="Không giải mã được văn bằng cũ">
+          Ví này không nằm trong danh sách người đọc của văn bằng cũ (thường gặp khi bạn là đơn vị
+          cấp trên). Hãy nhập lại nội dung từ hồ sơ gốc.
+        </Alert>
+      )}
+      {opened.data && opened.data.problems.length > 0 && (
+        <Alert tone="bad" title="Văn bằng cũ không khớp bản neo">{opened.data.problems.join("; ")}</Alert>
+      )}
+      {movedTo && !changingHolder && (
+        <Alert tone="info" title="Holder đã chuyển sang ví mới">
+          Admin đã ghi nhận ví <Mono value={movedTo.new_address} /> thay cho ví cũ ({movedTo.note}).{" "}
+          <button type="button" className="underline"
+            onClick={() => setForm((f) => ({ ...f, holderAddress: movedTo.new_address, holderDid: movedTo.new_did }))}>
+            Cấp sang ví mới
+          </button>
+        </Alert>
+      )}
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label="Địa chỉ ví người nhận" value={form.holderAddress} mono required
+          onChange={(v) => set("holderAddress", v)}
+          hint={changingHolder ? "Đổi ví chỉ được khi DID của ví cũ đã bị khoá/thu hồi." : undefined} />
+        <Field label="DID người nhận" value={form.holderDid} mono required onChange={(v) => set("holderDid", v)} />
+        <Field label="Mã sinh viên" value={form.studentId} required onChange={(v) => set("studentId", v)} />
+        <Field label="Tên văn bằng" value={form.degreeName} required onChange={(v) => set("degreeName", v)} />
+        <Field label="Khoa / Trường" value={form.faculty} onChange={(v) => set("faculty", v)} />
+        <Field label="Điểm trung bình" value={form.gpa} onChange={(v) => set("gpa", v)} />
+        <Field label="Năm tốt nghiệp" value={form.year} onChange={(v) => set("year", v)} />
+        <Field label="Loại văn bằng (giữ nguyên)" value={maskLabel(form.vcType)} onChange={() => {}} disabled />
+        <div className="sm:col-span-2">
+          <Field label="Hạn dùng (để trống = vĩnh viễn)" value={form.expiresAt} type="datetime-local"
+            onChange={(v) => set("expiresAt", v)} />
+        </div>
+      </div>
+      <button className="btn-primary" type="button" disabled={tx.busy || !wallet} onClick={reissue}>
+        {tx.busy ? tx.label : "Ký & cấp lại"}
+      </button>
+      <TxProgress tx={tx} okTitle="Đã cấp lại văn bằng" />
+    </div>
   );
 }

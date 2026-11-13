@@ -90,12 +90,15 @@ export interface Credential {
   vc_type: number;
   ipfs_cid: string;
   content_hash: string;
-  vc_json: Record<string, unknown>;
+  /** P3: KHÔNG còn vc_json — nội dung nằm trong phong bì mã hoá tại ipfs_cid (lib/vcStore.ts). */
   status: VcStatus;
   status_reason: string | null;
   issued_at: string;
   expires_at: string | null;
   tx_hash: string;
+  /** C3: văn bằng này thay cho / được thay bằng văn bằng nào (vc_id). */
+  replaces_vc_id?: string | null;
+  replaced_by_vc_id?: string | null;
   effective?: { status: VcStatus; source: "chain" | "db-index" | "db"; drift: boolean };
 }
 
@@ -139,11 +142,14 @@ export interface ResolvedDid {
   integrityOk: boolean | null;
 }
 
+export interface VerificationCheck { name: string; passed: boolean; detail: string; advisory?: boolean }
+
 export interface VerificationReport {
   vpId: string;
   holderDid: string;
   overallValid: boolean;
-  checks: Array<{ name: string; passed: boolean; detail: string }>;
-  credentials: Array<{ vcId: string; status: string; issuerDid: string; typeLabel: string }>;
+  checks: VerificationCheck[];
+  /** replacedBy (C3): văn bằng thay thế — backend chỉ trả khi chuỗi xác nhận liên kết. */
+  credentials: Array<{ vcId: string; status: string; issuerDid: string; typeLabel: string; replacedBy?: string | null }>;
   verifiedAt: string;
 }

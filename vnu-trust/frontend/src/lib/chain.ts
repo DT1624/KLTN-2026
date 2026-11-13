@@ -57,7 +57,8 @@ const MODULE = {
  */
 export const ENTRY = {
   registerDid: `${MODULE.didRegistry}::register_did`,
-  updateDidDocument: `${MODULE.didRegistry}::update_did_document`,
+  // update_did_document cố ý KHÔNG khai ở đây: chưa backend nào có tuyến ghi chỉ
+  // mục cho nó, nên giao dịch sẽ lên chuỗi rồi bị bỏ rơi (abi-check bắt chỗ này).
   suspendOwnDid: `${MODULE.didRegistry}::suspend_own_did`,
   reactivateOwnDid: `${MODULE.didRegistry}::reactivate_own_did`,
 
@@ -85,6 +86,14 @@ export const ENTRY = {
   adminReinstateVc: `${MODULE.vcRegistry}::admin_reinstate_vc`,
   adminSuspendVc: `${MODULE.vcRegistry}::admin_suspend_vc`,
   adminRevokeVc: `${MODULE.vcRegistry}::admin_revoke_vc`,
+  // C2 (nâng cấp 13/11): theo lô — admin mọi VC, issuer cha VC của sub-issuer.
+  adminSuspendVcs: `${MODULE.vcRegistry}::admin_suspend_vcs`,
+  adminRevokeVcs: `${MODULE.vcRegistry}::admin_revoke_vcs`,
+  delegatorSuspendVcs: `${MODULE.vcRegistry}::delegator_suspend_vcs`,
+  delegatorRevokeVcs: `${MODULE.vcRegistry}::delegator_revoke_vcs`,
+  // C3: cấp lại có liên kết cũ → mới.
+  reissueVc: `${MODULE.vcRegistry}::reissue_vc`,
+  adminLinkReplacement: `${MODULE.vcRegistry}::admin_link_replacement`,
 } as const;
 
 export const VIEW = {
@@ -96,6 +105,9 @@ export const VIEW = {
   getRootAdmin: `${MODULE.authority}::get_root_admin`,
   getPendingRoot: `${MODULE.authority}::get_pending_root`,
   getInfo: `${MODULE.authority}::get_info`,
+  getReplacement: `${MODULE.vcRegistry}::get_replacement`,
+  /** Bản ghi DID đầy đủ — cần trường `suspended_by` (ai đã khoá DID). */
+  getDidByOwner: `${MODULE.didRegistry}::get_did_by_owner`,
 } as const;
 
 // ---------- Mã hoá tham số ----------
@@ -466,6 +478,7 @@ export const ABORT_MESSAGES: Record<number, string> = {
   2010: "DID không do chính bạn tạm ngưng — phải nhờ admin mở",
   2011: "Chuỗi DID phải kết thúc bằng chính địa chỉ ví của bạn",
   2012: "DID do chính chủ tự khoá — chỉ chủ sở hữu mở lại được",
+  2013: "DID của địa chỉ này đã bị thu hồi vĩnh viễn — hãy lập ví mới và nhờ admin cấp lại văn bằng",
   3001: "Không tìm thấy văn bằng",
   3002: "Văn bằng không ở trạng thái hiệu lực",
   3003: "Văn bằng không ở trạng thái tạm ngưng",
@@ -474,10 +487,17 @@ export const ABORT_MESSAGES: Record<number, string> = {
   3006: "Chỉ đơn vị đã cấp văn bằng này mới thao tác được",
   3009: "Văn bằng này đã được neo trên chuỗi",
   3010: "Đơn vị cấp không được tự cấp văn bằng cho chính mình",
+  3011: "Danh sách không hợp lệ: 1–100 văn bằng, không trùng, sắp theo số hiệu tăng dần",
+  3012: "Văn bằng cũ đã có bản thay thế",
+  3013: "Holder cũ vẫn đang hoạt động — admin phải khoá/thu hồi DID cũ trước khi cấp sang ví mới",
+  3014: "Chỉ đơn vị đã cấp văn bằng cũ (hoặc đơn vị uỷ quyền cho họ) mới cấp lại được",
+  3015: "Văn bằng thay thế không hợp lệ: phải cùng loại, đang hiệu lực, cấp sau và chưa thay cho văn bằng nào",
+  3016: "Có văn bằng không do đơn vị cấp dưới của bạn cấp",
   4001: "Mã băm phải đúng 32 byte",
   4003: "Số hiệu không tồn tại trên chuỗi",
   4005: "Kết quả quá lớn — dùng bản phân trang",
   4006: "Hợp đồng đã được khởi tạo",
+  4007: "Hợp đồng chưa khởi tạo tính năng này (cần chạy entry init_* sau khi nâng cấp)",
 };
 
 // ---------- Đọc sự kiện ----------

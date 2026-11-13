@@ -5,6 +5,7 @@ import { useChainTx } from "../../hooks/useChain";
 import { ENTRY, bytesArg, u64Arg } from "../../lib/chain";
 import { Card, Alert, Mono, Field, Row, StatusBadge } from "../../components/ui";
 import TxProgress from "../../components/ChainTx";
+import ReviewPanel from "../../components/ReviewPanel";
 
 /**
  * Cưỡng chế đổi trạng thái văn bằng — dùng khi có gian lận hoặc quyết định hành chính.
@@ -29,7 +30,9 @@ export default function CredentialsTab() {
   });
 
   const onChainId = vc?.on_chain_vc_id ?? null;
-  const canSign = onChainId !== null && onChainId > 0;
+  // Số hiệu trên chuỗi BẮT ĐẦU TỪ 0 — văn bằng đầu tiên của gói có id 0. Điều
+  // kiện cũ `> 0` (từ thời giao diện ghi cứng onChainVcId = 0) chặn nhầm nó.
+  const canSign = onChainId !== null;
 
   const FN = { revoke: ENTRY.adminRevokeVc, suspend: ENTRY.adminSuspendVc, reinstate: ENTRY.adminReinstateVc };
   const act = (kind: keyof typeof FN) => {
@@ -52,6 +55,8 @@ export default function CredentialsTab() {
 
   return (
     <div className="space-y-6">
+      <ReviewPanel mode="admin" />
+      <LinkReplacementCard />
       <Card title="Tra văn bằng" subtitle="Nhập mã văn bằng để xem trạng thái và thao tác.">
         <form className="flex flex-col sm:flex-row gap-3 sm:items-end"
           onSubmit={(e) => { e.preventDefault(); find.mutate(); }}>
@@ -82,6 +87,8 @@ export default function CredentialsTab() {
               {vc.expires_at ? new Date(vc.expires_at).toLocaleString("vi-VN") : "Vĩnh viễn"}
             </Row>
             <Row label="Mã giao dịch cấp"><Mono value={vc.tx_hash} /></Row>
+            {vc.replaces_vc_id && <Row label="Thay cho văn bằng"><Mono value={vc.replaces_vc_id} /></Row>}
+            {vc.replaced_by_vc_id && <Row label="Đã được thay bằng"><Mono value={vc.replaced_by_vc_id} /></Row>}
             <Row label="CID nội dung"><Mono value={vc.ipfs_cid} /></Row>
           </dl>
 
@@ -120,5 +127,76 @@ export default function CredentialsTab() {
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * Nối liên kết thay thế (admin_link_replacement, C3) khi đơn vị cấp văn bằng cũ
+ * đã mất quyền: một đơn vị khác cấp văn bằng mới bằng issue_vc, admin nối hai bản
+ * ghi. Văn bằng cũ bị thu hồi với lý do "replaced" nếu chưa thu hồi; đã thu hồi
+ * (vd. vì gian lận) thì giữ nguyên lý do cũ — đúng như hợp đồng.
+ */
+function LinkReplacementCard() {
+  const qc = useQueryClient();
+  const tx = useChainTx();
+  const [oldId, setOldId] = useState("");
+  const [newId, setNewId] = useState("");
+  const [pair, setPair] = useState<[Credential, Credential] | null>(null);
+  const [err, setErr] = useState("");
+
+  const load = useMutation({
+    mutationFn: () => Promise.all([
+      api.get<Credential>(`/admin/credentials/${encodeURIComponent(oldId.trim())}`),
+      api.get<Credential>(`/admin/credentials/${encodeURIComponent(newId.trim())}`),
+    ]),
+    onSuccess: (d) => { setPair(d); setErr(""); tx.reset(); },
+    onError: (e) => { setErr((e as Error).message); setPair(null); },
+  });
+
+  const [o, n] = pair ?? [null, null];
+  const problem = !o || !n ? ""
+    : o.on_chain_vc_id == null || n.on_chain_vc_id == null ? "Có văn bằng chưa có số hiệu trên chuỗi"
+      : n.on_chain_vc_id <= o.on_chain_vc_id ? "Văn bằng thay thế phải được cấp sau văn bằng cũ"
+        : n.vc_type !== o.vc_type ? "Hai văn bằng khác loại"
+          : n.status !== "active" ? "Văn bằng thay thế không còn hiệu lực"
+            : o.replaced_by_vc_id ? "Văn bằng cũ đã có bản thay thế"
+              : n.replaces_vc_id ? "Văn bằng mới đã thay cho văn bằng khác" : "";
+
+  const link = () => {
+    if (!o || !n || problem) return;
+    void tx.run({
+      fn: ENTRY.adminLinkReplacement,
+      args: [u64Arg(o.on_chain_vc_id!), u64Arg(n.on_chain_vc_id!)],
+      index: async (out) => {
+        const r = await api.post(`/admin/credentials/${encodeURIComponent(o.vc_id)}/replacement`,
+          { newVcId: n.vc_id, txHash: out.hash });
+        load.mutate();
+        qc.invalidateQueries({ queryKey: ["admin"] });
+        return r;
+      },
+    });
+  };
+
+  return (
+    <Card title="Nối văn bằng thay thế"
+      subtitle="Dùng khi đơn vị cấp văn bằng cũ đã mất quyền và một đơn vị khác đã cấp văn bằng mới.">
+      <form className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end"
+        onSubmit={(e) => { e.preventDefault(); load.mutate(); }}>
+        <Field label="Văn bằng cũ (vcId)" value={oldId} onChange={setOldId} mono required placeholder="urn:uuid:…" />
+        <Field label="Văn bằng mới (vcId)" value={newId} onChange={setNewId} mono required placeholder="urn:uuid:…" />
+        <button className="btn-ghost" type="submit" disabled={load.isPending}>Kiểm tra</button>
+      </form>
+      {err && <div className="mt-4"><Alert tone="bad" title="Không tìm thấy">{err}</Alert></div>}
+      {o && n && (
+        <div className="mt-4 space-y-3 text-sm">
+          <p>Số hiệu <span className="mono">{o.on_chain_vc_id}</span> → <span className="mono">{n.on_chain_vc_id}</span>
+            {" · "}holder {o.holder_address === n.holder_address ? "giữ nguyên" : "đổi sang ví mới (DID cũ phải đã bị khoá/thu hồi)"}</p>
+          {problem
+            ? <Alert tone="warn" title="Không nối được">{problem}</Alert>
+            : <button className="btn-primary" type="button" disabled={tx.busy} onClick={link}>Ký &amp; nối liên kết</button>}
+          <TxProgress tx={tx} okTitle="Đã nối văn bằng thay thế" />
+        </div>
+      )}
+    </Card>
   );
 }

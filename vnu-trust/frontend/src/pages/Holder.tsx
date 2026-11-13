@@ -4,6 +4,8 @@ import QRCode from "qrcode";
 import { api, type Credential, type ShareToken } from "../lib/api";
 import { useWallet } from "../hooks/useWallet";
 import { canonicalize, signMessage, sha3_256Hex } from "../lib/wallet";
+import { openCredential, sealPresentation, type OpenedCredential } from "../lib/vcStore";
+import { maskLabel } from "../lib/constants";
 import { Card, StatusBadge, Alert, Spinner, Empty, Mono, Badge } from "../components/ui";
 
 export default function Holder() {
@@ -22,6 +24,25 @@ export default function Holder() {
     queryKey: ["holder", "shares"],
     queryFn: () => api.get<ShareToken[]>("/holder/shares"),
   });
+  // P3: máy chủ chỉ giữ siêu dữ liệu; trình duyệt giải mã từng phong bì bằng khoá riêng
+  // đang mở trong ví rồi TỰ KIỂM với hash neo trên chuỗi.
+  const ids = (creds.data ?? []).map((c) => c.vc_id).join(",");
+  const opened = useQuery({
+    queryKey: ["holder", "opened", ids, wallet?.address],
+    queryFn: async () => {
+      const out = new Map<string, OpenedCredential | { error: string }>();
+      await Promise.all((creds.data ?? []).map(async (c) => {
+        try { out.set(c.vc_id, await openCredential(c, wallet!)); }
+        catch (e) { out.set(c.vc_id, { error: (e as Error).message }); }
+      }));
+      return out;
+    },
+    enabled: !!wallet && !!creds.data?.length, staleTime: Infinity,
+  });
+  const plainOf = (id: string) => {
+    const o = opened.data?.get(id);
+    return o && "plain" in o && o.problems.length === 0 ? o.plain : null;
+  };
 
   const share = useMutation({
     mutationFn: async () => {
@@ -32,16 +53,21 @@ export default function Holder() {
         "@context": ["https://www.w3.org/2018/credentials/v1"],
         type: ["VerifiablePresentation"],
         holder: wallet.did,
-        verifiableCredential: selected.map((c) => c.vc_json),
+        verifiableCredential: selected.map((c) => {
+          const plain = plainOf(c.vc_id);
+          if (!plain) throw new Error(`Chưa giải mã được (hoặc văn bằng lỗi): ${c.vc_id}`);
+          return plain;
+        }),
         created: new Date().toISOString(),
       };
 
       // Ký ngay trong trình duyệt — khoá riêng không rời khỏi máy.
       const proofValue = signMessage(wallet, canonicalize(vp));
       const vpHash = sha3_256Hex(vp);
-      const { cid } = await api.post<{ cid: string }>("/ipfs/pin", { json: vp, name: `vp-${Date.now()}` });
+      // P3: chỉ ghim bản trình bày ĐÃ MÃ HOÁ; khoá nằm trong fragment liên kết, máy chủ không nhận.
+      const { cid, key } = await sealPresentation(vp);
 
-      return api.post<{ vp: unknown; share: { token: string; expiresAt: string } }>(
+      const res = await api.post<{ vp: unknown; share: { token: string; expiresAt: string } }>(
         "/holder/presentations",
         {
           vpId: `urn:uuid:${crypto.randomUUID()}`,
@@ -54,9 +80,11 @@ export default function Holder() {
           ttlSeconds: ttl,
         },
       );
+      return { ...res, key };
     },
     onSuccess: async (res) => {
-      const link = `${location.origin}/verify/${res.share.token}`;
+      // Trình duyệt KHÔNG gửi phần sau dấu # lên máy chủ — khoá giải mã chỉ đi theo liên kết.
+      const link = `${location.origin}/verify/${res.share.token}#k=${res.key}`;
       setQr({ url: await QRCode.toDataURL(link, { width: 320, margin: 1 }), link, expiresAt: res.share.expiresAt });
       setPicked([]);
       setErr("");
@@ -90,23 +118,39 @@ export default function Holder() {
         <div className="grid gap-4 lg:grid-cols-2">
           {creds.data!.map((c) => {
             const st = c.effective?.status ?? c.status;
-            const selectable = st === "active";
+            const o = opened.data?.get(c.vc_id);
+            // Chỉ trình bày được văn bằng đang hiệu lực, đã giải mã và khớp bản neo.
+            const selectable = st === "active" && plainOf(c.vc_id) !== null;
             return (
               <article key={c.vc_id}
                 className={`card p-5 transition ${picked.includes(c.vc_id) ? "ring-2 ring-brand-400" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="font-bold text-ink-900 truncate">
-                      {String((c.vc_json as Record<string, Record<string, unknown>>)?.credentialSubject?.["vnu:degreeName"]
-                        ?? (c.vc_json as Record<string, unknown>)?.name ?? "Văn bằng")}
+                      {String((plainOf(c.vc_id)?.credentialSubject as Record<string, unknown> | undefined)?.["vnu:degreeName"]
+                        ?? maskLabel(c.vc_type))}
                     </h3>
                     <p className="text-xs text-ink-500 mt-1">
                       Cấp ngày {new Date(c.issued_at).toLocaleDateString("vi-VN")}
                     </p>
+                    {c.replaces_vc_id && (
+                      <p className="text-xs text-brand-700 mt-1">Văn bằng này thay cho <Mono value={c.replaces_vc_id} /></p>
+                    )}
+                    {c.replaced_by_vc_id && (
+                      <p className="text-xs text-amber-700 mt-1">Đã được thay bằng <Mono value={c.replaced_by_vc_id} /></p>
+                    )}
                   </div>
                   <StatusBadge status={st} />
                 </div>
 
+                {o && "error" in o && (
+                  <div className="mt-3"><Alert tone="warn" title="Chưa giải mã được">{o.error}</Alert></div>
+                )}
+                {o && "problems" in o && o.problems.length > 0 && (
+                  <div className="mt-3"><Alert tone="bad" title="Văn bằng lỗi — nội dung không khớp bản neo">
+                    {o.problems.join("; ")}. Hãy liên hệ đơn vị cấp bằng.
+                  </Alert></div>
+                )}
                 {c.effective?.drift && (
                   <div className="mt-3">
                     <Alert tone="warn" title="Lệch trạng thái">

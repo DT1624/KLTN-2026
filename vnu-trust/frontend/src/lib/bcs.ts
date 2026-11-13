@@ -12,7 +12,8 @@
  */
 import { sha3_256 } from "@noble/hashes/sha3";
 
-export type MoveParam = "address" | "u64" | "bytes";
+/** "u64s" = vector<u64> (thao tác theo lô C2). */
+export type MoveParam = "address" | "u64" | "bytes" | "u64s";
 
 /**
  * Kiểu tham số (bỏ signer) của mọi hàm entry mà giao diện gọi, theo mã Move.
@@ -42,6 +43,13 @@ export const ENTRY_PARAMS: Record<string, MoveParam[]> = {
   "vc_registry::admin_suspend_vc": ["u64", "bytes"],
   "vc_registry::admin_reinstate_vc": ["u64", "bytes"],
   "vc_registry::admin_revoke_vc": ["u64", "bytes"],
+  // Nâng cấp 13/11: C2 (theo lô) và C3 (cấp lại).
+  "vc_registry::admin_suspend_vcs": ["u64s", "bytes"],
+  "vc_registry::admin_revoke_vcs": ["u64s", "bytes"],
+  "vc_registry::delegator_suspend_vcs": ["u64s", "bytes"],
+  "vc_registry::delegator_revoke_vcs": ["u64s", "bytes"],
+  "vc_registry::reissue_vc": ["u64", "address", "u64", "bytes", "bytes", "bytes", "u64"],
+  "vc_registry::admin_link_replacement": ["u64", "u64"],
 };
 
 /** Hex nghiêm ngặt: độ dài chẵn, chỉ ký tự hex — không lặng lẽ biến ký tự lạ thành 0. */
@@ -77,10 +85,16 @@ function address(a: string): number[] {
 }
 const str = (s: string) => { const b = new TextEncoder().encode(s); return [...uleb(b.length), ...b]; };
 
+function u64s(v: unknown): number[] {
+  if (!Array.isArray(v)) throw new Error("vector<u64> phải là mảng");
+  return [...uleb(v.length), ...v.flatMap((x) => u64(String(x)))];
+}
+
 function arg(kind: MoveParam, v: unknown): number[] {
   const inner = kind === "address" ? address(String(v))
     : kind === "u64" ? u64(String(v))
-      : (() => { const b = hexToBytes(String(v)); return [...uleb(b.length), ...b]; })();
+      : kind === "u64s" ? u64s(v)
+        : (() => { const b = hexToBytes(String(v)); return [...uleb(b.length), ...b]; })();
   return [...uleb(inner.length), ...inner];
 }
 
