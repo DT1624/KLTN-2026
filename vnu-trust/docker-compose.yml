@@ -20,6 +20,35 @@ services:
       retries: 20
     networks: [vnu_trust_net]
 
+  # ---- Ứng dụng (P7, 13/11/2026) — chỉ bật khi gọi kèm profile:
+  #   docker compose --profile app up --build
+  # `docker compose up` trơn (dev.sh / test.sh dùng) vẫn chỉ bật Postgres như trước.
+  # Chạy chế độ production: bắt buộc VERIFY_ONCHAIN=true (backend tự thoát nếu không).
+  backend-ts:
+    profiles: [app]
+    build: ./backend
+    env_file: [./chain.env, ./backend/.env]
+    environment: { DB_HOST: postgres, DB_PORT: "5432", PORT: "4000", VERIFY_ONCHAIN: "true" }
+    depends_on: { postgres: { condition: service_healthy } }
+    ports: ["127.0.0.1:4000:4000"]
+    networks: [vnu_trust_net]
+
+  backend-go:
+    profiles: [app]
+    build: ./backend-go
+    env_file: [./chain.env, ./backend-go/.env]
+    environment: { DB_HOST: postgres, DB_PORT: "5432", PORT: "4001", VERIFY_ONCHAIN: "true" }
+    depends_on: { postgres: { condition: service_healthy } }
+    ports: ["127.0.0.1:4001:4001"]
+    networks: [vnu_trust_net]
+
+  frontend:
+    profiles: [app]
+    build: ./frontend
+    depends_on: [backend-ts, backend-go]
+    ports: ["127.0.0.1:8080:80"]
+    networks: [vnu_trust_net]
+
 volumes:
   pgdata: { name: vnu_trust_pgdata }
 
