@@ -234,6 +234,8 @@ async function scale() {
   const NAMES = ["/did/resolve", "/holder/credentials", "verify k=1", "verify k=8"];
   const out = { meta: { at: new Date().toISOString(), levels: LEVELS, conc: 1 }, data: [], explain: [], size: [] };
   let have = 0;
+  // Lược đồ (db/schema.sql) đã có idx_vc_onchain; thí nghiệm bóc tách cần nhánh không chỉ mục thật.
+  psql("DROP INDEX IF EXISTS idx_vc_onchain;");
   for (const L of LEVELS) {
     if (L > have) { const t0 = Date.now(); fill(have, L); console.log(`   · nạp ${L - have} bản ghi trong ${((Date.now() - t0) / 1000).toFixed(1)} s`); have = L; }
     out.explain.push({ level: L, index: false, ...explain() });
@@ -241,11 +243,12 @@ async function scale() {
     out.data.push(...await measure(L, "", NAMES));
   }
   // Bóc tách: thêm chỉ mục trên on_chain_vc_id ở bậc lớn nhất rồi đo lại đúng các tuyến xác minh.
-  psql("CREATE INDEX idx_eval_vc_onchain ON credentials(on_chain_vc_id); ANALYZE credentials;");
+  psql("CREATE INDEX IF NOT EXISTS idx_vc_onchain ON credentials(on_chain_vc_id); ANALYZE credentials;");
   out.explain.push({ level: have, index: true, ...explain() });
   out.data.push(...await measure(have, "index", ["/holder/credentials", "verify k=1", "verify k=2", "verify k=4", "verify k=8"]));
-  psql("DROP INDEX idx_eval_vc_onchain; ANALYZE credentials;");
+  psql("DROP INDEX IF EXISTS idx_vc_onchain; ANALYZE credentials;");
   out.data.push(...await measure(have, "noindex", ["verify k=2", "verify k=4"]));
+  psql("CREATE INDEX IF NOT EXISTS idx_vc_onchain ON credentials(on_chain_vc_id); ANALYZE credentials;");
   writeFileSync(`${OUT}/scale.json`, JSON.stringify(out, null, 2));
   console.log(`  → ${OUT}/scale.json`);
 }

@@ -25,8 +25,8 @@ up() {
         wait_up http://localhost:5173/ "frontend   (:5173)" ;;
     all) up db && up ts && up go && up ui || return 1
          echo; echo "  Giao diện   http://localhost:5173"
-         echo "  Backend TS  http://localhost:4000/api"
-         echo "  Backend Go  http://localhost:4001/api" ;;
+         echo "  Backend TS  http://localhost:4000/health"
+         echo "  Backend Go  http://localhost:4001/health" ;;
     *) err "thành phần lạ: $1"; return 1 ;;
   esac
 }

@@ -163,6 +163,10 @@ CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor, created_at DESC);
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS replaces_vc_id    TEXT;
 ALTER TABLE credentials ADD COLUMN IF NOT EXISTS replaced_by_vc_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_vc_issuer_address ON credentials(issuer_address, status);
+-- Chế độ chỉ mục CSDL (VERIFY_ONCHAIN=false) tra trạng thái / toàn vẹn / cấp lại theo số hiệu
+-- on-chain (chain/offline.ts, chain/offline.go); thiếu chỉ mục thì mỗi lượt là quét toàn bảng.
+-- Không UNIQUE: ở chế độ đó giao diện gửi số hiệu 0 cho mọi văn bằng.
+CREATE INDEX IF NOT EXISTS idx_vc_onchain ON credentials(on_chain_vc_id);
 
 -- Holder mất khoá lập ví mới; admin xác minh danh tính ngoài hệ thống rồi ghi
 -- liên kết ví cũ → ví mới ở ĐÂY (không ghi lên chuỗi: một mối nối công khai

@@ -49,6 +49,8 @@ start_db || exit 1
 psql_c -d postgres -c "DROP DATABASE IF EXISTS $TEST_DB WITH (FORCE)" -c "CREATE DATABASE $TEST_DB" >/dev/null || exit 1
 psql_c -d "$TEST_DB" <"$ROOT/db/schema.sql" >/dev/null || exit 1
 ok "CSDL $TEST_DB đã nạp lược đồ"
+# Truy vấn đường offline tra theo số hiệu on-chain: thiếu chỉ mục thì quét toàn bảng credentials.
+run "Lược đồ: chỉ mục on_chain_vc_id" ". '$ROOT/scripts/lib.sh' && { for w in \"on_chain_vc_id = 1\" \"on_chain_vc_id = ANY('{1,2}'::bigint[])\"; do echo \"SET enable_seqscan = off; EXPLAIN SELECT status FROM credentials WHERE \$w;\" | psql_c -d '$TEST_DB' -At | grep -q idx_vc_onchain || { echo \"thiếu chỉ mục idx_vc_onchain cho: \$w\"; exit 1; }; done; echo 'chỉ mục idx_vc_onchain được dùng (2/2)'; }"
 
 # Hạn mức nâng cao: không bộ nào khẳng định hành vi 429, để mặc định thì dính 429 ngẫu nhiên.
 ENV="DB_NAME=$TEST_DB RATE_LIMIT_PER_MIN=100000 AUTH_RATE_LIMIT_PER_MIN=5000 VERIFY_ONCHAIN=false LOG_LEVEL=warn"
