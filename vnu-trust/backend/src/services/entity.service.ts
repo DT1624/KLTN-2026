@@ -4,6 +4,13 @@ import { cfg } from "../config/index.js";
 import { hasActiveDid, isActiveAdmin, isActiveIssuer, canDelegate } from "../chain/registry.js";
 import { OFFLINE } from "../chain/offline.js";
 import type { EntityRow, Role } from "../types/index.js";
+import { createHash } from "node:crypto";
+
+/** Địa chỉ Aptos/Movement của khoá Ed25519 một chữ ký: SHA3-256(pub ‖ 0x00). */
+export function deriveAddress(publicKeyHex: string): string {
+  const pub = Buffer.from(publicKeyHex.replace(/^0x/, ""), "hex");
+  return "0x" + createHash("sha3-256").update(Buffer.concat([pub, Buffer.from([0])])).digest("hex");
+}
 
 export interface RegisterEntityInput {
   address: string;
@@ -22,6 +29,13 @@ export interface RegisterEntityInput {
 export async function registerEntity(input: RegisterEntityInput): Promise<EntityRow> {
   if (input.role === "root") {
     throw badRequest("Không thể tự đăng ký vai trò root — root do contract quy định lúc publish");
+  }
+
+  // Địa chỉ phải là địa chỉ của CHÍNH khoá công khai được khai (S-01). Thiếu
+  // bước này thì ai cũng ghi danh được địa chỉ của người khác — kể cả admin hay
+  // root trên chuỗi chưa ghi danh — bằng khoá của mình, rồi ký challenge mà đăng nhập.
+  if (deriveAddress(input.publicKeyHex) !== input.address) {
+    throw badRequest("Địa chỉ ví không khớp khoá công khai (địa chỉ = SHA3-256(khoá công khai ‖ 0x00))");
   }
 
   // DID phải bám theo địa chỉ ví để không thể mạo danh DID của người khác.

@@ -5,8 +5,9 @@ import rateLimit from "express-rate-limit";
 import { pinoHttp } from "pino-http";
 import { cfg } from "./config/index.js";
 import { logger } from "./utils/logger.js";
-import { sendOk } from "./utils/http.js";
+import { sendOk, fail } from "./utils/http.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
+import { badRequest } from "./utils/errors.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import entitiesRoutes from "./routes/entities.routes.js";
@@ -21,7 +22,7 @@ import publicRoutes from "./routes/public.routes.js";
 export function createApp() {
   const app = express();
 
-  app.set("trust proxy", 1);
+  app.set("trust proxy", cfg.TRUST_PROXY_HOPS);
   app.use(helmet());
   app.use(
     cors({
@@ -29,7 +30,16 @@ export function createApp() {
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: "2mb" }));
+  // Ký tự NUL: Postgres từ chối trong TEXT/JSONB, để lọt xuống là 500 (L-03).
+  // Bắt chuỗi thoát \u0000 trên thân thô — cùng biểu thức với bản Go.
+  app.use(express.json({
+    limit: "2mb",
+    verify: (req, _res, buf) => {
+      if (/(^|[^\\])(\\\\)*\\u0000/.test(buf.toString("utf8"))) (req as { hasNul?: boolean }).hasNul = true;
+    },
+  }));
+  app.use((req, _res, next) =>
+    (req as { hasNul?: boolean }).hasNul ? next(badRequest("Dữ liệu không được chứa ký tự NUL (\\u0000)")) : next());
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req: { url?: string }) => req.url === "/health" } }));
 
   // Giới hạn chung, các tuyến nhạy cảm còn có giới hạn riêng chặt hơn.
@@ -38,6 +48,8 @@ export function createApp() {
     limit: cfg.RATE_LIMIT_PER_MIN,
     standardHeaders: true,
     legacyHeaders: false,
+    // Cùng phong bì JSON như mọi lỗi khác và như bản Go (trước đây: văn bản thuần — P-08).
+    handler: (_req, res) => { res.status(429).json(fail("Quá nhiều yêu cầu, thử lại sau")); },
   }));
 
   // /health cho hạ tầng (probe của Docker/Kubernetes), /api/health cho giao diện

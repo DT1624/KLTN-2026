@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -101,8 +102,69 @@ type Transaction struct {
 	Sender   string `json:"sender"`
 	Version  string `json:"version"`
 	Payload  struct {
-		Function string `json:"function"`
+		Function  string `json:"function"`
+		Arguments []any  `json:"arguments"`
 	} `json:"payload"`
+	Events []struct {
+		Type string         `json:"type"`
+		Data map[string]any `json:"data"`
+	} `json:"events"`
+}
+
+// Arg là kỳ vọng cho một tham số của hàm entry (bỏ qua signer). Kind rỗng = không kiểm.
+// Fullnode trả address dạng rút gọn, u64 dạng chuỗi thập phân, vector<u8> dạng hex.
+type Arg struct{ Kind, Val string }
+
+func ArgAddress(a string) Arg { return Arg{"address", a} }
+func ArgU64(n int64) Arg      { return Arg{"u64", strconv.FormatInt(n, 10)} }
+func ArgBytes(h string) Arg   { return Arg{"bytes", h} }
+
+func argMatches(actual any, want Arg) bool {
+	s, ok := actual.(string)
+	if !ok {
+		return false
+	}
+	switch want.Kind {
+	case "address":
+		a, err1 := NormalizeAddress(s)
+		b, err2 := NormalizeAddress(want.Val)
+		return err1 == nil && err2 == nil && a == b
+	case "u64":
+		return s == want.Val
+	default:
+		return strings.EqualFold(s, want.Val)
+	}
+}
+
+// NormalizeMoveID đưa "địa_chỉ::module::tên" về địa chỉ đầy đủ 64 hex. Fullnode in
+// địa chỉ module ở dạng RÚT GỌN — gói tại 0x0ede7f… hiện ra là
+// "0xede7f…::did_registry::register_did" — nên so chuỗi trực tiếp với tên dựng từ
+// CONTRACT_ADDRESS đầy đủ thì mọi giao dịch thật đều bị từ chối (S-04).
+func NormalizeMoveID(id string) string {
+	parts := strings.Split(id, "::")
+	if len(parts) < 2 {
+		return id
+	}
+	a, err := NormalizeAddress(parts[0])
+	if err != nil {
+		return id
+	}
+	parts[0] = a
+	return strings.Join(parts, "::")
+}
+
+// FindEvent trả dữ liệu của sự kiện đầu tiên có kiểu khớp (sau chuẩn hoá địa chỉ).
+func FindEvent(tx *Transaction, typ string) map[string]any {
+	if tx == nil {
+		return nil
+	}
+	want := NormalizeMoveID(typ)
+	for _, e := range tx.Events {
+		if NormalizeMoveID(e.Type) == want {
+			return e.Data
+		}
+	}
+	return nil
 }
 
 var reTx = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
@@ -128,35 +190,55 @@ func (c *Client) GetTransaction(ctx context.Context, hash string) (*Transaction,
 // txHash nào thì backend ghi thẳng, nên có thể bịa ra bản ghi không hề tồn tại
 // trên chuỗi.
 func (c *Client) VerifyTransaction(ctx context.Context, hash, expectedFn, expectedSender string) error {
+	_, err := c.VerifyTransactionArgs(ctx, hash, expectedFn, expectedSender, nil)
+	return err
+}
+
+// VerifyTransactionArgs như VerifyTransaction, thêm: tham số giao dịch phải khớp
+// đúng bản ghi đang ghi (S-02). Trả về giao dịch để đọc sự kiện; trả nil khi
+// VERIFY_ONCHAIN=false (không có giao dịch nào được đọc).
+func (c *Client) VerifyTransactionArgs(ctx context.Context, hash, expectedFn, expectedSender string, args []Arg) (*Transaction, error) {
 	if !c.cfg.VerifyOnChain {
 		slog.Warn("VERIFY_ONCHAIN=false — BỎ QUA xác minh giao dịch", "hash", hash)
-		return nil
+		return nil, nil
 	}
 	tx, err := c.GetTransaction(ctx, hash)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if tx == nil {
-		return httpx.BadRequest("Không tìm thấy giao dịch này trên chuỗi")
+		return nil, httpx.BadRequest("Không tìm thấy giao dịch này trên chuỗi")
 	}
 	if !tx.Success {
-		return httpx.BadRequest("Giao dịch thất bại trên chuỗi: %s", tx.VMStatus)
+		return nil, httpx.BadRequest("Giao dịch thất bại trên chuỗi: %s", tx.VMStatus)
 	}
-	if tx.Payload.Function != expectedFn {
-		return httpx.BadRequest("Giao dịch gọi hàm %q, cần %q", tx.Payload.Function, expectedFn)
+	if tx.Payload.Function == "" || NormalizeMoveID(tx.Payload.Function) != NormalizeMoveID(expectedFn) {
+		return nil, httpx.BadRequest("Giao dịch gọi hàm %q, cần %q", tx.Payload.Function, expectedFn)
 	}
 	got, err := NormalizeAddress(tx.Sender)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	want, err := NormalizeAddress(expectedSender)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if got != want {
-		return httpx.BadRequest("Người gửi giao dịch không khớp với tài khoản đang đăng nhập")
+		return nil, httpx.BadRequest("Người gửi giao dịch không khớp với tài khoản đang đăng nhập")
 	}
-	return nil
+	for i, a := range args {
+		if a.Kind == "" {
+			continue
+		}
+		var actual any
+		if i < len(tx.Payload.Arguments) {
+			actual = tx.Payload.Arguments[i]
+		}
+		if !argMatches(actual, a) {
+			return nil, httpx.BadRequest("Tham số thứ %d của giao dịch không khớp dữ liệu đang ghi", i+1)
+		}
+	}
+	return tx, nil
 }
 
 // NormalizeAddress đưa địa chỉ về dạng 0x + 64 hex chữ thường.

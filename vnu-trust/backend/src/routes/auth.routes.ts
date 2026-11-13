@@ -5,7 +5,7 @@ import { cfg } from "../config/index.js";
 import { createChallenge, verifyChallenge } from "../services/auth.service.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getLiveStatus } from "../services/entity.service.js";
-import { sendOk } from "../utils/http.js";
+import { sendOk, fail } from "../utils/http.js";
 import { zAddress, zSignature } from "../utils/validate.js";
 
 const router = Router();
@@ -16,7 +16,8 @@ const authLimiter = rateLimit({
   limit: cfg.AUTH_RATE_LIMIT_PER_MIN,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: "Quá nhiều yêu cầu, thử lại sau một phút" },
+  // Đủ phong bì JSON (data, timestamp) như bản Go — P-08.
+  handler: (_req, res) => { res.status(429).json(fail("Quá nhiều yêu cầu, thử lại sau một phút")); },
 });
 
 router.post("/challenge", authLimiter, async (req, res, next) => {

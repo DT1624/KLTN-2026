@@ -312,10 +312,20 @@ export async function importWallet(
 }
 
 /**
- * Khôi phục ví từ 12 từ trên một thiết bị mới.
+ * Khôi phục ví từ 12 từ — trên thiết bị mới, hoặc trên chính máy này khi quên
+ * mật khẩu.
  *
- * Khoá được sinh lại từ chính cụm từ, nên ra đúng địa chỉ cũ. Nếu trình duyệt
- * này đã có sẵn ví đó rồi thì chỉ cần mở bằng mật khẩu, không tạo trùng.
+ * Khoá được sinh lại từ chính cụm từ, nên ra đúng địa chỉ cũ. Cụm từ là bằng
+ * chứng sở hữu MẠNH HƠN mật khẩu, nên nếu máy này đã có ví đó thì ghi đè bằng
+ * mật khẩu mới (đây chính là đường "quên mật khẩu"): không mất gì, vì khoá sinh
+ * lại y hệt. Trước đây trường hợp này báo "hãy dùng Mở ví" — mà Mở ví lại cần
+ * đúng mật khẩu đã quên, nên người dùng phải xoá ví (kèm cảnh báo "không khôi
+ * phục được") rồi mới khôi phục lại.
+ *
+ * `serverDid`: DID mà máy chủ đã ghi danh cho địa chỉ này. Phải dùng đúng chuỗi
+ * đó: DID gắn vai trò LÚC ĐĂNG KÝ, còn `role` là vai trò HIỆN TẠI — holder được
+ * phong issuer mà dựng lại DID theo vai trò mới thì ví mang DID sai và mọi thao
+ * tác DID sau đó bị máy chủ từ chối ("DID không khớp tài khoản").
  */
 export async function restoreFromMnemonic(
   mnemonic: string,
@@ -323,6 +333,7 @@ export async function restoreFromMnemonic(
   role: Role,
   label: string,
   didMethod = "did:vnu",
+  serverDid?: string,
 ): Promise<UnlockedWallet> {
   if (!isValidMnemonic(mnemonic)) {
     throw new Error("Cụm từ ghi nhớ không hợp lệ — kiểm tra lại chính tả và thứ tự các từ");
@@ -331,14 +342,11 @@ export async function restoreFromMnemonic(
   if (!strength.ok) throw new Error(strength.message);
 
   const kp = keyPairFromPrivate(privateKeyFromMnemonic(mnemonic));
+  // Ví đã có trên máy này: giữ tên hiển thị cục bộ (máy chủ không trả tên qua
+  // tuyến công khai — P-05) rồi ghi đè bằng mật khẩu mới.
   const existing = await getKeystore(kp.address);
-  if (existing) {
-    // Đã có trên máy này — mở bằng mật khẩu cũ thay vì ghi đè, để không mất
-    // nhãn và vai trò đã đăng ký.
-    throw new Error(
-      `Ví ${kp.address.slice(0, 10)}… đã có sẵn trên trình duyệt này. Hãy dùng thẻ "Mở ví".`,
-    );
-  }
+  const keepLabel = existing?.label ?? label;
+  const did = serverDid && serverDid.endsWith(kp.address) ? serverDid : `${didMethod}:${role}:${kp.address}`;
 
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -352,9 +360,9 @@ export async function restoreFromMnemonic(
   const record: StoredKeystore = {
     address: kp.address,
     publicKeyHex: kp.publicKeyHex,
-    did: `${didMethod}:${role}:${kp.address}`,
+    did,
     role,
-    label,
+    label: keepLabel,
     ciphertext: b64.enc(ciphertext),
     salt: b64.enc(salt),
     iv: b64.enc(iv),
@@ -368,7 +376,7 @@ export async function restoreFromMnemonic(
     publicKeyHex: kp.publicKeyHex,
     did: record.did,
     role,
-    label,
+    label: keepLabel,
     keyPair: kp,
   };
 }

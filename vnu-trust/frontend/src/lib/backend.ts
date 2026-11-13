@@ -18,9 +18,16 @@ export interface BackendInfo {
   tech: string;
 }
 
+// Chạy máy nhà: proxy của Vite chuyển /api-ts và /api-go sang cổng 4000/4001.
+// Triển khai lên host: đặt URL đầy đủ của từng backend lúc build, ví dụ
+// VITE_API_TS_URL=https://vnu-trust-ts.onrender.com/api — giao diện gọi thẳng
+// sang đó (CORS do FRONTEND_ORIGIN của backend cho phép), bộ chọn vẫn dùng được.
+const tsBase = (import.meta.env.VITE_API_TS_URL || "/api-ts").replace(/\/$/, "");
+const goBase = (import.meta.env.VITE_API_GO_URL || "/api-go").replace(/\/$/, "");
+
 export const BACKENDS: Record<BackendId, BackendInfo> = {
-  ts: { id: "ts", label: "TypeScript", base: "/api-ts", port: 4000, tech: "Express + pg" },
-  go: { id: "go", label: "Go", base: "/api-go", port: 4001, tech: "net/http + pgx" },
+  ts: { id: "ts", label: "TypeScript", base: tsBase, port: 4000, tech: "Express + pg" },
+  go: { id: "go", label: "Go", base: goBase, port: 4001, tech: "net/http + pgx" },
 };
 
 const KEY = "vnu_trust_backend";

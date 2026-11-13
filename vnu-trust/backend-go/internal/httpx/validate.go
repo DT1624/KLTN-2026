@@ -16,12 +16,16 @@ var (
 	reDID       = regexp.MustCompile(`^did:[a-zA-Z0-9]+:[\w.:%-]+$`)
 )
 
+// Address chuẩn hoá về DẠNG DUY NHẤT 0x + 64 hex chữ thường, giống zAddress bên
+// TypeScript. Chỉ hạ chữ thường là không đủ: "0xede7…" (rút gọn của root
+// 0x0ede7…) lọt UNIQUE vì khác chuỗi, trong khi chuỗi lại coi nó là root (S-01).
 func Address(v, field string) (string, error) {
 	v = strings.TrimSpace(v)
 	if !reAddress.MatchString(v) {
 		return "", BadRequest("%s: địa chỉ ví không hợp lệ", field)
 	}
-	return strings.ToLower(v), nil
+	h := strings.ToLower(v[2:])
+	return "0x" + strings.Repeat("0", 64-len(h)) + h, nil
 }
 
 func Hash32(v, field string) (string, error) {
@@ -87,10 +91,12 @@ func Role(v, field string) (string, error) {
 	return v, nil
 }
 
-// VCType kiểm bit mask 1..63 — 6 bit đã định nghĩa trong constants.move.
+// VCType kiểm loại của MỘT văn bằng: đúng một bit trong 6 bit đã định nghĩa
+// (1, 2, 4, …, 32). Contract từ chối vc_type nhiều bit (E_INVALID_VC_TYPE).
+// Khác với vcTypeMask của issuer — mask được nhiều bit (1..63).
 func VCType(v int, field string) (int, error) {
-	if v < 1 || v > 63 {
-		return 0, BadRequest("%s: vc_type phải trong khoảng 1..63", field)
+	if v < 1 || v > 32 || v&(v-1) != 0 {
+		return 0, BadRequest("%s: vcType phải là đúng một loại văn bằng (1, 2, 4, 8, 16 hoặc 32)", field)
 	}
 	return v, nil
 }

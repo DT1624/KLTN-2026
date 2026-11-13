@@ -74,6 +74,7 @@ export async function verifyChallenge(
 
   const payload: JwtPayload = { address: entity.address, did: entity.did, role: entity.role };
   const token = jwt.sign(payload, cfg.JWT_SECRET, {
+    algorithm: "HS256",
     expiresIn: cfg.JWT_EXPIRY as jwt.SignOptions["expiresIn"],
   });
 
@@ -82,7 +83,9 @@ export async function verifyChallenge(
 
 export function verifyToken(token: string): JwtPayload {
   try {
-    return jwt.verify(token, cfg.JWT_SECRET) as JwtPayload;
+    // Ghim thuật toán: không ghim thì jsonwebtoken nhận cả HS384/HS512 ký bằng cùng
+    // khoá, trong khi bản Go chỉ nhận HS256 — hai backend lệch nhau (L-01).
+    return jwt.verify(token, cfg.JWT_SECRET, { algorithms: ["HS256"] }) as JwtPayload;
   } catch {
     throw unauthorized("Token không hợp lệ hoặc đã hết hạn");
   }

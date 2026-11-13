@@ -30,6 +30,13 @@ func (s *Store) DIDByDID(ctx context.Context, did string) (*db.DIDDocument, erro
 	return scanDID(s.DB.Pool.QueryRow(ctx, `SELECT `+didCols+` FROM did_documents WHERE did = $1`, did))
 }
 
+// IsDIDDocumentCID — CID này có phải tài liệu của một DID đã ghi nhận không.
+func (s *Store) IsDIDDocumentCID(ctx context.Context, cid string) (bool, error) {
+	var ok bool
+	err := s.DB.Pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM did_documents WHERE document_cid = $1)`, cid).Scan(&ok)
+	return ok, err
+}
+
 func (s *Store) DIDByAddress(ctx context.Context, address string) (*db.DIDDocument, error) {
 	return scanDID(s.DB.Pool.QueryRow(ctx,
 		`SELECT d.`+`id, d.entity_id, d.did, d.document_cid, d.document_hash, d.doc_json,
@@ -115,7 +122,12 @@ func (s *Store) listVCs(ctx context.Context, where string, args ...any) ([]db.Cr
 func (s *Store) VCsByHolder(ctx context.Context, did string) ([]db.Credential, error) {
 	return s.listVCs(ctx, "holder_did = $1", did)
 }
-func (s *Store) VCsByIssuer(ctx context.Context, did string) ([]db.Credential, error) {
+
+// VCsByIssuer — status rỗng là mọi trạng thái.
+func (s *Store) VCsByIssuer(ctx context.Context, did, status string) ([]db.Credential, error) {
+	if status != "" {
+		return s.listVCs(ctx, "issuer_did = $1 AND status = $2", did, status)
+	}
 	return s.listVCs(ctx, "issuer_did = $1", did)
 }
 

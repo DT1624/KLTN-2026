@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vnu-trust/backend-go/internal/auth"
 	"github.com/vnu-trust/backend-go/internal/chain"
 	"github.com/vnu-trust/backend-go/internal/config"
 	"github.com/vnu-trust/backend-go/internal/httpx"
@@ -29,16 +30,19 @@ func New(cfg *config.Config, st *services.Store, cc *chain.Client, ip *services.
 	return &API{Cfg: cfg, Store: st, Chain: cc, IPFS: ip}
 }
 
-func queryInt(r *http.Request, key string, def, min, max int) int {
+// queryInt đọc tham số số nguyên. Giá trị sai hoặc ngoài khoảng trả 400 — giống
+// zod bên TypeScript. Trước đây lặng lẽ thay bằng mặc định: cùng ?limit=100000
+// mà TS trả 400 còn Go trả 200 (L-05).
+func queryInt(r *http.Request, key string, def, min, max int) (int, error) {
 	raw := r.URL.Query().Get(key)
 	if raw == "" {
-		return def
+		return def, nil
 	}
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < min || n > max {
-		return def
+		return 0, httpx.BadRequest("%s: phải là số nguyên trong khoảng %d..%d", key, min, max)
 	}
-	return n
+	return n, nil
 }
 
 // Health báo trạng thái máy chủ. verifyOnChain nói rõ có đang kiểm chứng trên
@@ -101,6 +105,9 @@ func (a *API) computeStats(ctx context.Context) (map[string]any, error) {
 	}, nil
 }
 
+// maxPinBytes — giới hạn một lần ghim, khớp MAX_PIN_BYTES bên TypeScript.
+const maxPinBytes = 256 << 10
+
 // PinIPFS ghim JSON lên IPFS. Cần đăng nhập để không bị lạm dụng làm kho lưu trữ.
 func (a *API) PinIPFS(w http.ResponseWriter, r *http.Request) error {
 	var body struct {
@@ -115,6 +122,12 @@ func (a *API) PinIPFS(w http.ResponseWriter, r *http.Request) error {
 	}
 	if len(body.Name) == 0 || len(body.Name) > 120 {
 		return httpx.BadRequest("name: tên phải dài 1..120 ký tự")
+	}
+	// Văn bằng/DID Document thật chỉ vài KB. Không giới hạn thì bất kỳ ai tự đăng
+	// ký được tài khoản holder đều ghim được ~2 MB mỗi yêu cầu vào bảng
+	// ipfs_objects (hoặc tiêu hạn mức Pinata) — S-07.
+	if n := len(auth.CanonicalJSON(body.JSON)); n > maxPinBytes {
+		return httpx.TooLarge("Nội dung ghim %d byte, vượt giới hạn %d byte", n, maxPinBytes)
 	}
 	res, err := a.IPFS.PinJSON(r.Context(), body.JSON, body.Name)
 	if err != nil {

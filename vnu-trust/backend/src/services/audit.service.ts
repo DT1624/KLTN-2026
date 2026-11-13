@@ -13,6 +13,9 @@ import { logger } from "../utils/logger.js";
  */
 export type AuditAction =
   | "did.save"
+  | "did.suspend"
+  | "did.reactivate"
+  | "did.revoke"
   | "vc.issue"
   | "vc.revoke"
   | "vc.suspend"

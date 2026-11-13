@@ -66,7 +66,7 @@ export default function Holder() {
   });
 
   const revoke = useMutation({
-    mutationFn: (token: string) => api.del(`/holder/shares/${token}`),
+    mutationFn: (token: string) => api.del(`/holder/shares/${encodeURIComponent(token)}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["holder", "shares"] }),
   });
 

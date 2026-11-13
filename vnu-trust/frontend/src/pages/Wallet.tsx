@@ -261,7 +261,8 @@ function CreatePanel({ onDone }: { onDone: (w: UnlockedWallet) => Promise<void> 
         </div>
 
         <Alert tone="info" title="Mật khẩu và cụm từ khôi phục là hai thứ khác nhau">
-          <strong>Mật khẩu</strong> chỉ mở ví trên chính máy này — quên thì dùng cụm từ để tạo lại.
+          <strong>Mật khẩu</strong> chỉ mở ví trên chính máy này — quên thì vào "Khôi phục", nhập
+          12 từ và đặt mật khẩu mới (không cần xoá ví trước).
           <br />
           <strong>Cụm từ 12 từ</strong> (hiện ở bước sau) mới là thứ đăng nhập được ở máy khác.
           Chúng tôi không lưu cả hai và không thể đặt lại.
@@ -337,7 +338,10 @@ function ImportPanel({ onDone, onRestored }: {
           </Alert>
           <div>
             <label className="label" htmlFor="pk">Khoá riêng Ed25519</label>
-            <input id="pk" className="input mono" value={privKey} onChange={(e) => setPrivKey(e.target.value)}
+            {/* type="password" + tắt tự điền: khoá riêng không vào lịch sử biểu mẫu,
+                không bị kiểm chính tả gửi đi, không hiện rõ khi chia sẻ màn hình (W-10). */}
+            <input id="pk" className="input mono" type="password" autoComplete="off" spellCheck={false}
+              value={privKey} onChange={(e) => setPrivKey(e.target.value)}
               placeholder="0x…" required />
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
@@ -377,7 +381,8 @@ function PhrasePanel({ onDone }: { onDone: (w: UnlockedWallet) => Promise<void> 
   const [phrase, setPhrase] = useState("");
   const [pass, setPass] = useState("");
   const [pass2, setPass2] = useState("");
-  const [found, setFound] = useState<{ address: string; did: string; role: Role; label: string } | null>(null);
+  // Tuyến công khai không trả tên hiển thị (P-05) — chỉ vai trò và DID.
+  const [found, setFound] = useState<{ address: string; did: string; role: Role; label: string | null } | null>(null);
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -392,7 +397,7 @@ function PhrasePanel({ onDone }: { onDone: (w: UnlockedWallet) => Promise<void> 
     try {
       const { address } = previewFromMnemonic(phrase);
       try {
-        const e = await api.get<{ address: string; did: string; role: Role; label: string }>(
+        const e = await api.get<{ address: string; did: string; role: Role; label: string | null }>(
           `/entities/by-address/${address}`,
         );
         setFound(e);
@@ -443,7 +448,7 @@ function PhrasePanel({ onDone }: { onDone: (w: UnlockedWallet) => Promise<void> 
       ) : (
         <>
           {found ? (
-            <Alert tone="ok" title={`Tìm thấy tài khoản: ${found.label}`}>
+            <Alert tone="ok" title={`Tìm thấy tài khoản ${found.role} đã ghi danh`}>
               Vai trò <strong>{found.role}</strong> · <Mono value={found.address} />
             </Alert>
           ) : (
@@ -465,6 +470,8 @@ function PhrasePanel({ onDone }: { onDone: (w: UnlockedWallet) => Promise<void> 
                   phrase, pass,
                   found?.role ?? "holder",
                   found?.label ?? "Ví khôi phục",
+                  undefined,
+                  found?.did,
                 );
                 await onDone(w);
                 nav(`/${w.role}`);

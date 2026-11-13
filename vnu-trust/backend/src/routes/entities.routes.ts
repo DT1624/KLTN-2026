@@ -39,8 +39,10 @@ router.get("/by-address/:address", async (req, res, next) => {
     const address = zAddress.parse(param(req.params, "address"));
     const entity = await getByAddress(address);
     if (!entity) throw notFound("Không tìm thấy thực thể");
-    // Không lộ email ra tuyến công khai (giữ khoá, đặt null — giống bản Go).
-    sendOk(res, { ...entity, email: null });
+    // Không lộ email và tên hiển thị ra tuyến công khai (giữ khoá, đặt null —
+    // giống bản Go). Tên hiển thị thường là họ tên thật; ghép với sự kiện công
+    // khai VCIssuedEvent (holder ↔ issuer ↔ loại) là biết "ai có bằng gì" (P-05).
+    sendOk(res, { ...entity, email: null, label: null });
   } catch (e) {
     next(e);
   }

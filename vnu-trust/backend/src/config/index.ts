@@ -16,6 +16,9 @@ const schema = z.object({
   DB_USER: z.string().default("vnu_trust"),
   DB_PASSWORD: z.string().default("vnu_trust"),
   DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+  /** Cùng ý nghĩa với sslmode của libpq/pgx: disable | require (mã hoá) |
+   *  verify-full (mã hoá + kiểm chứng chỉ). Neon/Supabase bắt buộc SSL. */
+  DB_SSLMODE: z.enum(["disable", "require", "verify-full"]).default("disable"),
 
   // Tối thiểu 32 ký tự — chặn việc vô tình chạy production với secret rác.
   JWT_SECRET: z.string().min(32, "JWT_SECRET phải dài ít nhất 32 ký tự"),
@@ -35,6 +38,12 @@ const schema = z.object({
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(300),
   /** Hạn mức riêng cho tuyến đăng nhập — chặt hơn vì đây là chỗ bị dò. */
   AUTH_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(20),
+  /** Số proxy tin cậy đứng trước server, dùng để lấy IP thật cho hạn mức.
+   *  Mặc định 0, khớp bên Go. Mặc định cũ là 1: chạy không có proxy (dev.sh,
+   *  gọi thẳng cổng) thì Express lấy IP từ X-Forwarded-For do CLIENT tự ghi,
+   *  đổi giá trị mỗi lượt là né hẳn hạn mức đăng nhập (S-06). Sau proxy của
+   *  nhà cung cấp (Render) thì đặt 1 — render.yaml đã đặt. */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
 
   IPFS_PROVIDER: z.enum(["pinata", "mock"]).default("mock"),
   PINATA_JWT: z.string().optional(),
@@ -62,6 +71,14 @@ if (!cfg.VERIFY_ONCHAIN && cfg.NODE_ENV === "production") {
     "VERIFY_ONCHAIN=false không được phép khi NODE_ENV=production — " +
       "cờ này tắt toàn bộ kiểm chứng on-chain.",
   );
+  process.exit(1);
+}
+
+// Contract (từ 13/11/2026) chỉ nhận chuỗi DID dạng "did:vnu:…<địa chỉ>". Đặt
+// phương thức khác thì mọi register_did sẽ bị chuỗi từ chối (E_DID_NOT_BOUND_TO_OWNER)
+// sau khi người dùng đã ghi danh xong — báo ngay lúc khởi động thay vì nửa chừng.
+if (cfg.VERIFY_ONCHAIN && cfg.DID_METHOD !== "did:vnu") {
+  console.error(`DID_METHOD=${cfg.DID_METHOD} — contract chỉ chấp nhận "did:vnu" khi VERIFY_ONCHAIN=true.`);
   process.exit(1);
 }
 

@@ -5,6 +5,8 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"strings"
+
+	"golang.org/x/crypto/sha3"
 )
 
 // CanonicalJSON và Hash phải cho kết quả GIỐNG HỆT hàm canonicalize/sha3_256Hex
@@ -35,4 +37,15 @@ func ChallengeMessage(address, nonce string) string {
 		"dia chi: " + address,
 		"nonce: " + nonce,
 	}, "\n")
+}
+
+// DeriveAddress — địa chỉ Aptos/Movement của khoá Ed25519 một chữ ký:
+// SHA3-256(khoá công khai ‖ 0x00), dạng 0x + 64 hex. Trả "" nếu khoá không hợp lệ.
+func DeriveAddress(publicKeyHex string) string {
+	pub, err := decodeHex(publicKeyHex)
+	if err != nil || len(pub) != ed25519.PublicKeySize {
+		return ""
+	}
+	h := sha3.Sum256(append(append(make([]byte, 0, len(pub)+1), pub...), 0x00))
+	return "0x" + hex.EncodeToString(h[:])
 }

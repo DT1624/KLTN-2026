@@ -38,8 +38,9 @@ for (const file of readdirSync(moveDir).filter((f) => f.endsWith(".move"))) {
   for (const m of src.matchAll(/public\s+entry\s+fun\s+(\w+)/g)) {
     contract.entry.set(`${module}::${m[1]}`, true);
   }
-  // `#[view]` đứng ngay trước một `public fun ten(`
-  for (const m of src.matchAll(/#\[view\][\s\S]{0,80}?public\s+fun\s+(\w+)/g)) {
+  // `#[view]`, có thể kèm các dòng chú thích `///`, rồi tới `public fun ten(`.
+  // Trước đây cho tối đa 80 ký tự ở giữa nên chú thích dài làm mất hàm view.
+  for (const m of src.matchAll(/#\[view\](?:\s*\/\/[^\n]*)*\s*public\s+fun\s+(\w+)/g)) {
     contract.view.set(`${module}::${m[1]}`, true);
   }
 }

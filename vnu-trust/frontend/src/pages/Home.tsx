@@ -163,6 +163,14 @@ function LookupCard({ data }: { data: LookupResult }) {
           <Row label="Loại">{String(r.typeLabel)}</Row>
           <Row label="Đơn vị cấp"><Mono value={String(r.issuerDid)} /></Row>
         </dl>
+      ) : data.kind === "cid" && r.private ? (
+        // Máy chủ chỉ trả nội dung CID khi đó là DID Document. Nội dung văn bằng
+        // là dữ liệu cá nhân — người giữ chia sẻ qua liên kết xác minh của mình.
+        <p className="text-sm text-ink-600">
+          CID <span className="mono">{String(r.cid)}</span> không phải tài liệu DID công khai. Nội dung
+          văn bằng là dữ liệu cá nhân nên không hiển thị ở ô tra cứu — người giữ văn bằng chia sẻ qua
+          liên kết xác minh.
+        </p>
       ) : (
         <pre className="mono bg-ink-50 rounded-xl p-4 overflow-x-auto max-h-96 text-xs">
           {JSON.stringify(r.content ?? r, null, 2)}

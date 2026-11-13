@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/vnu-trust/backend-go/internal/auth"
+	"github.com/vnu-trust/backend-go/internal/db"
 	"github.com/vnu-trust/backend-go/internal/httpx"
 	"github.com/vnu-trust/backend-go/internal/middleware"
 	"github.com/vnu-trust/backend-go/internal/services"
@@ -124,8 +125,13 @@ func (a *API) EntityByAddressPublic(w http.ResponseWriter, r *http.Request) erro
 	if e == nil {
 		return httpx.NotFound("Không tìm thấy thực thể")
 	}
-	e.Email = nil
-	httpx.OK(w, http.StatusOK, e)
+	// Không lộ email và tên hiển thị (thường là họ tên thật) ra tuyến công khai —
+	// ghép với sự kiện VCIssuedEvent công khai là biết "ai có bằng gì" (P-05).
+	httpx.OK(w, http.StatusOK, struct {
+		*db.Entity
+		Label *string `json:"label"`
+		Email *string `json:"email"`
+	}{Entity: e})
 	return nil
 }
 
@@ -195,6 +201,13 @@ func (a *API) RegisterEntity(w http.ResponseWriter, r *http.Request) error {
 	}
 	if role == "root" {
 		return httpx.BadRequest("Không thể tự đăng ký vai trò root — root do contract quy định lúc publish")
+	}
+
+	// Địa chỉ phải là địa chỉ của CHÍNH khoá công khai được khai (S-01). Thiếu
+	// bước này thì ai cũng ghi danh được địa chỉ của người khác — kể cả admin hay
+	// root trên chuỗi chưa ghi danh — bằng khoá của mình, rồi ký challenge mà đăng nhập.
+	if auth.DeriveAddress(pub) != address {
+		return httpx.BadRequest("Địa chỉ ví không khớp khoá công khai (địa chỉ = SHA3-256(khoá công khai ‖ 0x00))")
 	}
 
 	// DID phải bám theo địa chỉ ví để không thể mạo danh DID của người khác.

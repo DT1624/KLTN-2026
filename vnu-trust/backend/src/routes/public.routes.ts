@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import { lookup } from "../services/resolver.service.js";
-import { pinJSON } from "../services/ipfs.service.js";
+import { pinJSON, canonicalize } from "../services/ipfs.service.js";
+import { AppError } from "../utils/errors.js";
+
+/** Giới hạn một lần ghim — khớp maxPinBytes bên Go. */
+const MAX_PIN_BYTES = 256 * 1024;
 import { requireAuth } from "../middleware/auth.js";
 import { sendOk } from "../utils/http.js";
 import { authorityStats, totalDids, totalVcs, getRootAdmin } from "../chain/registry.js";
@@ -61,6 +65,12 @@ router.post("/ipfs/pin", requireAuth, async (req, res, next) => {
       .object({ json: z.record(z.unknown()), name: z.string().trim().min(1).max(120) })
       .strict()
       .parse(req.body);
+    // Văn bằng/DID Document thật chỉ vài KB. Không giới hạn thì ai tự đăng ký được
+    // tài khoản holder đều ghim được ~2 MB mỗi yêu cầu vào ipfs_objects (S-07).
+    const size = Buffer.byteLength(canonicalize(json));
+    if (size > MAX_PIN_BYTES) {
+      throw new AppError(413, `Nội dung ghim ${size} byte, vượt giới hạn ${MAX_PIN_BYTES} byte`, "PAYLOAD_TOO_LARGE");
+    }
     sendOk(res, await pinJSON(json, name), 201);
   } catch (e) {
     next(e);

@@ -126,13 +126,15 @@ check("Chuẩn hoá được cụm từ gõ tay (hoa/thường, khoảng trắng
 const pubB = ed25519.getPublicKey(privB);
 check("Sinh lại ĐÚNG địa chỉ ví cũ", addressOf(pubB) === address, address.slice(0, 20) + "…");
 
-// Máy B tra máy chủ để lấy vai trò/tên cũ
+// Máy B tra máy chủ để lấy vai trò cũ. Tên hiển thị KHÔNG còn trên tuyến công
+// khai (P-05, docs/SECURITY_REVIEW.md) — giao diện đặt "Ví khôi phục" như dưới đây.
 const lookup = await call("GET", `/entities/by-address/${address}`);
 check("Tra được hồ sơ công khai từ máy chủ", lookup.status === 200 && lookup.data.data.did === did,
-  `${lookup.data?.data?.label} / ${lookup.data?.data?.role}`);
+  `${lookup.data?.data?.role}`);
+check("Hồ sơ công khai không lộ tên hiển thị", lookup.data?.data?.label === null);
 
 // Đặt mật khẩu KHÁC ở máy B — mật khẩu là cục bộ từng máy
-await deviceB.saveWallet(privB, "MatKhauMayB@KhacHan99", { did, role, label: lookup.data.data.label });
+await deviceB.saveWallet(privB, "MatKhauMayB@KhacHan99", { did, role, label: lookup.data.data.label ?? "Ví khôi phục" });
 const loginB = await login(address, await deviceB.unlock(address, "MatKhauMayB@KhacHan99"));
 check("Máy B đăng nhập ĐÚNG tài khoản đó", loginB.ok && loginB.entity?.did === did);
 check("Mật khẩu hai máy khác nhau vẫn cùng một tài khoản", loginB.entity?.address === loginA.entity?.address);

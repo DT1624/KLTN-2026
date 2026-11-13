@@ -7,7 +7,9 @@ services:
       POSTGRES_DB: ${DB_NAME:-vnu_trust}
       POSTGRES_USER: ${DB_USER:-vnu_trust}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-vnu_trust}
-    ports: ["5432:5432"]
+    # Chỉ nghe trên máy này. "5432:5432" mở ra MỌI giao diện mạng, kèm mật khẩu
+    # dự phòng "vnu_trust" khi thiếu .env — ai cùng mạng cũng vào được CSDL.
+    ports: ["127.0.0.1:5432:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro

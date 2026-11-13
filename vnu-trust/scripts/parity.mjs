@@ -341,6 +341,64 @@ for (const [name, path, who] of byAddrCases) {
   compare(name, await call(TS, "GET", path, null, tsTok), await call(GO, "GET", path, null, goTok));
 }
 
+// ---- Đợt rà soát bảo mật (docs/SECURITY_REVIEW.md): mỗi hành vi mới phải giống nhau ở hai bên.
+async function callRaw(base, method, path, raw) {
+  const r = await fetch(base + path, { method, headers: { "content-type": "application/json" }, body: raw });
+  return { status: r.status, data: await r.json().catch(() => null) };
+}
+{
+  // S-01: địa chỉ không khớp khoá công khai; địa chỉ chữ hoa được chuẩn hoá.
+  const p1 = ed25519.getPublicKey(ed25519.utils.randomPrivateKey());
+  const other = "0x" + "7".repeat(64);
+  const bad = { address: other, publicKeyHex: hex(p1), did: `did:vnu:holder:${other}`, role: "holder", label: "Mạo danh" };
+  compare("S-01 đăng ký địa chỉ không khớp khoá công khai → 400",
+    await call(TS, "POST", "/entities/register", bad), await call(GO, "POST", "/entities/register", bad));
+
+  // S-03: tra CID của nội dung không phải DID Document → không trả nội dung.
+  const pinBody = { json: { credentialSubject: { "vnu:studentId": "SV-PARITY" } }, name: "vc" };
+  const cTS = (await call(TS, "POST", "/ipfs/pin", pinBody, holder.tokenTS)).data?.data?.cid;
+  const lTS = await call(TS, "GET", `/lookup?q=${cTS}`), lGO = await call(GO, "GET", `/lookup?q=${cTS}`);
+  compare("S-03 GET /lookup — CID văn bằng (riêng tư)", lTS, lGO);
+  const noLeak = ![lTS, lGO].some((r) => JSON.stringify(r.data).includes("SV-PARITY"));
+  rows.push({ name: "S-03 không bên nào lộ nội dung văn bằng qua /lookup", ok: noLeak });
+  console.log(`  ${noLeak ? "KHỚP" : "LỆCH"}  S-03 không bên nào lộ nội dung văn bằng qua /lookup`);
+
+  // P-05: hồ sơ công khai không có tên hiển thị.
+  const eTS = await call(TS, "GET", `/entities/by-address/${holder.address}`);
+  const eGO = await call(GO, "GET", `/entities/by-address/${holder.address}`);
+  const noLabel = eTS.data?.data?.label === null && eGO.data?.data?.label === null;
+  rows.push({ name: "P-05 /entities/by-address trả label = null ở cả hai bên", ok: noLabel });
+  console.log(`  ${noLabel ? "KHỚP" : "LỆCH"}  P-05 /entities/by-address trả label = null ở cả hai bên`);
+
+  // S-07, L-02, L-03: dung lượng ghim, thân hỏng, thân quá lớn, NUL.
+  const big = { json: { x: "a".repeat(300 * 1024) }, name: "lon" };
+  compare("S-07 POST /ipfs/pin 300KB → 413",
+    await call(TS, "POST", "/ipfs/pin", big, holder.tokenTS), await call(GO, "POST", "/ipfs/pin", big, holder.tokenGO));
+  compare("L-02 JSON hỏng → 400",
+    await callRaw(TS, "POST", "/auth/challenge", "{hỏng"), await callRaw(GO, "POST", "/auth/challenge", "{hỏng"));
+  const huge = JSON.stringify({ address: "0x" + "a".repeat(3 * 1024 * 1024) });
+  compare("L-02 thân > 2MB → 413",
+    await callRaw(TS, "POST", "/auth/challenge", huge), await callRaw(GO, "POST", "/auth/challenge", huge));
+  const nul = JSON.stringify({ address: "0x1\u0000" });
+  compare("L-03 chuỗi chứa NUL → 400",
+    await callRaw(TS, "POST", "/auth/challenge", nul), await callRaw(GO, "POST", "/auth/challenge", nul));
+
+  // L-05: lọc trạng thái và phân trang không hợp lệ.
+  const iss = await makeActor("issuer", "Đơn vị đối chiếu");
+  compare("L-05 GET /issuer/credentials?status=sai → 400",
+    await call(TS, "GET", "/issuer/credentials?status=sai", null, iss.tokenTS),
+    await call(GO, "GET", "/issuer/credentials?status=sai", null, iss.tokenGO));
+  compare("L-05 GET /issuer/credentials?status=active",
+    await call(TS, "GET", "/issuer/credentials?status=active", null, iss.tokenTS),
+    await call(GO, "GET", "/issuer/credentials?status=active", null, iss.tokenGO));
+  compare("L-05 GET /admin/audit?limit=100000 → 400",
+    await call(TS, "GET", "/admin/audit?limit=100000", null, adminActor.tokenTS),
+    await call(GO, "GET", "/admin/audit?limit=100000", null, adminActor.tokenGO));
+  compare("L-05 GET /admin/issuers?offset=-1 → 400",
+    await call(TS, "GET", "/admin/issuers?offset=-1", null, adminActor.tokenTS),
+    await call(GO, "GET", "/admin/issuers?offset=-1", null, adminActor.tokenGO));
+}
+
 // Giao diện bật/tắt màn hình uỷ quyền theo cờ này, nên thiếu ở một bên là giao
 // diện đổi hành vi chỉ vì người dùng chọn backend khác ở thanh trên.
 const meTS = await call(TS, "GET", "/auth/me", null, holder.tokenTS);
@@ -351,6 +409,107 @@ const bothCanDelegate =
 rows.push({ name: "/auth/me trả canDelegate ở cả hai backend", ok: bothCanDelegate });
 console.log(`  ${bothCanDelegate ? "KHỚP" : "LỆCH"}  /auth/me trả canDelegate ở cả hai backend` +
   `  → TS=${meTS.data?.data?.onChain?.canDelegate}, GO=${meGO.data?.data?.onChain?.canDelegate}`);
+
+console.log("\n=== K. Logic hợp đồng 13/11/2026: kiểm duyệt DID, uỷ quyền, tạm ngưng của admin ===");
+// Tuyến mới thêm cùng lúc ở hai backend (bài học #22). Hợp đồng đòi admin và
+// issuer có DID ACTIVE, nên actor ở đây phải ghi DID thật — admin không DID thì
+// mọi tuyến kiểm quyền on-chain dừng ở 403 và phép đối chiếu chẳng chứng minh gì.
+async function withDid(a) {
+  const body = await mkSaveBody(a, TS, a.tokenTS);
+  const r = await call(TS, "POST", "/did/save", body, a.tokenTS);
+  if (r.status !== 201 && r.status !== 200) throw new Error(`ghi DID lỗi: ${JSON.stringify(r.data)}`);
+  return a;
+}
+const live = (await call(TS, "GET", "/health")).data?.data?.verifyOnChain !== false;
+const modAdmin = await withDid(await makeActor("admin", "Admin kiem duyet"));
+const otherAdmin = await withDid(await makeActor("admin", "Admin khac"));
+const issTS = await withDid(await makeActor("issuer", "Issuer phia TS"));
+const issGO = await withDid(await makeActor("issuer", "Issuer phia GO"));
+const tgtTS = await withDid(await makeActor("holder", "Dich kiem duyet TS"));
+const tgtGO = await withDid(await makeActor("holder", "Dich kiem duyet GO"));
+
+const didStatus = (st, reason = "Kiem duyet doi chieu") => ({ status: st, reason, txHash: fakeTx });
+const pairs = [
+  ["POST /admin/dids/{addr}/status — vai trò holder → 403",
+    [TS, `/admin/dids/${tgtTS.address}/status`, didStatus("suspended"), holder.tokenTS],
+    [GO, `/admin/dids/${tgtGO.address}/status`, didStatus("suspended"), holder.tokenGO]],
+  ["POST /admin/dids/{addr}/status — trạng thái lạ → 400",
+    [TS, `/admin/dids/${tgtTS.address}/status`, didStatus("xoa"), modAdmin.tokenTS],
+    [GO, `/admin/dids/${tgtGO.address}/status`, didStatus("xoa"), modAdmin.tokenGO]],
+  ["POST /admin/dids/{addr}/status — lý do quá ngắn → 400",
+    [TS, `/admin/dids/${tgtTS.address}/status`, didStatus("suspended", "x"), modAdmin.tokenTS],
+    [GO, `/admin/dids/${tgtGO.address}/status`, didStatus("suspended", "x"), modAdmin.tokenGO]],
+  ["POST /admin/dids/{addr}/status — kèm trường lạ → 400",
+    [TS, `/admin/dids/${tgtTS.address}/status`, { ...didStatus("suspended"), thua: 1 }, modAdmin.tokenTS],
+    [GO, `/admin/dids/${tgtGO.address}/status`, { ...didStatus("suspended"), thua: 1 }, modAdmin.tokenGO]],
+  ["POST /admin/dids/{addr}/status — admin khoá DID của holder",
+    [TS, `/admin/dids/${tgtTS.address}/status`, didStatus("suspended"), modAdmin.tokenTS],
+    [GO, `/admin/dids/${tgtGO.address}/status`, didStatus("suspended"), modAdmin.tokenGO]],
+  ["POST /admin/dids/{addr}/status — admin thường khoá DID admin khác → 403 (offline) / chuỗi chặn",
+    [TS, `/admin/dids/${otherAdmin.address}/status`, didStatus("suspended"), modAdmin.tokenTS],
+    [GO, `/admin/dids/${otherAdmin.address}/status`, didStatus("suspended"), modAdmin.tokenGO]],
+  ["POST /admin/dids/{addr}/status — thu hồi DID của issuer (M-01)",
+    [TS, `/admin/dids/${issTS.address}/status`, didStatus("revoked"), modAdmin.tokenTS],
+    [GO, `/admin/dids/${issGO.address}/status`, didStatus("revoked"), modAdmin.tokenGO]],
+  ["POST /admin/credentials/{vcId}/suspend — vai trò holder → 403",
+    [TS, "/admin/credentials/urn:uuid:khong-ton-tai/suspend", { reason: "thu nghiem", txHash: fakeTx }, holder.tokenTS],
+    [GO, "/admin/credentials/urn:uuid:khong-ton-tai/suspend", { reason: "thu nghiem", txHash: fakeTx }, holder.tokenGO]],
+  ["POST /admin/credentials/{vcId}/suspend — admin, mã không tồn tại",
+    [TS, "/admin/credentials/urn:uuid:khong-ton-tai/suspend", { reason: "thu nghiem", txHash: fakeTx }, modAdmin.tokenTS],
+    [GO, "/admin/credentials/urn:uuid:khong-ton-tai/suspend", { reason: "thu nghiem", txHash: fakeTx }, modAdmin.tokenGO]],
+  ["POST /admin/authority/admins/{addr}/revoke — kèm trường status thừa → 400",
+    [TS, `/admin/authority/admins/${otherAdmin.address}/revoke`, { reason: "thu nghiem", txHash: fakeTx, status: "revoked" }, modAdmin.tokenTS],
+    [GO, `/admin/authority/admins/${otherAdmin.address}/revoke`, { reason: "thu nghiem", txHash: fakeTx, status: "revoked" }, modAdmin.tokenGO]],
+];
+for (const [name, [b1, p1, body1, t1], [b2, p2, body2, t2]] of pairs) {
+  compare(name, await call(b1, "POST", p1, body1, t1), await call(b2, "POST", p2, body2, t2));
+}
+
+// Sau khi kiểm duyệt, chỉ mục ở hai bên phải phản ánh đúng điều hợp đồng làm.
+if (!live) {
+  const sTS = (await call(TS, "GET", `/did/by-address/${tgtTS.address}`)).data?.data?.status;
+  const sGO = (await call(GO, "GET", `/did/by-address/${tgtGO.address}`)).data?.data?.status;
+  const okSusp = sTS === "suspended" && sGO === "suspended";
+  rows.push({ name: "DID bị admin khoá đọc ra 'suspended' ở cả hai", ok: okSusp });
+  console.log(`  ${okSusp ? "KHỚP" : "LỆCH"}  DID bị admin khoá đọc ra 'suspended' ở cả hai  → TS=${sTS}, GO=${sGO}`);
+  const rTS = (await call(TS, "GET", `/entities/by-address/${issTS.address}`)).data?.data?.role;
+  const rGO = (await call(GO, "GET", `/entities/by-address/${issGO.address}`)).data?.data?.role;
+  const okM01 = rTS === "holder" && rGO === "holder";
+  rows.push({ name: "M-01: thu hồi DID hạ vai trò issuer về holder ở cả hai", ok: okM01 });
+  console.log(`  ${okM01 ? "KHỚP" : "LỆCH"}  M-01: thu hồi DID hạ vai trò issuer về holder ở cả hai  → TS=${rTS}, GO=${rGO}`);
+}
+
+// Uỷ quyền: quan hệ cha–con chỉ tồn tại trên chuỗi, nên chế độ offline từ chối
+// thẳng thay vì đoán (cùng tinh thần canDelegateOffline).
+const delegator = await withDid(await makeActor("issuer", "Issuer uy quyen"));
+const delegCases = [
+  ["GET /issuer/delegation — issuer", "GET", "/issuer/delegation", null, delegator],
+  ["GET /issuer/delegation — vai trò holder → 403", "GET", "/issuer/delegation", null, holder],
+  ["POST /issuer/sub-issuers — bit uỷ quyền → 400", "POST", "/issuer/sub-issuers",
+    { address: tgtTS.address, vcTypeMask: 33, expiresAt: 0, txHash: fakeTx }, delegator],
+  ["POST /issuer/sub-issuers — kèm trường lạ → 400", "POST", "/issuer/sub-issuers",
+    { address: tgtTS.address, vcTypeMask: 1, expiresAt: 0, txHash: fakeTx, thua: 1 }, delegator],
+  ["POST /issuer/sub-issuers — hợp lệ về hình thức", "POST", "/issuer/sub-issuers",
+    { address: tgtTS.address, vcTypeMask: 1, expiresAt: 0, txHash: fakeTx }, delegator],
+  ["POST /issuer/sub-issuers/{addr}/status — kích hoạt lại không được phép → 400", "POST",
+    `/issuer/sub-issuers/${tgtTS.address}/status`, { status: "active", reason: "thu nghiem", txHash: fakeTx }, delegator],
+  ["POST /issuer/sub-issuers/{addr}/status — tạm ngưng", "POST",
+    `/issuer/sub-issuers/${tgtTS.address}/status`, { status: "suspended", reason: "thu nghiem", txHash: fakeTx }, delegator],
+];
+for (const [name, method, path, body, a] of delegCases) {
+  compare(name, await call(TS, method, path, body, a.tokenTS), await call(GO, method, path, body, a.tokenGO));
+}
+
+// vc_type phải là đúng MỘT bit: hợp đồng từ chối "cử nhân + thạc sĩ" (3).
+const vcIss = await withDid(await makeActor("issuer", "Issuer kiem loai van bang"));
+const multiBit = {
+  vcId: "urn:uuid:doi-chieu-nhieu-bit", onChainVcId: 1, holderDid: holder.did, holderAddress: holder.address,
+  vcType: 3, ipfsCid: "bafkrei" + "a".repeat(52), vcIdHash: "0x" + "1".repeat(64), contentHash: "0x" + "2".repeat(64),
+  proofValue: "0x" + "c".repeat(128), vcJson: { x: 1 }, issuedAt: new Date().toISOString(), expiresAt: null, txHash: fakeTx,
+};
+compare("POST /issuer/credentials — vcType nhiều bit → 400",
+  await call(TS, "POST", "/issuer/credentials", multiBit, vcIss.tokenTS),
+  await call(GO, "POST", "/issuer/credentials", multiBit, vcIss.tokenGO));
 
 const failed = rows.filter((r) => !r.ok);
 console.log(`\n${rows.length - failed.length}/${rows.length} KHỚP` +

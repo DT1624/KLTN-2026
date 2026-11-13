@@ -11,7 +11,7 @@ export function utf8ToHex(s: string): string {
 }
 
 /** Bytes on-chain (vector<u8>) trả về dạng "0x..." — đổi về chuỗi UTF-8. */
-function hexToUtf8(hex: string): string {
+export function hexToUtf8(hex: string): string {
   const clean = hex.replace(/^0x/, "");
   if (clean.length === 0) return "";
   const bytes = new Uint8Array(clean.length / 2);
@@ -162,6 +162,19 @@ export async function getRoleInfo(address: string): Promise<OnChainRole | null> 
     expiresAt: Number(expiresAt),
     status: ROLE_STATUS[Number(status)] ?? "unknown",
   };
+}
+
+/**
+ * Issuer cha đã cấp `issuer` qua uỷ quyền, hoặc null nếu issuer do root/admin cấp.
+ * Chế độ offline không biết quan hệ uỷ quyền (nó chỉ tồn tại trên chuỗi) nên trả
+ * null — tức là KHÔNG ai được coi là cha, thay vì đoán bừa.
+ */
+export async function getDelegator(issuer: string): Promise<string | null> {
+  if (offline.OFFLINE) return null;
+  const r = await viewOrNull<[string]>(VIEW.getDelegator, [normalizeAddress(issuer)]);
+  if (!r?.[0]) return null;
+  const addr = normalizeAddress(r[0]);
+  return addr === NO_PENDING_ROOT ? null : addr;
 }
 
 /** Số VC đang còn hiệu lực (đã trừ phần bị thu hồi) — F-11e. */

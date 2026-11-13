@@ -7,6 +7,7 @@ import { requireByAddress } from "../services/entity.service.js";
 import { requireAuth, requireRole, requireOnChainRole } from "../middleware/auth.js";
 import { sendOk, param } from "../utils/http.js";
 import { forbidden } from "../utils/errors.js";
+import * as authority from "../services/authority.service.js";
 import { zAddress, zCid, zDid, zHash32, zTxHash, zVcType } from "../utils/validate.js";
 
 const router = Router();
@@ -91,6 +92,60 @@ router.post("/credentials/:vcId/suspend", async (req, res, next) => {
       .parse(req.body);
     const actor = await requireByAddress(req.user!.address);
     sendOk(res, await changeStatus(param(req.params, "vcId"), actor, "suspended", reason, txHash));
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Uỷ quyền: issuer có bit VC_DELEGATION cấp và quản lý sub-issuer.
+// Contract quyết định toàn bộ luật; backend xác minh giao dịch rồi ghi chỉ mục.
+// ---------------------------------------------------------------------------
+
+/** Quyền uỷ quyền của chính mình và danh sách sub-issuer mình đã cấp. */
+router.get("/delegation", async (req, res, next) => {
+  try {
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await authority.delegationSnapshot(actor));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** Cấp sub-issuer qua uỷ quyền (approve_issuer do issuer ký). */
+router.post("/sub-issuers", async (req, res, next) => {
+  try {
+    const { address, vcTypeMask, expiresAt, txHash } = z
+      .object({
+        address: zAddress,
+        vcTypeMask: z.coerce.number().int().min(1).max(31),
+        /** Giây Unix; 0 = vĩnh viễn (chỉ khi chính mình vĩnh viễn). */
+        expiresAt: z.coerce.number().int().min(0).default(0),
+        txHash: zTxHash,
+      })
+      .strict()
+      .parse(req.body);
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await authority.approveSubIssuer(actor, address, vcTypeMask, expiresAt, txHash), 201);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** Tạm ngưng / thu hồi sub-issuer do chính mình cấp. Kích hoạt lại thì nhờ admin. */
+router.post("/sub-issuers/:address/status", async (req, res, next) => {
+  try {
+    const address = zAddress.parse(param(req.params, "address"));
+    const { status, reason, txHash } = z
+      .object({
+        status: z.enum(["suspended", "revoked"]),
+        reason: z.string().trim().min(2).max(500),
+        txHash: zTxHash,
+      })
+      .strict()
+      .parse(req.body);
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await authority.setSubIssuerStatus(actor, address, status, reason, txHash));
   } catch (e) {
     next(e);
   }

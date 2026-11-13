@@ -124,6 +124,9 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		// Như helmet bên TypeScript. Trình duyệt chỉ xét header này qua HTTPS (vd.
+		// sau proxy TLS của Render), nên chạy máy nhà qua HTTP không ảnh hưởng.
+		h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -158,6 +161,8 @@ type RateLimiter struct {
 	visitors map[string]*visitor
 	rps      rate.Limit
 	burst    int
+	// TrustProxyHops: số proxy tin cậy đứng trước server, xem ClientIP.
+	TrustProxyHops int
 }
 
 type visitor struct {
@@ -201,14 +206,35 @@ func (rl *RateLimiter) allow(ip string) bool {
 
 func (rl *RateLimiter) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			ip = r.RemoteAddr
-		}
-		if !rl.allow(ip) {
+		if !rl.allow(ClientIP(r, rl.TrustProxyHops)) {
 			httpx.Fail(w, http.StatusTooManyRequests, "Quá nhiều yêu cầu, thử lại sau")
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// ClientIP trả IP của người dùng thật. hops = 0: lấy từ kết nối TCP (chạy máy
+// nhà, không có proxy). hops = N: tin N proxy đứng trước server và lấy phần tử
+// thứ N tính từ cuối X-Forwarded-For — cùng quy tắc với `trust proxy` của
+// Express. Không lấy phần tử đầu tiên vì client tự ghi được giá trị đó để né
+// hạn mức.
+func ClientIP(r *http.Request, hops int) string {
+	if hops > 0 {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			i := len(parts) - hops
+			if i < 0 {
+				i = 0
+			}
+			if ip := strings.TrimSpace(parts[i]); ip != "" {
+				return ip
+			}
+		}
+	}
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return ip
 }

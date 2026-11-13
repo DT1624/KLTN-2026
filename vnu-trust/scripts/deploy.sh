@@ -86,7 +86,11 @@ echo "Đang publish…"
     --profile "$PROFILE" \
     --named-addresses "vnu=$ADDR,root_admin=0x0" \
     --skip-fetch-latest-git-deps \
+    --included-artifacts none \
     --assume-yes )
+# `--included-artifacts none`: chỉ đưa bytecode lên chuỗi, không kèm mã nguồn và
+# source map. Bytecode vẫn công khai (ai cũng dịch ngược được) — cờ này chỉ
+# giấu mã nguồn gốc, không phải cơ chế bảo mật.
 
 echo
 echo "Cập nhật chain.env → CONTRACT_ADDRESS=$ADDR"

@@ -4,6 +4,8 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -19,6 +21,9 @@ type Config struct {
 	DBHost, DBName, DBUser, DBPassword string
 	DBPort                             int
 	DBPoolMax                          int
+	// DBSSLMode truyền thẳng cho pgx (disable | require | verify-full).
+	// Postgres dịch vụ (Neon, Supabase) bắt buộc SSL nên khi triển khai đặt "require".
+	DBSSLMode string
 
 	JWTSecret string
 	JWTExpiry time.Duration
@@ -27,6 +32,10 @@ type Config struct {
 	ChainID         int
 	RateLimitPerMin int
 	AuthRateLimit   int
+	// TrustProxyHops: số proxy tin cậy đứng trước server. 0 = lấy IP từ kết nối
+	// TCP; 1 = lấy từ X-Forwarded-For do proxy của nhà cung cấp (vd. Render) thêm.
+	// Sai số này thì mọi người dùng chung một IP và chung một hạn mức.
+	TrustProxyHops  int
 	ContractAddress string
 	VerifyOnChain   bool
 
@@ -87,6 +96,16 @@ func Load() (*Config, error) {
 	if err != nil {
 		add("%v", err)
 	}
+	proxyHops, err := envInt("TRUST_PROXY_HOPS", 0)
+	if err != nil || proxyHops < 0 {
+		add("TRUST_PROXY_HOPS phải là số nguyên không âm")
+	}
+	sslMode := env("DB_SSLMODE", "disable")
+	switch sslMode {
+	case "disable", "require", "verify-full":
+	default:
+		add("DB_SSLMODE phải là disable, require hoặc verify-full, nhận %q", sslMode)
+	}
 
 	secret := env("JWT_SECRET", "")
 	if len(secret) < 32 {
@@ -131,6 +150,7 @@ func Load() (*Config, error) {
 		DBUser:          env("DB_USER", "vnu_trust"),
 		DBPassword:      env("DB_PASSWORD", "vnu_trust"),
 		DBPoolMax:       poolMax,
+		DBSSLMode:       sslMode,
 		JWTSecret:       secret,
 		JWTExpiry:       expiry,
 		ChainFullnode:   strings.TrimRight(env("CHAIN_FULLNODE", "https://testnet.movementnetwork.xyz/v1"), "/"),
@@ -139,6 +159,7 @@ func Load() (*Config, error) {
 		VerifyOnChain:   env("VERIFY_ONCHAIN", "true") == "true",
 		RateLimitPerMin: rateLimit,
 		AuthRateLimit:   authRateLimit,
+		TrustProxyHops:  proxyHops,
 		IPFSProvider:    provider,
 		PinataJWT:       pinata,
 		IPFSGateway:     strings.TrimRight(env("IPFS_GATEWAY", "https://ipfs.io/ipfs"), "/"),
@@ -152,10 +173,27 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("VERIFY_ONCHAIN=false không được phép khi NODE_ENV=production " +
 			"— cờ này tắt toàn bộ kiểm chứng on-chain")
 	}
+	// Contract (từ 13/11/2026) chỉ nhận chuỗi DID dạng "did:vnu:…<địa chỉ>". Đặt
+	// phương thức khác thì mọi register_did bị chuỗi từ chối sau khi người dùng
+	// đã ghi danh xong — báo ngay lúc khởi động. Phải khớp backend TypeScript.
+	if c.VerifyOnChain && c.DIDMethod != "did:vnu" {
+		return nil, fmt.Errorf("DID_METHOD=%s — contract chỉ chấp nhận \"did:vnu\" khi VERIFY_ONCHAIN=true", c.DIDMethod)
+	}
 	return c, nil
 }
 
+// DSN dựng chuỗi kết nối qua net/url để mật khẩu có ký tự đặc biệt
+// (@, /, :, %) không làm vỡ cú pháp URL.
 func (c *Config) DSN() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable&pool_max_conns=%d",
-		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName, c.DBPoolMax)
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.DBUser, c.DBPassword),
+		Host:   net.JoinHostPort(c.DBHost, strconv.Itoa(c.DBPort)),
+		Path:   "/" + c.DBName,
+	}
+	q := url.Values{}
+	q.Set("sslmode", c.DBSSLMode)
+	q.Set("pool_max_conns", strconv.Itoa(c.DBPoolMax))
+	u.RawQuery = q.Encode()
+	return u.String()
 }

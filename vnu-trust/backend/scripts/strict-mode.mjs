@@ -60,19 +60,24 @@ console.log(`  ${ok2?"PASS":"FAIL"}  VERIFY_ONCHAIN=true: chỉ mục ghi issuer
 // === Tuyến quản trị quyền: vai trò trong CSDL KHÔNG được biến thành quyền thật ===
 const tok3 = await account("Chi muc lech admin", "admin");
 
-// Thu hồi phải có hiệu lực NGAY, không đợi JWT (8 giờ) hết hạn.
-const tok7 = await account("Admin bi ha quyen", "admin");
-const before7 = await call("GET","/admin/audit",null,tok7);
-await db.query("UPDATE entities SET role = 'holder' WHERE did = $1", [JSON.parse(Buffer.from(tok7.split(".")[1], "base64url")).did]);
-const after7 = await call("GET","/admin/audit",null,tok7);
-const ok7 = before7.status === 200 && after7.status === 403;
-console.log(`  ${ok7?"PASS":"FAIL"}  hạ quyền admin có hiệu lực ngay với token cũ  → trước ${before7.status}, sau ${after7.status}`);
+// V1 (13/11/2026): chỉ mục ghi "admin" nhưng chuỗi không công nhận — ví dụ quyền
+// bị thu hồi NGOÀI ứng dụng — thì kể cả tuyến CHỈ ĐỌC cũng phải chặn. Phép kiểm cũ
+// ở đây kỳ vọng `/admin/audit` trả 200 cho đúng tài khoản này làm tiền đề, tức là
+// khẳng định chính lỗ hổng: admin chỉ có trong CSDL đọc được nhật ký và toàn văn
+// văn bằng của mọi người. Thu hồi trong chỉ mục vẫn có hiệu lực ngay (requireRole
+// đọc CSDL mỗi yêu cầu) — nay thêm cả thu hồi trên chuỗi.
+const tok7 = await account("Admin chi trong chi muc", "admin");
+const audit7 = await call("GET","/admin/audit",null,tok7);
+const vc7 = await call("GET","/admin/credentials/urn:uuid:bat-ky",null,tok7);
+const ok7 = [audit7, vc7].every((r) => r.status === 403 && /chuỗi/i.test(r.data?.error ?? ""));
+console.log(`  ${ok7?"PASS":"FAIL"}  V1: admin chỉ có trong chỉ mục KHÔNG đọc được nhật ký / toàn văn văn bằng  → audit ${audit7.status}, văn bằng ${vc7.status}`);
 await db.end();
 
 const grant = await call("POST","/admin/authority/admins",{address,txHash:fakeTx},tok3);
-// Phải bị chặn vì KHÔNG phải root trên chuỗi — đọc cả thông điệp để chắc chắn
-// dừng đúng chỗ, chứ không phải tình cờ hỏng vì lý do khác.
-const ok3 = grant.status === 403 && /root/i.test(grant.data?.error ?? "");
+// Phải bị chặn vì chuỗi không công nhận — đọc cả thông điệp để chắc chắn dừng
+// đúng chỗ. Từ V1 (13/11/2026) rào đầu tiên là "admin đang hoạt động trên chuỗi"
+// áp cho MỌI tuyến admin, nên yêu cầu dừng ở đó, trước cả rào "chỉ root".
+const ok3 = grant.status === 403 && /admin đang hoạt động trên chuỗi/i.test(grant.data?.error ?? "");
 console.log(`  ${ok3?"PASS":"FAIL"}  VERIFY_ONCHAIN=true: admin trong chỉ mục KHÔNG cấp được quyền admin  → HTTP ${grant.status} "${grant.data?.error}"`);
 
 const approve = await call("POST","/admin/authority/issuers",{address,vcTypeMask:1,expiresAt:0,txHash:fakeTx},tok3);

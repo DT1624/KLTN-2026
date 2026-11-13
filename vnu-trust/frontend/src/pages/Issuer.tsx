@@ -6,8 +6,8 @@ import { useWallet } from "../hooks/useWallet";
 import { useChainTx, useMe } from "../hooks/useChain";
 import { canonicalize, signMessage, sha3_256Hex } from "../lib/wallet";
 import { ENTRY, bytesArg, hashArg, u64Arg, vcIdFromEvents } from "../lib/chain";
-import { ISSUABLE_VC_TYPES } from "../lib/constants";
-import { Card, StatusBadge, Alert, Spinner, Empty, Mono, Stat, Field } from "../components/ui";
+import { ISSUABLE_VC_TYPES, maskLabel } from "../lib/constants";
+import { Card, StatusBadge, Alert, Spinner, Empty, Mono, Stat, Field, Badge } from "../components/ui";
 import { TabBar, useTabs } from "../components/Tabs";
 import TxProgress from "../components/ChainTx";
 import GasPanel from "../components/GasPanel";
@@ -33,6 +33,8 @@ export default function Issuer() {
   const { active, select, visible } = useTabs([
     { id: "cap", label: "Cấp văn bằng" },
     { id: "da-cap", label: "Văn bằng đã cấp", count: stats.data?.total },
+    // Chỉ issuer có bit uỷ quyền (do root cấp) mới cấp được sub-issuer.
+    { id: "uy-quyen", label: "Uỷ quyền", hidden: !me.data?.onChain.canDelegate },
   ]);
 
   const on = me.data?.onChain;
@@ -92,6 +94,133 @@ export default function Issuer() {
         </>
       )}
       {active === "da-cap" && <IssuedList />}
+      {active === "uy-quyen" && <DelegationPanel />}
+    </div>
+  );
+}
+
+interface Delegation {
+  canDelegate: boolean;
+  delegableMask: number;
+  expiresAt: number;
+  subIssuers: { address: string; label: string | null; vcTypeMask: number; expiresAt: number; status: string }[];
+  source: string;
+}
+
+/**
+ * Cấp và quản lý sub-issuer qua uỷ quyền (approve_issuer do chính issuer ký).
+ *
+ * Luật do hợp đồng quyết định, giao diện chỉ dựng sẵn cho đúng:
+ *  - loại văn bằng của sub-issuer phải nằm trong phạm vi của mình, không có bit uỷ quyền;
+ *  - hạn không vượt hạn của mình (mình có hạn thì sub-issuer bắt buộc có hạn);
+ *  - chỉ cấp được cho địa chỉ chưa từng là issuer;
+ *  - kèm chứng thư uỷ quyền (CID + hash) — ghim lên IPFS trước khi ký.
+ * Sub-issuer mất quyền ngay khi quyền của mình bị tạm ngưng, thu hồi hay hết hạn (M-02).
+ */
+function DelegationPanel() {
+  const qc = useQueryClient();
+  const tx = useChainTx();
+  const { wallet } = useWallet();
+  const info = useQuery({ queryKey: ["issuer", "delegation"], queryFn: () => api.get<Delegation>("/issuer/delegation") });
+  const [address, setAddress] = useState("");
+  const [mask, setMask] = useState(0);
+  const [expiresAt, setExpiresAt] = useState("");
+  const [reason, setReason] = useState("");
+
+  if (info.isLoading) return <Spinner />;
+  if (!info.data) return <Alert tone="bad" title="Không đọc được quyền uỷ quyền">{String(info.error ?? "")}</Alert>;
+  const d = info.data;
+  const myExpiry = d.expiresAt;
+  const expiresUnix = expiresAt ? Math.floor(new Date(expiresAt).getTime() / 1000) : 0;
+  const expiryOk = myExpiry === 0 || (expiresUnix !== 0 && expiresUnix <= myExpiry);
+  const types = ISSUABLE_VC_TYPES.filter((t) => (d.delegableMask & t.bit) !== 0);
+
+  const approve = () =>
+    void tx.run({
+      fn: ENTRY.approveIssuer,
+      args: async () => {
+        const doc = {
+          type: "VNUDelegationCredential",
+          issuer: wallet?.did ?? "",
+          issuerAddress: wallet?.address ?? "",
+          subject: address.trim(),
+          vcTypeMask: mask,
+          expiresAt: expiresUnix,
+          approvedAt: new Date().toISOString(),
+        };
+        const { cid } = await api.post<{ cid: string }>("/ipfs/pin", { json: doc, name: `delegation-${address.trim().slice(0, 10)}` });
+        return [address.trim(), u64Arg(mask), bytesArg(cid), hashArg(sha3_256Hex(doc)), u64Arg(expiresUnix)];
+      },
+      index: async (out) => {
+        const r = await api.post("/issuer/sub-issuers", { address: address.trim(), vcTypeMask: mask, expiresAt: expiresUnix, txHash: out.hash });
+        setAddress(""); setMask(0); setExpiresAt("");
+        qc.invalidateQueries({ queryKey: ["issuer", "delegation"] });
+        return r;
+      },
+    });
+
+  const setStatus = (target: string, status: "suspended" | "revoked") =>
+    void tx.run({
+      fn: status === "suspended" ? ENTRY.suspendIssuer : ENTRY.revokeIssuer,
+      args: [target, bytesArg(reason.trim())],
+      index: async (out) => {
+        const r = await api.post(`/issuer/sub-issuers/${encodeURIComponent(target)}/status`, { status, reason: reason.trim(), txHash: out.hash });
+        setReason("");
+        qc.invalidateQueries({ queryKey: ["issuer", "delegation"] });
+        return r;
+      },
+    });
+
+  return (
+    <div className="space-y-6">
+      <Card title="Cấp sub-issuer"
+        subtitle={`Phạm vi được giao: ${maskLabel(d.delegableMask)} · Hạn của bạn: ${myExpiry === 0 ? "vĩnh viễn" : new Date(myExpiry * 1000).toLocaleString("vi-VN")}`}>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Địa chỉ ví sub-issuer (đã đăng ký DID, chưa từng là issuer)" value={address} onChange={setAddress} mono placeholder="0x…" />
+          <Field label={myExpiry === 0 ? "Hạn (để trống = vĩnh viễn)" : "Hạn (bắt buộc, không vượt hạn của bạn)"} value={expiresAt} type="datetime-local" onChange={setExpiresAt} />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-4">
+          {types.map((t) => (
+            <label key={t.bit} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={(mask & t.bit) !== 0} onChange={(e) => setMask(e.target.checked ? mask | t.bit : mask & ~t.bit)} />
+              {t.label}
+            </label>
+          ))}
+        </div>
+        {!expiryOk && <div className="mt-3"><Alert tone="warn" title="Hạn không hợp lệ">Sub-issuer không được có hạn dài hơn hạn uỷ quyền của bạn.</Alert></div>}
+        <button className="btn-primary mt-4" type="button"
+          disabled={tx.busy || mask === 0 || address.trim().length < 3 || !expiryOk} onClick={approve}>
+          Ký &amp; cấp sub-issuer
+        </button>
+      </Card>
+
+      <Card title="Sub-issuer do bạn cấp" subtitle="Bạn tạm ngưng hoặc thu hồi được; kích hoạt lại thì nhờ quản trị viên.">
+        {d.subIssuers.length === 0 ? <Empty title="Chưa cấp sub-issuer nào" /> : (
+          <>
+            <Field label="Lý do (bắt buộc khi tạm ngưng / thu hồi)" value={reason} onChange={setReason} placeholder="Hết hợp đồng cộng tác" />
+            <table className="w-full text-sm mt-4">
+              <thead><tr className="text-left text-ink-500"><th>Địa chỉ</th><th>Phạm vi</th><th>Hạn</th><th>Trạng thái</th><th /></tr></thead>
+              <tbody>
+                {d.subIssuers.map((s) => (
+                  <tr key={s.address} className="border-t border-ink-100">
+                    <td className="py-2"><Mono value={s.address} />{s.label && <div className="text-xs text-ink-500">{s.label}</div>}</td>
+                    <td>{maskLabel(s.vcTypeMask)}</td>
+                    <td>{s.expiresAt === 0 ? "Vĩnh viễn" : new Date(s.expiresAt * 1000).toLocaleDateString("vi-VN")}</td>
+                    <td><Badge tone={s.status === "active" ? "ok" : s.status === "suspended" ? "warn" : "muted"}>{s.status}</Badge></td>
+                    <td className="text-right space-x-2 whitespace-nowrap">
+                      <button className="btn-ghost" type="button" disabled={tx.busy || reason.trim().length < 2 || s.status !== "active"}
+                        onClick={() => setStatus(s.address, "suspended")}>Tạm ngưng</button>
+                      <button className="btn-danger" type="button" disabled={tx.busy || reason.trim().length < 2 || s.status === "revoked"}
+                        onClick={() => setStatus(s.address, "revoked")}>Thu hồi</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </Card>
+      <TxProgress tx={tx} okTitle="Đã cập nhật uỷ quyền" />
     </div>
   );
 }
@@ -152,7 +281,9 @@ function IssueCard() {
           throw new Error("Thời điểm hết hạn phải sau thời điểm cấp");
         }
         const pinned = await api.post<{ cid: string }>("/ipfs/pin", {
-          json: vc, name: `vc-${form.studentId || "vnu"}`,
+          // Tên pin trung tính: Pinata lưu tên này làm siêu dữ liệu công khai với
+          // chủ tài khoản — "vc-<MSSV>" từng làm lộ mã sinh viên (P-04).
+          json: vc, name: `vc-${vcId.slice(-12)}`,
         });
         cid = pinned.cid;
         return [

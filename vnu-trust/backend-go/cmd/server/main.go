@@ -73,6 +73,7 @@ func run() error {
 		burst = 1
 	}
 	limiter := middleware.NewRateLimiter(cfg.RateLimitPerMin, burst)
+	limiter.TrustProxyHops = cfg.TrustProxyHops
 	handler := middleware.SecurityHeaders(
 		middleware.CORS(cfg.FrontendOrigin,
 			middleware.Logger(limiter.Wrap(api.Routes()))))

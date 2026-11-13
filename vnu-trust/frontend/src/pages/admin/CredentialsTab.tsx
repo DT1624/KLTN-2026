@@ -31,10 +31,11 @@ export default function CredentialsTab() {
   const onChainId = vc?.on_chain_vc_id ?? null;
   const canSign = onChainId !== null && onChainId > 0;
 
-  const act = (kind: "revoke" | "reinstate") => {
+  const FN = { revoke: ENTRY.adminRevokeVc, suspend: ENTRY.adminSuspendVc, reinstate: ENTRY.adminReinstateVc };
+  const act = (kind: keyof typeof FN) => {
     if (!vc || !canSign) return;
     void tx.run({
-      fn: kind === "revoke" ? ENTRY.adminRevokeVc : ENTRY.adminReinstateVc,
+      fn: FN[kind],
       args: [u64Arg(onChainId!), bytesArg(reason.trim())],
       index: async (out) => {
         const r = await api.post(
@@ -102,12 +103,16 @@ export default function CredentialsTab() {
                 disabled={!canSign || reason.trim().length < 2 || tx.busy || vc.status === "revoked"}
                 onClick={() => act("revoke")}>Ký &amp; thu hồi</button>
               <button className="btn-ghost" type="button"
+                disabled={!canSign || reason.trim().length < 2 || tx.busy || vc.status !== "active"}
+                onClick={() => act("suspend")}>Ký &amp; tạm ngưng</button>
+              <button className="btn-ghost" type="button"
                 disabled={!canSign || reason.trim().length < 2 || tx.busy || vc.status !== "suspended"}
                 onClick={() => act("reinstate")}>Ký &amp; kích hoạt lại</button>
             </div>
             <p className="text-xs text-ink-400">
               Thu hồi là vĩnh viễn — hợp đồng không cho đổi trạng thái của văn bằng đã thu hồi.
-              Chỉ kích hoạt lại được văn bằng đang tạm ngưng.
+              Tạm ngưng chỉ áp dụng cho văn bằng đang hiệu lực, và chỉ admin kích hoạt lại được.
+              Văn bằng đã hết hạn chỉ còn thu hồi được.
             </p>
           </div>
 

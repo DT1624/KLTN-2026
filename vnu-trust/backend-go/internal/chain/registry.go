@@ -20,6 +20,16 @@ func (c *Client) EntryAdminRevokeVC() string {
 func (c *Client) EntryAdminReinstateVC() string {
 	return c.Module("vc_registry") + "::admin_reinstate_vc"
 }
+func (c *Client) EntryAdminSuspendVC() string {
+	return c.Module("vc_registry") + "::admin_suspend_vc"
+}
+
+// Admin kiểm duyệt DID — nằm ở module authority vì cần kiểm quyền admin.
+func (c *Client) EntryAdminSuspendDID() string { return c.Module("authority") + "::admin_suspend_did" }
+func (c *Client) EntryAdminReactivateDID() string {
+	return c.Module("authority") + "::admin_reactivate_did"
+}
+func (c *Client) EntryAdminRevokeDID() string { return c.Module("authority") + "::admin_revoke_did" }
 
 // Quản trị quyền hạn. Tên phải khớp từng chữ với backend TypeScript
 // (backend/src/chain/abi.ts), nếu không cùng một giao dịch sẽ được một bên
@@ -211,6 +221,32 @@ func (c *Client) CanDelegate(ctx context.Context, a string) bool {
 		return c.offline.isAdmin(ctx, a)
 	}
 	return c.boolView(ctx, c.Module("authority")+"::can_delegate", a)
+}
+
+// GetDelegator trả issuer cha đã cấp issuer này qua uỷ quyền, hoặc "" nếu do
+// root/admin cấp. Chế độ offline không biết quan hệ uỷ quyền (chỉ có trên chuỗi)
+// nên trả "" — không ai được coi là cha, thay vì đoán bừa.
+func (c *Client) GetDelegator(ctx context.Context, issuer string) string {
+	if c.offline != nil {
+		return ""
+	}
+	addr, err := NormalizeAddress(issuer)
+	if err != nil {
+		return ""
+	}
+	raw := c.ViewOrNil(ctx, c.Module("authority")+"::get_delegator", addr)
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw[0], &s) != nil {
+		return ""
+	}
+	parent, err := NormalizeAddress(s)
+	if err != nil || parent == NoPendingRoot {
+		return ""
+	}
+	return parent
 }
 
 // PendingRoot trả địa chỉ đang được đề cử làm root nhưng chưa ký nhận.

@@ -1,10 +1,11 @@
 import { query, queryOne } from "../db/pool.js";
-import { badRequest, forbidden } from "../utils/errors.js";
-import { verifyTransaction, normalizeAddress } from "../chain/client.js";
+import { badRequest, conflict, forbidden } from "../utils/errors.js";
+import { verifyTransaction, normalizeAddress, type ArgSpec } from "../chain/client.js";
+import { utf8ToHex } from "../chain/registry.js";
 import { ENTRY } from "../chain/abi.js";
 import {
   getRootAdmin, getPendingRoot, getRoleInfo, isActiveAdmin, isActiveIssuer,
-  canDelegate, liveCounts,
+  canDelegate, liveCounts, getDelegator, resolveDidByOwner,
 } from "../chain/registry.js";
 import { OFFLINE } from "../chain/offline.js";
 import { getByAddress } from "./entity.service.js";
@@ -66,6 +67,39 @@ async function syncAppRole(address: string, role: Role): Promise<Role | null> {
   return row?.role ?? null;
 }
 
+/**
+ * Chống phát lại: sau khi giao dịch đã xác minh, trạng thái vai trò HIỆN TẠI trên
+ * chuỗi phải đúng là trạng thái sắp ghi. Một giao dịch có thật nhưng cũ (vd.
+ * revoke_issuer trước lần issuer được cấp lại) qua được mọi phép kiểm giao dịch,
+ * và nếu không có bước này thì hạ được vai trò của người đang hoạt động trong chỉ mục.
+ * Chế độ offline không có giao dịch nào để phát lại nên bỏ qua.
+ */
+function expectRoleStatus(target: string, status: "active" | "suspended" | "revoked", mask?: number) {
+  return async (): Promise<void> => {
+    if (OFFLINE) return;
+    const info = await getRoleInfo(target);
+    if (!info || info.status !== status || (mask !== undefined && info.vcTypeMask !== mask)) {
+      throw conflict(
+        `Trên chuỗi vai trò của địa chỉ này đang "${info?.status ?? "không có"}", không khớp thao tác — giao dịch đã cũ`,
+      );
+    }
+  };
+}
+
+/**
+ * Chế độ offline không có contract để chặn xung đột vai trò (M-04, R-05), nên
+ * phải chặn ở đây: mỗi địa chỉ giữ tối đa MỘT vai trò. Khi nối chuỗi thì contract
+ * đã chặn — giao dịch vi phạm không bao giờ thành công để mà có txHash.
+ */
+async function assertNoRoleConflictOffline(target: string, wanted: "admin" | "issuer"): Promise<void> {
+  if (!OFFLINE) return;
+  const role = (await getByAddress(normalizeAddress(target)))?.role;
+  if (role === "root") throw conflict("Root không được giữ thêm vai trò admin hay issuer");
+  if (wanted === "admin" && role === "issuer") throw conflict("Địa chỉ đang là issuer — thu hồi quyền issuer trước");
+  if (wanted === "issuer" && role === "admin") throw conflict("Địa chỉ đang là admin — thu hồi quyền admin trước");
+  if (role === wanted) throw conflict(`Địa chỉ đã là ${wanted}`);
+}
+
 async function applyAuthorityTx(opts: {
   actor: EntityRow;
   target: string;
@@ -74,13 +108,24 @@ async function applyAuthorityTx(opts: {
   newRole: Role | null;
   auditAction: AuditAction;
   detail: Record<string, unknown>;
+  /**
+   * Tham số giao dịch phải khớp (S-02). Mặc định: tham số đầu là địa chỉ đích.
+   * Thiếu bước này thì một giao dịch approve_issuer thật phong được issuer cho
+   * địa chỉ BẤT KỲ, và dùng lại được bao nhiêu lần cũng được.
+   */
+  args?: ArgSpec[];
+  /** Kiểm thêm sau khi giao dịch đã xác minh, trước khi đổi chỉ mục. */
+  beforeSync?: () => Promise<void>;
 }): Promise<AuthorityActionResult> {
   const target = normalizeAddress(opts.target);
 
   await verifyTransaction(opts.txHash, {
     expectedFunction: opts.expectedFunction,
     expectedSender: opts.actor.address,
+    args: opts.args ?? [{ address: target }],
   });
+
+  if (opts.beforeSync) await opts.beforeSync();
 
   const entity = await getByAddress(target);
   const appRole = opts.newRole ? await syncAppRole(target, opts.newRole) : (entity?.role ?? null);
@@ -104,6 +149,7 @@ export async function grantAdmin(
   txHash: string,
 ): Promise<AuthorityActionResult> {
   await assertRootAuthority(actor);
+  await assertNoRoleConflictOffline(target, "admin");
   return applyAuthorityTx({
     actor,
     target,
@@ -112,6 +158,7 @@ export async function grantAdmin(
     newRole: "admin",
     auditAction: "authority.grant_admin",
     detail: {},
+    beforeSync: expectRoleStatus(target, "active"),
   });
 }
 
@@ -134,6 +181,7 @@ export async function revokeAdmin(
     newRole: "holder",
     auditAction: "authority.revoke_admin",
     detail: { reason },
+    beforeSync: expectRoleStatus(target, "revoked"),
   });
 }
 
@@ -148,6 +196,7 @@ export async function approveIssuer(
   if (expiresAt !== 0 && expiresAt * 1000 <= Date.now()) {
     throw badRequest("Thời điểm hết hạn phải ở tương lai (0 = vĩnh viễn)");
   }
+  await assertNoRoleConflictOffline(target, "issuer");
   return applyAuthorityTx({
     actor,
     target,
@@ -156,6 +205,8 @@ export async function approveIssuer(
     newRole: "issuer",
     auditAction: "authority.approve_issuer",
     detail: { vcTypeMask, expiresAt },
+    args: [{ address: target }, { u64: vcTypeMask }, null, null, { u64: expiresAt }],
+    beforeSync: expectRoleStatus(target, "active", vcTypeMask),
   });
 }
 
@@ -183,7 +234,146 @@ export async function setIssuerStatus(
     newRole: next === "revoked" ? "holder" : null,
     auditAction: `authority.issuer_${next}` as AuditAction,
     detail: { reason },
+    beforeSync: expectRoleStatus(target, next),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Uỷ quyền: issuer có bit VC_DELEGATION cấp và quản lý sub-issuer (M-02, R-04)
+// ---------------------------------------------------------------------------
+
+/** Mask nằm trọn trong 6 bit đã định nghĩa; bit 32 = uỷ quyền, chỉ root cấp. */
+const DELEGATION_BIT = 32;
+
+/**
+ * Issuer uỷ quyền cấp sub-issuer. Contract quyết định toàn bộ luật (mask con ⊆
+ * mask cha, không có bit uỷ quyền, hạn không vượt hạn cha, địa chỉ chưa từng là
+ * issuer); backend chỉ chặn sớm những gì rẻ và xác minh giao dịch.
+ * Chế độ offline không biết bit uỷ quyền (chỉ có trên chuỗi) nên từ chối thẳng.
+ */
+export async function approveSubIssuer(
+  actor: EntityRow,
+  target: string,
+  vcTypeMask: number,
+  expiresAt: number,
+  txHash: string,
+): Promise<AuthorityActionResult> {
+  if (OFFLINE) throw forbidden("Chế độ không nối chuỗi không xác định được quyền uỷ quyền");
+  if ((vcTypeMask & DELEGATION_BIT) !== 0) throw badRequest("Sub-issuer không được nhận bit uỷ quyền");
+  if (!(await canDelegate(actor.address))) {
+    throw forbidden("Quyền issuer của bạn không có bit uỷ quyền, hoặc đã hết hiệu lực");
+  }
+  return approveIssuer(actor, target, vcTypeMask, expiresAt, txHash);
+}
+
+/**
+ * Issuer cha tạm ngưng / thu hồi sub-issuer do CHÍNH MÌNH cấp. Không kích hoạt
+ * lại được — tự ngưng rồi tự bật là né kiểm soát; việc đó để admin.
+ */
+export async function setSubIssuerStatus(
+  actor: EntityRow,
+  target: string,
+  next: "suspended" | "revoked",
+  reason: string,
+  txHash: string,
+): Promise<AuthorityActionResult> {
+  if (OFFLINE) throw forbidden("Chế độ không nối chuỗi không xác định được quan hệ uỷ quyền");
+  const parent = await getDelegator(target);
+  if (parent !== normalizeAddress(actor.address)) {
+    throw forbidden("Địa chỉ này không phải sub-issuer do bạn cấp");
+  }
+  return setIssuerStatus(actor, target, next, reason, txHash);
+}
+
+/**
+ * Sub-issuer do issuer này đã cấp, đọc từ nhật ký kiểm toán (chuỗi không có view
+ * liệt kê theo cha). Trạng thái hiện hành đọc lại từ chuỗi cho từng địa chỉ.
+ */
+export async function delegationSnapshot(actor: EntityRow) {
+  const me = normalizeAddress(actor.address);
+  const [allowed, info] = await Promise.all([canDelegate(me), getRoleInfo(me)]);
+  const rows = await query<{ target: string }>(
+    `SELECT DISTINCT target FROM audit_log
+      WHERE actor = $1 AND action = 'authority.approve_issuer' AND target IS NOT NULL`,
+    [me],
+  );
+  const subIssuers = [];
+  for (const { target } of rows) {
+    if ((await getDelegator(target)) !== me) continue; // đã được root/admin cấp lại
+    const [role, entity] = await Promise.all([getRoleInfo(target), getByAddress(target)]);
+    subIssuers.push({
+      address: target,
+      label: entity?.label ?? null,
+      vcTypeMask: role?.vcTypeMask ?? 0,
+      expiresAt: role?.expiresAt ?? 0,
+      status: role?.status ?? "unknown",
+    });
+  }
+  return {
+    canDelegate: allowed,
+    /** Bit loại văn bằng được phép giao cho sub-issuer (mask của mình, bỏ bit uỷ quyền). */
+    delegableMask: (info?.vcTypeMask ?? 0) & ~DELEGATION_BIT,
+    /** Hạn của mình; sub-issuer không được sống lâu hơn (0 = vĩnh viễn). */
+    expiresAt: info?.expiresAt ?? 0,
+    subIssuers,
+    source: OFFLINE ? "db-index" : "chain",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Admin kiểm duyệt DID (M-01, M-08)
+// ---------------------------------------------------------------------------
+
+const DID_MODERATION = {
+  suspended: { fn: ENTRY.adminSuspendDid, action: "did.suspend" },
+  active: { fn: ENTRY.adminReactivateDid, action: "did.reactivate" },
+  revoked: { fn: ENTRY.adminRevokeDid, action: "did.revoke" },
+} as const;
+
+/**
+ * Admin khoá / mở / thu hồi DID của một địa chỉ. Thu hồi DID trên chuỗi thu hồi
+ * luôn vai trò admin/issuer của địa chỉ đó (M-01), nên chỉ mục hạ vai trò về
+ * holder cho khớp. Admin thường không được đụng DID của root hay admin khác.
+ */
+export async function moderateDid(
+  actor: EntityRow,
+  target: string,
+  next: "suspended" | "active" | "revoked",
+  reason: string,
+  txHash: string,
+) {
+  const addr = normalizeAddress(target);
+  const entity = await getByAddress(addr);
+  if (OFFLINE) {
+    if (entity?.role === "root") throw forbidden("Không được tác động lên DID của root");
+    if (actor.role !== "root" && entity?.role === "admin") {
+      throw forbidden("Chỉ root mới tác động được lên DID của admin khác");
+    }
+  }
+  const { fn, action } = DID_MODERATION[next];
+  await verifyTransaction(txHash, {
+    expectedFunction: fn,
+    expectedSender: actor.address,
+    args: [{ address: addr }, { bytes: utf8ToHex(reason) }],
+  });
+  // Chống phát lại: DID trên chuỗi hiện tại phải đúng trạng thái sắp ghi.
+  if (!OFFLINE) {
+    const onChain = await resolveDidByOwner(addr);
+    if (!onChain || onChain.status !== next) {
+      throw conflict(`Trên chuỗi DID đang "${onChain?.status ?? "không có"}", không khớp thao tác — giao dịch đã cũ`);
+    }
+  }
+  await query(
+    `UPDATE did_documents d SET status = $2, updated_at = now()
+       FROM entities e WHERE e.id = d.entity_id AND e.address = $1 AND d.status <> 'revoked'`,
+    [addr, next],
+  );
+  let appRole = entity?.role ?? null;
+  if (next === "revoked" && (appRole === "admin" || appRole === "issuer")) {
+    appRole = await syncAppRole(addr, "holder");
+  }
+  await record(actor.address, action, addr, { reason, txHash });
+  return { address: addr, txHash, status: next, appRole, notRegisteredInApp: entity === null };
 }
 
 export async function proposeRoot(
@@ -227,13 +417,26 @@ export async function acceptRoot(actor: EntityRow, txHash: string): Promise<Auth
     newRole: "root",
     auditAction: "authority.accept_root",
     detail: {},
+    args: [],
+    // accept_root không có tham số nên giao dịch CŨ cũng hợp lệ: root trước đây
+    // đem hash accept_root của mình gửi lại là giành lại "root" trong chỉ mục
+    // và hạ root thật xuống admin. Phải hỏi chuỗi: root HIỆN TẠI là ai.
+    beforeSync: async () => {
+      if (OFFLINE) return;
+      const root = await getRootAdmin();
+      if (!root || normalizeAddress(root) !== normalizeAddress(actor.address)) {
+        throw forbidden("Trên chuỗi, tài khoản này hiện không phải root_admin — giao dịch accept_root đã cũ");
+      }
+    },
   });
 
   // Chỉ có MỘT root. Chuỗi chỉ giữ đúng một `root_admin`, nên để hai hàng
-  // role='root' trong chỉ mục là nói dối về chính thứ vừa thay đổi. Root cũ
-  // xuống admin — họ vẫn là người có thẩm quyền, chỉ không còn là gốc.
+  // role='root' trong chỉ mục là nói dối về chính thứ vừa thay đổi. Root cũ về
+  // holder: trên chuỗi họ KHÔNG có bản ghi admin nào (chuyển root không cấp quyền
+  // admin cho root cũ). Trước đây chỉ mục ghi "admin" — ở chế độ offline điều đó
+  // còn để root cũ giữ nguyên quyền quản trị.
   await query(
-    "UPDATE entities SET role = 'admin', updated_at = now() WHERE role = 'root' AND address <> $1",
+    "UPDATE entities SET role = 'holder', updated_at = now() WHERE role = 'root' AND address <> $1",
     [normalizeAddress(actor.address)],
   );
 
@@ -253,6 +456,7 @@ export async function cancelRootTransfer(
     newRole: null,
     auditAction: "authority.cancel_root_transfer",
     detail: {},
+    args: [],
   });
 }
 

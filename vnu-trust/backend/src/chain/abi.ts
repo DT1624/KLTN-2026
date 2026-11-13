@@ -43,6 +43,7 @@ export const ENTRY = {
   issueVc: `${MODULE.vcRegistry}::issue_vc`,
   revokeVc: `${MODULE.vcRegistry}::revoke_vc`,
   suspendVc: `${MODULE.vcRegistry}::suspend_vc`,
+  adminSuspendVc: `${MODULE.vcRegistry}::admin_suspend_vc`,
   adminRevokeVc: `${MODULE.vcRegistry}::admin_revoke_vc`,
   adminReinstateVc: `${MODULE.vcRegistry}::admin_reinstate_vc`,
 } as const;
@@ -59,6 +60,8 @@ export const VIEW = {
   getRootAdmin: `${MODULE.authority}::get_root_admin`,
   getPendingRoot: `${MODULE.authority}::get_pending_root`,
   getInfo: `${MODULE.authority}::get_info`,
+  /** Issuer cha của một sub-issuer; @0x0 nếu không được cấp qua uỷ quyền. */
+  getDelegator: `${MODULE.authority}::get_delegator`,
   authorityStats: `${MODULE.authority}::stats`,
   getRolesPaginated: `${MODULE.authority}::get_roles_paginated`,
 

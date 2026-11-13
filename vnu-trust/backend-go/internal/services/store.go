@@ -90,11 +90,13 @@ func (s *Store) UpdateEntityRole(ctx context.Context, address, role string) (str
 	return out, nil
 }
 
-// DemoteOtherRoots hạ mọi hàng role='root' khác xuống 'admin'. Chuỗi chỉ giữ
-// đúng một root_admin nên chỉ mục cũng chỉ được có một root.
+// DemoteOtherRoots hạ mọi hàng role='root' khác xuống 'holder'. Chuỗi chỉ giữ
+// đúng một root_admin nên chỉ mục cũng chỉ được có một root. Root cũ về holder
+// vì trên chuỗi họ KHÔNG có bản ghi admin nào — trước đây chỉ mục ghi "admin",
+// và ở chế độ offline điều đó để root cũ giữ nguyên quyền quản trị.
 func (s *Store) DemoteOtherRoots(ctx context.Context, keep string) error {
 	_, err := s.DB.Pool.Exec(ctx,
-		`UPDATE entities SET role = 'admin', updated_at = now()
+		`UPDATE entities SET role = 'holder', updated_at = now()
 		  WHERE role = 'root' AND address <> $1`, keep)
 	return err
 }
@@ -169,4 +171,36 @@ func (s *Store) PurgeExpiredChallenges(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return tag.RowsAffected(), nil
+}
+
+// AuditTargets trả các đích (không trùng) của một hành động do một người thực
+// hiện, đọc từ nhật ký kiểm toán. Dùng để liệt kê sub-issuer mà issuer đã cấp,
+// vì chuỗi không có view liệt kê theo cha.
+func (s *Store) AuditTargets(ctx context.Context, actor, action string) ([]string, error) {
+	rows, err := s.DB.Pool.Query(ctx,
+		`SELECT DISTINCT target FROM audit_log
+		  WHERE actor = $1 AND action = $2 AND target IS NOT NULL`, actor, action)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// SetDIDStatusByAddress đổi trạng thái DID hiện hành (chưa bị thu hồi) của một
+// địa chỉ trong chỉ mục, sau khi giao dịch kiểm duyệt của admin đã xác minh.
+func (s *Store) SetDIDStatusByAddress(ctx context.Context, address, status string) error {
+	_, err := s.DB.Pool.Exec(ctx,
+		`UPDATE did_documents d SET status = $2, updated_at = now()
+		   FROM entities e
+		  WHERE e.id = d.entity_id AND e.address = $1 AND d.status <> 'revoked'`, address, status)
+	return err
 }

@@ -8,7 +8,7 @@
 
 echo "Dừng dịch vụ…"
 for s in "$RUN"/*.pid; do [ -e "$s" ] && stop_svc "$(basename "$s" .pid)" && ok "đã dừng $(basename "$s" .pid)"; done
-for p in 5173 4000 4001 4010 4011 4097 4098; do stop_port "$p" && ok "đã giải phóng cổng $p"; done
+for p in 5173 4000 4001 4010 4011 4095 4096 4097 4098; do stop_port "$p" && ok "đã giải phóng cổng $p"; done
 # Lượt kiểm thử bị ngắt giữa chừng có thể để sót CSDL tạm.
 psql_c -d postgres -c "DROP DATABASE IF EXISTS vnu_trust_test WITH (FORCE)" >/dev/null 2>&1
 if docker ps -q --filter name=$PG_CONTAINER | grep -q .; then

@@ -250,7 +250,11 @@ func (a *API) VerifyAndRecord(w http.ResponseWriter, r *http.Request) error {
 
 func (a *API) VerifyHistory(w http.ResponseWriter, r *http.Request) error {
 	c := middleware.ClaimsFrom(r.Context())
-	rows, err := a.Store.VerificationHistory(r.Context(), c.Address, queryInt(r, "limit", 50, 1, 200))
+	limit, err := queryInt(r, "limit", 50, 1, 200)
+	if err != nil {
+		return err
+	}
+	rows, err := a.Store.VerificationHistory(r.Context(), c.Address, limit)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"math"
 	"net/http"
 
 	"github.com/vnu-trust/backend-go/internal/httpx"
@@ -48,8 +49,15 @@ func (a *API) AdminAnalytics(w http.ResponseWriter, r *http.Request) error {
 
 func (a *API) listRoleWithChain(role string) httpx.Handler {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		rows, err := a.Store.ListEntitiesByRole(r.Context(),
-			role, queryInt(r, "limit", 20, 1, 100), queryInt(r, "offset", 0, 0, 1<<20))
+		limit, err := queryInt(r, "limit", 20, 1, 100)
+		if err != nil {
+			return err
+		}
+		offset, err := queryInt(r, "offset", 0, 0, math.MaxInt32)
+		if err != nil {
+			return err
+		}
+		rows, err := a.Store.ListEntitiesByRole(r.Context(), role, limit, offset)
 		if err != nil {
 			return err
 		}
@@ -89,8 +97,14 @@ func (a *API) AdminCheckAddress(w http.ResponseWriter, r *http.Request) error {
 // ở backend TypeScript — thiếu ở Go là một lệch thật mà bộ parity chưa chạm tới
 // vì nó đối chiếu bằng tài khoản holder.
 func (a *API) AdminAudit(w http.ResponseWriter, r *http.Request) error {
-	limit := queryInt(r, "limit", 20, 1, 100)
-	offset := queryInt(r, "offset", 0, 0, 1_000_000)
+	limit, err := queryInt(r, "limit", 20, 1, 100)
+	if err != nil {
+		return err
+	}
+	offset, err := queryInt(r, "offset", 0, 0, math.MaxInt32)
+	if err != nil {
+		return err
+	}
 	rows, err := a.Store.AuditList(r.Context(), limit, offset)
 	if err != nil {
 		return err

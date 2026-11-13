@@ -16,7 +16,9 @@ export default function Verify() {
   const preview = useQuery({
     queryKey: ["share", routeToken],
     queryFn: () => api.get<{ vpId: string; holderDid: string; expiresAt: string; vcIds: string[] }>(
-      `/verify/share/${routeToken}`),
+      // Mã hoá: liên kết kiểu /verify/..%2F..%2Fadmin%2Faudit từng khiến trình duyệt
+      // gửi kèm token của người đang đăng nhập sang tuyến khác (W-08).
+      `/verify/share/${encodeURIComponent(routeToken ?? "")}`),
     enabled: Boolean(routeToken),
     retry: false,
   });
@@ -25,7 +27,7 @@ export default function Verify() {
     mutationFn: (t: string) => {
       // Đăng nhập với vai trò xác minh thì lưu vào lịch sử, không thì chỉ kiểm tra.
       const canRecord = wallet && ["verifier", "admin", "root"].includes(wallet.role);
-      return api.post<VerificationReport>(`/verify/share/${t}${canRecord ? "/record" : ""}`);
+      return api.post<VerificationReport>(`/verify/share/${encodeURIComponent(t.trim())}${canRecord ? "/record" : ""}`);
     },
     onSuccess: (r) => { setReport(r); setErr(""); },
     onError: (e) => { setErr((e as Error).message); setReport(null); },

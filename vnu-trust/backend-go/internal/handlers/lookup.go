@@ -37,12 +37,23 @@ func (a *API) Lookup(w http.ResponseWriter, r *http.Request) error {
 		return nil
 
 	case reLookupCID.MatchString(q):
+		// Chỉ trả nội dung khi CID là DID Document đã ghi nhận. Nội dung văn bằng
+		// là dữ liệu cá nhân, mà CID của mọi văn bằng nằm công khai trên chuỗi (S-03).
+		isDidDoc, err := a.Store.IsDIDDocumentCID(r.Context(), q)
+		if err != nil {
+			return err
+		}
+		if !isDidDoc {
+			httpx.OK(w, http.StatusOK, map[string]any{
+				"kind": "cid", "result": map[string]any{"cid": q, "content": nil, "private": true}})
+			return nil
+		}
 		content, err := a.IPFS.FetchJSON(r.Context(), q)
 		if err != nil {
 			return err
 		}
 		httpx.OK(w, http.StatusOK, map[string]any{
-			"kind": "cid", "result": map[string]any{"cid": q, "content": content}})
+			"kind": "cid", "result": map[string]any{"cid": q, "content": content, "private": false}})
 		return nil
 
 	case strings.HasPrefix(strings.ToLower(q), "urn:uuid:"):

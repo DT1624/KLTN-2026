@@ -22,6 +22,7 @@
  */
 import { ed25519 } from "@noble/curves/ed25519";
 import { canonicalize, sha3_256Hex, type UnlockedWallet } from "./wallet";
+import { hexToBytes, signingMessage } from "./bcs";
 
 // ---------- Cấu hình ----------
 
@@ -78,11 +79,11 @@ export const ENTRY = {
   issueVc: `${MODULE.vcRegistry}::issue_vc`,
   suspendVc: `${MODULE.vcRegistry}::suspend_vc`,
   revokeVc: `${MODULE.vcRegistry}::revoke_vc`,
-  // Cố ý KHÔNG khai `admin_suspend_vc`: backend xác minh giao dịch tạm ngưng
-  // bằng tên `suspend_vc` nên gửi hàm kia thì chuỗi nhận mà backend từ chối ghi
-  // chỉ mục. Tạm ngưng là việc của đơn vị cấp bằng; admin chỉ thu hồi và kích
-  // hoạt lại. (`scripts/abi-check.mjs` bắt đúng chỗ lệch này.)
+  // Admin dùng bộ `admin_*`, đơn vị cấp bằng dùng `suspend_vc` / `revoke_vc`.
+  // Backend chọn hàm kỳ vọng theo vai trò người gửi (admin → admin_*), nên hai
+  // bên phải khai cùng tên — `scripts/abi-check.mjs` bắt chỗ lệch.
   adminReinstateVc: `${MODULE.vcRegistry}::admin_reinstate_vc`,
+  adminSuspendVc: `${MODULE.vcRegistry}::admin_suspend_vc`,
   adminRevokeVc: `${MODULE.vcRegistry}::admin_revoke_vc`,
 } as const;
 
@@ -314,7 +315,16 @@ export async function submitEntry(
     jsonPost(tx),
   );
   phase("signing");
+  // Ví TỰ dựng lại thông điệp và so từng byte với bản fullnode trả về (W-01).
+  // Lệch là fullnode muốn ví ký một giao dịch khác thứ người dùng vừa bấm.
   const toSign = hexToBytes(message);
+  const mine = signingMessage(tx, CHAIN.chainId);
+  if (toHex(mine) !== toHex(toSign)) {
+    throw new ChainError(
+      "Fullnode trả về thông điệp ký KHÔNG khớp giao dịch đang gửi — ví đã từ chối ký. Kiểm tra lại VITE_CHAIN_FULLNODE.",
+    );
+  }
+  assertUnlocked(wallet);
   const signature = ed25519.sign(toSign, wallet.keyPair.privateKey);
 
   const pending = await node<{ hash: string }>(
@@ -390,36 +400,85 @@ function signLocally(wallet: UnlockedWallet, fn: string, args: unknown[]): TxOut
   };
 }
 
-function hexToBytes(h: string): Uint8Array {
-  const c = h.replace(/^0x/, "");
-  const out = new Uint8Array(c.length / 2);
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(c.slice(i * 2, i * 2 + 2), 16);
-  return out;
+/** Khoá riêng bị ghi đè bằng 0 khi ví khoá (useWallet.lock) — đừng ký bằng nó. */
+function assertUnlocked(wallet: UnlockedWallet): void {
+  if (wallet.keyPair.privateKey.every((b) => b === 0)) throw new ChainError("Ví đã khoá — mở lại ví rồi thử lại.");
 }
 
 /**
  * Mã abort của Move chẳng nói gì với người dùng cuối. Dịch những mã hay gặp
  * sang câu tiếng Việt nói đúng việc phải làm; giữ nguyên phần gốc để còn tra.
  */
-function readableVmStatus(raw: string): string {
+export function readableVmStatus(raw: string): string {
+  const code = moveAbortCode(raw);
+  if (code !== null && ABORT_MESSAGES[code]) return `${ABORT_MESSAGES[code]} (${raw})`;
   const table: [RegExp, string][] = [
-    [/NOT_ROOT_ADMIN|0x1f4\b/i, "Chỉ tài khoản root mới gọi được hàm này"],
-    [/ADMIN_NOT_ACTIVE/i, "Địa chỉ này không phải admin đang hoạt động"],
-    [/ISSUER_NOT_ACTIVE|NOT_ACTIVE_ISSUER/i, "Quyền issuer chưa được cấp hoặc đã hết hiệu lực"],
-    [/OWNER_NOT_EXISTS|DID_NOT_FOUND/i, "Địa chỉ này chưa đăng ký DID trên chuỗi"],
-    [/DID_NOT_ACTIVE/i, "DID của địa chỉ này đang không hoạt động"],
-    [/ALREADY_EXISTS/i, "Bản ghi đã tồn tại trên chuỗi"],
-    [/UNAUTHORIZED_VC_TYPE|0x3f5\b/i, "Loại văn bằng vượt quá phạm vi được uỷ quyền"],
-    [/PROTECTED_TARGET|0x3fa\b/i, "Không được tác động lên DID của root hoặc admin khác"],
-    [/DID_NOT_BOUND_TO_OWNER|0x7db\b/i, "Chuỗi DID phải kết thúc bằng chính địa chỉ ví của bạn"],
-    [/OWNER_LOCKED|0x7dc\b/i, "DID do chính chủ tự khoá — chỉ chủ sở hữu mở lại được"],
-    [/SELF_ISSUE|0xbc2\b/i, "Đơn vị cấp không được tự cấp văn bằng cho chính mình"],
     [/INSUFFICIENT_BALANCE|OUT_OF_GAS/i, "Không đủ gas — bấm “Nhận token” rồi thử lại"],
     [/SEQUENCE_NUMBER_TOO_OLD/i, "Số thứ tự giao dịch đã cũ — thử lại"],
   ];
   for (const [re, msg] of table) if (re.test(raw)) return `${msg} (${raw})`;
   return raw;
 }
+
+/**
+ * Bắt theo MÃ chứ không theo tên: hằng số lỗi nằm ở `vnu::errors` còn lệnh
+ * abort chạy ở module khác, nên `vm_status` không chắc có kèm tên. Bảng cũ
+ * bắt theo tên và ghi nhầm mã root là 0x1f4 (= 500) thay vì 0x3e9 (= 1001).
+ * Chỉ nhận abort từ ba module của gói để mã trùng số của framework không bị
+ * dịch nhầm.
+ */
+export function moveAbortCode(raw: string): number | null {
+  const m = raw.match(/::(?:authority|did_registry|vc_registry)\b[^:]*:\s*(?:[A-Za-z_]+\()?0x([0-9a-f]+)\b/i);
+  return m?.[1] ? parseInt(m[1], 16) : null;
+}
+
+/** Đối chiếu với `contracts/sources/utils/errors.move` — đổi mã ở đó thì đổi ở đây. */
+export const ABORT_MESSAGES: Record<number, string> = {
+  1001: "Chỉ tài khoản root mới gọi được hàm này",
+  1002: "Địa chỉ này không phải admin",
+  1003: "Địa chỉ này đã là admin",
+  1004: "Địa chỉ này đã là đơn vị cấp bằng",
+  1005: "Địa chỉ này không phải đơn vị cấp bằng",
+  1006: "Quyền cấp bằng đang không hoạt động (bị tạm ngưng hoặc thu hồi)",
+  1008: "Quyền cấp bằng đã bị thu hồi — phải phê duyệt lại",
+  1009: "Admin này đã bị thu hồi",
+  1010: "Địa chỉ này không phải admin đang hoạt động",
+  1011: "Không có quyền thực hiện thao tác này",
+  1012: "Quyền cấp bằng đã hết hạn, hoặc hạn yêu cầu vượt hạn của người uỷ quyền",
+  1013: "Loại văn bằng vượt quá phạm vi được uỷ quyền",
+  1014: "Không có đề cử root nào đang chờ",
+  1015: "Ví này không phải địa chỉ đang được đề cử làm root",
+  1016: "Một địa chỉ không được vừa là admin vừa là đơn vị cấp bằng",
+  1017: "Quyền cấp bằng này không có bit uỷ quyền",
+  1018: "Không được tác động lên DID của root hoặc admin khác",
+  1019: "Đơn vị uỷ quyền cho bạn không còn hiệu lực — liên hệ admin",
+  1020: "Loại văn bằng không hợp lệ: mỗi văn bằng đúng một loại, phạm vi quyền phải khác rỗng",
+  1021: "Không thể đề cử địa chỉ này làm root",
+  2001: "Chuỗi DID này đã được đăng ký",
+  2002: "Không tìm thấy DID",
+  2003: "DID của địa chỉ này đang không hoạt động",
+  2004: "DID không ở trạng thái tạm ngưng",
+  2005: "DID đã bị thu hồi",
+  2006: "Địa chỉ này chưa đăng ký DID trên chuỗi",
+  2007: "Địa chỉ này đã có DID",
+  2008: "CID không hợp lệ",
+  2009: "Phiên bản DID đã thay đổi — tải lại rồi thử lại",
+  2010: "DID không do chính bạn tạm ngưng — phải nhờ admin mở",
+  2011: "Chuỗi DID phải kết thúc bằng chính địa chỉ ví của bạn",
+  2012: "DID do chính chủ tự khoá — chỉ chủ sở hữu mở lại được",
+  3001: "Không tìm thấy văn bằng",
+  3002: "Văn bằng không ở trạng thái hiệu lực",
+  3003: "Văn bằng không ở trạng thái tạm ngưng",
+  3004: "Văn bằng đã bị thu hồi",
+  3005: "Văn bằng đã hết hạn, hoặc thời điểm hết hạn đã qua",
+  3006: "Chỉ đơn vị đã cấp văn bằng này mới thao tác được",
+  3009: "Văn bằng này đã được neo trên chuỗi",
+  3010: "Đơn vị cấp không được tự cấp văn bằng cho chính mình",
+  4001: "Mã băm phải đúng 32 byte",
+  4003: "Số hiệu không tồn tại trên chuỗi",
+  4005: "Kết quả quá lớn — dùng bản phân trang",
+  4006: "Hợp đồng đã được khởi tạo",
+};
 
 // ---------- Đọc sự kiện ----------
 

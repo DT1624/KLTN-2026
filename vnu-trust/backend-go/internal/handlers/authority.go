@@ -60,18 +60,39 @@ func (a *API) assertRootAuthority(ctx context.Context, actor *db.Entity) error {
 
 // applyAuthorityTx xác minh giao dịch rồi đồng bộ vai trò trong chỉ mục.
 // newRole rỗng nghĩa là thao tác không đổi vai trò phía ứng dụng.
+// Tham số đầu của giao dịch phải là địa chỉ đích (S-02).
 func (a *API) applyAuthorityTx(
 	r *http.Request, actor *db.Entity,
 	target, txHash, expectedFn, newRole, auditAction string,
 	detail map[string]any,
+) (*authorityResult, error) {
+	return a.applyAuthorityTxArgs(r, actor, target, txHash, expectedFn, newRole, auditAction, detail, nil, nil)
+}
+
+// applyAuthorityTxArgs: args nil = mặc định [địa chỉ đích]. Thiếu phép đối chiếu
+// này thì một giao dịch approve_issuer thật phong được issuer cho địa chỉ BẤT KỲ,
+// dùng lại bao nhiêu lần cũng được. beforeSync chạy sau khi giao dịch đã xác minh,
+// trước khi đổi chỉ mục.
+func (a *API) applyAuthorityTxArgs(
+	r *http.Request, actor *db.Entity,
+	target, txHash, expectedFn, newRole, auditAction string,
+	detail map[string]any, args []chain.Arg, beforeSync func() error,
 ) (*authorityResult, error) {
 	ctx := r.Context()
 	addr, err := chain.NormalizeAddress(target)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.Chain.VerifyTransaction(ctx, txHash, expectedFn, actor.Address); err != nil {
+	if args == nil {
+		args = []chain.Arg{chain.ArgAddress(addr)}
+	}
+	if _, err := a.Chain.VerifyTransactionArgs(ctx, txHash, expectedFn, actor.Address, args); err != nil {
 		return nil, err
+	}
+	if beforeSync != nil {
+		if err := beforeSync(); err != nil {
+			return nil, err
+		}
 	}
 
 	entity, _ := a.Store.EntityByAddress(ctx, addr)
@@ -198,7 +219,57 @@ type addressTxBody struct {
 type reasonTxBody struct {
 	Reason string `json:"reason"`
 	TxHash string `json:"txHash"`
+}
+
+// statusReasonTxBody dành cho tuyến đổi trạng thái. Tách khỏi reasonTxBody để
+// tuyến KHÔNG nhận "status" (thu hồi admin) từ chối trường thừa như TypeScript.
+type statusReasonTxBody struct {
 	Status string `json:"status"`
+	Reason string `json:"reason"`
+	TxHash string `json:"txHash"`
+}
+
+// expectRoleStatus chống phát lại: sau khi giao dịch đã xác minh, trạng thái vai
+// trò HIỆN TẠI trên chuỗi phải đúng là trạng thái sắp ghi. mask < 0 = không kiểm
+// mask. Offline không có giao dịch để phát lại nên bỏ qua. Khớp TypeScript.
+func (a *API) expectRoleStatus(ctx context.Context, target, status string, mask int) func() error {
+	return func() error {
+		if a.Chain.Offline() {
+			return nil
+		}
+		info := a.Chain.RoleInfo(ctx, target)
+		if info == nil || info.Status != status || (mask >= 0 && info.VCTypeMask != mask) {
+			got := "không có"
+			if info != nil {
+				got = info.Status
+			}
+			return httpx.Conflict("Trên chuỗi vai trò của địa chỉ này đang \"%s\", không khớp thao tác — giao dịch đã cũ", got)
+		}
+		return nil
+	}
+}
+
+// assertNoRoleConflictOffline: offline không có contract chặn xung đột vai trò
+// (M-04, R-05) nên chặn ở đây — mỗi địa chỉ tối đa MỘT vai trò. Khớp TypeScript.
+func (a *API) assertNoRoleConflictOffline(ctx context.Context, target, wanted string) error {
+	if !a.Chain.Offline() {
+		return nil
+	}
+	e, _ := a.Store.EntityByAddress(ctx, target)
+	if e == nil {
+		return nil
+	}
+	switch {
+	case e.Role == "root":
+		return httpx.Conflict("Root không được giữ thêm vai trò admin hay issuer")
+	case wanted == "admin" && e.Role == "issuer":
+		return httpx.Conflict("Địa chỉ đang là issuer — thu hồi quyền issuer trước")
+	case wanted == "issuer" && e.Role == "admin":
+		return httpx.Conflict("Địa chỉ đang là admin — thu hồi quyền admin trước")
+	case e.Role == wanted:
+		return httpx.Conflict("Địa chỉ đã là %s", wanted)
+	}
+	return nil
 }
 
 func validReason(v string) (string, error) {
@@ -230,8 +301,12 @@ func (a *API) AuthorityGrantAdmin(w http.ResponseWriter, r *http.Request) error 
 	if err := a.assertRootAuthority(r.Context(), actor); err != nil {
 		return err
 	}
-	res, err := a.applyAuthorityTx(r, actor, address, txHash,
-		a.Chain.EntryGrantAdmin(), "admin", services.AuditGrantAdmin, nil)
+	if err := a.assertNoRoleConflictOffline(r.Context(), address, "admin"); err != nil {
+		return err
+	}
+	res, err := a.applyAuthorityTxArgs(r, actor, address, txHash,
+		a.Chain.EntryGrantAdmin(), "admin", services.AuditGrantAdmin, nil,
+		nil, a.expectRoleStatus(r.Context(), address, "active", -1))
 	if err != nil {
 		return err
 	}
@@ -272,9 +347,9 @@ func (a *API) AuthorityRevokeAdmin(w http.ResponseWriter, r *http.Request) error
 		return httpx.BadRequest("Root không thể tự thu hồi quyền admin của chính mình")
 	}
 	// Mất quyền admin thì quay về holder — vẫn giữ DID và văn bằng của mình.
-	res, err := a.applyAuthorityTx(r, actor, address, txHash,
+	res, err := a.applyAuthorityTxArgs(r, actor, address, txHash,
 		a.Chain.EntryRevokeAdmin(), "holder", services.AuditRevokeAdmin,
-		map[string]any{"reason": reason})
+		map[string]any{"reason": reason}, nil, a.expectRoleStatus(r.Context(), address, "revoked", -1))
 	if err != nil {
 		return err
 	}
@@ -314,14 +389,25 @@ func (a *API) AuthorityApproveIssuer(w http.ResponseWriter, r *http.Request) err
 	if err != nil {
 		return err
 	}
-	res, err := a.applyAuthorityTx(r, actor, address, txHash,
-		a.Chain.EntryApproveIssuer(), "issuer", services.AuditApproveIssuer,
-		map[string]any{"vcTypeMask": body.VCTypeMask, "expiresAt": body.ExpiresAt})
+	res, err := a.approveIssuer(r, actor, address, body.VCTypeMask, body.ExpiresAt, txHash)
 	if err != nil {
 		return err
 	}
 	httpx.OK(w, http.StatusCreated, res)
 	return nil
+}
+
+// approveIssuer xác minh giao dịch approve_issuer rồi ghi chỉ mục. Dùng chung
+// cho root/admin và cho issuer uỷ quyền cấp sub-issuer.
+func (a *API) approveIssuer(r *http.Request, actor *db.Entity, address string, mask int, expiresAt int64, txHash string) (*authorityResult, error) {
+	if err := a.assertNoRoleConflictOffline(r.Context(), address, "issuer"); err != nil {
+		return nil, err
+	}
+	return a.applyAuthorityTxArgs(r, actor, address, txHash,
+		a.Chain.EntryApproveIssuer(), "issuer", services.AuditApproveIssuer,
+		map[string]any{"vcTypeMask": mask, "expiresAt": expiresAt},
+		[]chain.Arg{chain.ArgAddress(address), chain.ArgU64(int64(mask)), {}, {}, chain.ArgU64(expiresAt)},
+		a.expectRoleStatus(r.Context(), address, "active", mask))
 }
 
 // AuthorityIssuerStatus — tạm ngưng / kích hoạt lại / thu hồi quyền issuer.
@@ -330,7 +416,7 @@ func (a *API) AuthorityIssuerStatus(w http.ResponseWriter, r *http.Request) erro
 	if err != nil {
 		return err
 	}
-	var body reasonTxBody
+	var body statusReasonTxBody
 	if err := httpx.DecodeJSON(r, &body); err != nil {
 		return err
 	}
@@ -342,9 +428,23 @@ func (a *API) AuthorityIssuerStatus(w http.ResponseWriter, r *http.Request) erro
 	if err != nil {
 		return err
 	}
+	actor, err := a.actor(r)
+	if err != nil {
+		return err
+	}
+	res, err := a.setIssuerStatus(r, actor, address, body.Status, reason, txHash)
+	if err != nil {
+		return err
+	}
+	httpx.OK(w, http.StatusOK, res)
+	return nil
+}
 
+// setIssuerStatus xác minh giao dịch đổi trạng thái issuer rồi ghi chỉ mục.
+// Dùng chung cho admin và cho issuer cha quản lý sub-issuer.
+func (a *API) setIssuerStatus(r *http.Request, actor *db.Entity, address, status, reason, txHash string) (*authorityResult, error) {
 	var expectedFn, newRole, action string
-	switch body.Status {
+	switch status {
 	case "suspended":
 		// Tạm ngưng thì vẫn là issuer: quyền còn đó, chỉ bị khoá.
 		expectedFn, newRole, action = a.Chain.EntrySuspendIssuer(), "", services.AuditIssuerSuspended
@@ -353,20 +453,10 @@ func (a *API) AuthorityIssuerStatus(w http.ResponseWriter, r *http.Request) erro
 	case "revoked":
 		expectedFn, newRole, action = a.Chain.EntryRevokeIssuer(), "holder", services.AuditIssuerRevoked
 	default:
-		return httpx.BadRequest("status: phải là suspended, active hoặc revoked")
+		return nil, httpx.BadRequest("status: phải là suspended, active hoặc revoked")
 	}
-
-	actor, err := a.actor(r)
-	if err != nil {
-		return err
-	}
-	res, err := a.applyAuthorityTx(r, actor, address, txHash, expectedFn, newRole, action,
-		map[string]any{"reason": reason})
-	if err != nil {
-		return err
-	}
-	httpx.OK(w, http.StatusOK, res)
-	return nil
+	return a.applyAuthorityTxArgs(r, actor, address, txHash, expectedFn, newRole, action,
+		map[string]any{"reason": reason}, nil, a.expectRoleStatus(r.Context(), address, status, -1))
 }
 
 // AuthorityProposeRoot — bước 1 của chuyển quyền root.
@@ -431,8 +521,8 @@ func (a *API) AuthorityCancelRootTransfer(w http.ResponseWriter, r *http.Request
 	if err := a.assertRootAuthority(r.Context(), actor); err != nil {
 		return err
 	}
-	res, err := a.applyAuthorityTx(r, actor, actor.Address, txHash,
-		a.Chain.EntryCancelRootTransfer(), "", services.AuditCancelRootTransfer, nil)
+	res, err := a.applyAuthorityTxArgs(r, actor, actor.Address, txHash,
+		a.Chain.EntryCancelRootTransfer(), "", services.AuditCancelRootTransfer, nil, []chain.Arg{}, nil)
 	if err != nil {
 		return err
 	}
@@ -462,15 +552,29 @@ func (a *API) AuthorityAcceptRoot(w http.ResponseWriter, r *http.Request) error 
 	if err != nil {
 		return err
 	}
-	res, err := a.applyAuthorityTx(r, actor, actor.Address, txHash,
-		a.Chain.EntryAcceptRoot(), "root", services.AuditAcceptRoot, nil)
+	// accept_root không có tham số nên giao dịch CŨ cũng hợp lệ: root trước đây
+	// gửi lại hash accept_root của mình là giành lại "root" trong chỉ mục và hạ
+	// root thật xuống admin. Phải hỏi chuỗi: root HIỆN TẠI là ai.
+	stillRoot := func() error {
+		if a.Chain.Offline() {
+			return nil
+		}
+		root, err1 := chain.NormalizeAddress(a.Chain.GetRootAdmin(r.Context()))
+		me, err2 := chain.NormalizeAddress(actor.Address)
+		if err1 != nil || err2 != nil || root != me {
+			return httpx.Forbidden("Trên chuỗi, tài khoản này hiện không phải root_admin — giao dịch accept_root đã cũ")
+		}
+		return nil
+	}
+	res, err := a.applyAuthorityTxArgs(r, actor, actor.Address, txHash,
+		a.Chain.EntryAcceptRoot(), "root", services.AuditAcceptRoot, nil, []chain.Arg{}, stillRoot)
 	if err != nil {
 		return err
 	}
 
 	// Chỉ có MỘT root. Chuỗi chỉ giữ đúng một root_admin, nên để hai hàng
-	// role='root' trong chỉ mục là nói dối về chính thứ vừa thay đổi. Root cũ
-	// xuống admin — họ vẫn là người có thẩm quyền, chỉ không còn là gốc.
+	// role='root' trong chỉ mục là nói dối về chính thứ vừa thay đổi. Root cũ về
+	// holder: trên chuỗi họ không có bản ghi admin nào.
 	if err := a.Store.DemoteOtherRoots(r.Context(), res.Address); err != nil {
 		return err
 	}

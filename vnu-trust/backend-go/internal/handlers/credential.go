@@ -3,10 +3,13 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/vnu-trust/backend-go/internal/auth"
+	"github.com/vnu-trust/backend-go/internal/chain"
 	"github.com/vnu-trust/backend-go/internal/db"
 	"github.com/vnu-trust/backend-go/internal/httpx"
 	"github.com/vnu-trust/backend-go/internal/middleware"
@@ -55,7 +58,14 @@ func (a *API) IssuerStats(w http.ResponseWriter, r *http.Request) error {
 
 func (a *API) IssuerCredentials(w http.ResponseWriter, r *http.Request) error {
 	c := middleware.ClaimsFrom(r.Context())
-	rows, err := a.Store.VCsByIssuer(r.Context(), c.DID)
+	// Bộ lọc ?status trước đây bị BỎ QUA ở bản Go (bản TS có lọc) — L-05.
+	status := r.URL.Query().Get("status")
+	switch status {
+	case "", "active", "suspended", "expired", "revoked":
+	default:
+		return httpx.BadRequest("status: phải là active, suspended, expired hoặc revoked")
+	}
+	rows, err := a.Store.VCsByIssuer(r.Context(), c.DID, status)
 	if err != nil {
 		return err
 	}
@@ -184,8 +194,30 @@ func (a *API) IssueCredential(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := a.Chain.VerifyTransaction(r.Context(), txHash, a.Chain.EntryIssueVC(), issuer.Address); err != nil {
+	// Tham số giao dịch phải đúng là văn bằng đang ghi (S-02).
+	var expUnix int64
+	if expiresAt != nil {
+		expUnix = expiresAt.Unix()
+	}
+	tx, err := a.Chain.VerifyTransactionArgs(r.Context(), txHash, a.Chain.EntryIssueVC(), issuer.Address, []chain.Arg{
+		chain.ArgAddress(holderAddr), chain.ArgU64(int64(vcType)), chain.ArgBytes(vcIDHash),
+		chain.ArgBytes(chain.UTF8ToHex(cid)), chain.ArgBytes(contentHash), chain.ArgU64(expUnix),
+	})
+	if err != nil {
 		return err
+	}
+	// Số hiệu on-chain và DID holder lấy từ sự kiện của CHÍNH giao dịch, không tin client.
+	if !a.Chain.Offline() {
+		ev := chain.FindEvent(tx, a.Chain.Module("vc_registry")+"::VCIssuedEvent")
+		if ev == nil {
+			return httpx.BadRequest("Giao dịch không phát VCIssuedEvent")
+		}
+		if fmt.Sprint(ev["id"]) != strconv.FormatInt(body.OnChainVCID, 10) {
+			return httpx.BadRequest("onChainVcId không khớp sự kiện trên chuỗi (chuỗi ghi %v)", ev["id"])
+		}
+		if hd, _ := ev["holder_did"].(string); chain.HexToUTF8(hd) != holderDID {
+			return httpx.BadRequest("holderDid không khớp DID của người nhận ghi trên chuỗi")
+		}
 	}
 
 	row, err := a.Store.SaveVC(r.Context(), services.SaveVCInput{
@@ -237,8 +269,11 @@ func (a *API) ChangeVCStatus(next string) httpx.Handler {
 			return err
 		}
 
-		isIssuer := vc.IssuerAddress == actor.Address
+		// Hai đường, khớp contract và backend TypeScript (vc.service.ts):
+		// admin/root luôn dùng hàm admin_*; issuer đã cấp VC dùng suspend_vc /
+		// revoke_vc và không kích hoạt lại được.
 		isAdmin := actor.Role == "admin" || actor.Role == "root"
+		isIssuer := vc.IssuerAddress == actor.Address
 		if !isIssuer && !isAdmin {
 			return httpx.Forbidden("Chỉ issuer đã cấp hoặc admin mới đổi được trạng thái")
 		}
@@ -259,22 +294,42 @@ func (a *API) ChangeVCStatus(next string) httpx.Handler {
 				return httpx.Forbidden("Chỉ admin mới kích hoạt lại được VC đã tạm ngưng")
 			}
 		}
+		// M-06 do contract chặn khi nối chuỗi; issuer bị thu hồi đã bị RequireRole
+		// chặn ở tuyến. Offline không mô hình hoá DID/tạm ngưng của vai trò.
 
 		var expectedFn string
-		switch next {
-		case "revoked":
-			if isAdmin && !isIssuer {
-				expectedFn = a.Chain.EntryAdminRevokeVC()
-			} else {
-				expectedFn = a.Chain.EntryRevokeVC()
-			}
-		case "suspended":
-			expectedFn = a.Chain.EntrySuspendVC()
-		default:
+		switch {
+		case isAdmin && next == "revoked":
+			expectedFn = a.Chain.EntryAdminRevokeVC()
+		case isAdmin && next == "suspended":
+			expectedFn = a.Chain.EntryAdminSuspendVC()
+		case isAdmin:
 			expectedFn = a.Chain.EntryAdminReinstateVC()
+		case next == "revoked":
+			expectedFn = a.Chain.EntryRevokeVC()
+		default:
+			expectedFn = a.Chain.EntrySuspendVC()
 		}
-		if err := a.Chain.VerifyTransaction(r.Context(), txHash, expectedFn, actor.Address); err != nil {
+		// Giao dịch phải nhắm đúng VC này (S-02).
+		if !a.Chain.Offline() && vc.OnChainVCID == nil {
+			return httpx.BadRequest("VC này chưa có số hiệu on-chain — không đối chiếu được giao dịch")
+		}
+		var args []chain.Arg
+		if vc.OnChainVCID != nil {
+			args = []chain.Arg{chain.ArgU64(*vc.OnChainVCID)}
+		}
+		if _, err := a.Chain.VerifyTransactionArgs(r.Context(), txHash, expectedFn, actor.Address, args); err != nil {
 			return err
+		}
+		// Chống phát lại: giao dịch có thật nhưng CŨ vẫn qua mọi phép kiểm trên.
+		// Chuỗi hiện tại phải đúng là trạng thái sắp ghi.
+		if !a.Chain.Offline() && vc.OnChainVCID != nil {
+			if onChain := a.Chain.VCStatus(r.Context(), *vc.OnChainVCID); onChain != next {
+				if onChain == "" {
+					onChain = "không đọc được"
+				}
+				return httpx.Conflict("Trên chuỗi VC đang \"%s\", không phải \"%s\" — giao dịch đã cũ", onChain, next)
+			}
 		}
 
 		row, err := a.Store.UpdateVCStatus(r.Context(), vcID, next, body.Reason, txHash)
@@ -289,7 +344,7 @@ func (a *API) ChangeVCStatus(next string) httpx.Handler {
 			action = services.AuditVCSuspend
 		}
 		a.Store.Audit(r.Context(), actor.Address, action, &vcID,
-			map[string]any{"reason": body.Reason, "txHash": txHash, "byAdmin": isAdmin && !isIssuer})
+			map[string]any{"reason": body.Reason, "txHash": txHash, "byAdmin": isAdmin})
 		httpx.OK(w, http.StatusOK, row)
 		return nil
 	}

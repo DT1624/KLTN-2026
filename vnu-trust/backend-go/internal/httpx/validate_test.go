@@ -15,10 +15,17 @@ func TestAddress(t *testing.T) {
 			t.Errorf("Address(%q) lẽ ra bị từ chối", v)
 		}
 	}
-	// Phải chuẩn hoá về chữ thường để so sánh không bị lệch hoa/thường.
+	// Phải chuẩn hoá về DẠNG DUY NHẤT 0x + 64 hex chữ thường. Trước đây chỉ hạ
+	// chữ thường, nên "0xede7…" (rút gọn của root 0x0ede7…) là một bản ghi khác
+	// mà chuỗi lại coi là root (S-01, docs/SECURITY_REVIEW.md).
 	got, _ := Address("0xABCDEF", "f")
-	if got != "0xabcdef" {
-		t.Errorf("không chuẩn hoá về chữ thường: %s", got)
+	if got != "0x"+repeat("0", 58)+"abcdef" {
+		t.Errorf("không chuẩn hoá về 0x + 64 hex chữ thường: %s", got)
+	}
+	a, _ := Address("0xede7", "f")
+	b, _ := Address("0x0ede7", "f")
+	if a != b {
+		t.Errorf("hai dạng của cùng một địa chỉ cho hai chuỗi khác nhau: %s / %s", a, b)
 	}
 }
 
@@ -62,12 +69,14 @@ func TestRoleAndVCType(t *testing.T) {
 	if _, err := Role("superuser", "f"); err == nil {
 		t.Error("vai trò lạ lẽ ra bị từ chối")
 	}
-	for _, n := range []int{0, -1, 64, 1000} {
+	// Hợp đồng nâng cấp 13/11/2026 đòi MỘT VC mang đúng một bit loại văn bằng;
+	// 3 (cử nhân + thạc sĩ) và 63 (mọi bit) nay bị từ chối (E_INVALID_VC_TYPE).
+	for _, n := range []int{0, -1, 3, 63, 64, 1000} {
 		if _, err := VCType(n, "f"); err == nil {
 			t.Errorf("vcType %d lẽ ra bị từ chối", n)
 		}
 	}
-	for _, n := range []int{1, 32, 63} {
+	for _, n := range []int{1, 2, 4, 8, 16, 32} {
 		if _, err := VCType(n, "f"); err != nil {
 			t.Errorf("vcType %d lẽ ra hợp lệ", n)
 		}

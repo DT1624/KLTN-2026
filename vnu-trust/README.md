@@ -12,7 +12,8 @@ vnu-trust/
 ├── db/schema.sql  Lược đồ CSDL DÙNG CHUNG cho cả hai backend
 ├── chain.env      Nguồn duy nhất của địa chỉ hợp đồng và thông số chuỗi
 ├── scripts/       dev.sh · test.sh · bench.sh · clean.sh · deploy.sh · sync-chain-env.sh
-├── docs/          API, rà soát hợp đồng, tóm tắt, checklist khoá luận
+├── docs/          API, rà soát hợp đồng
+├── deploy/        Triển khai lên host free (Render, Vercel, Neon) — xem deploy/README.md
 └── Makefile       `make` để xem mọi lệnh
 ```
 

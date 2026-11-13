@@ -2,7 +2,7 @@ import { query, queryOne } from "../db/pool.js";
 import { notFound, badRequest, conflict } from "../utils/errors.js";
 import { verifyTransaction } from "../chain/client.js";
 import { ENTRY } from "../chain/abi.js";
-import { resolveDidOnChain, resolveDidByOwner } from "../chain/registry.js";
+import { resolveDidOnChain, resolveDidByOwner, utf8ToHex } from "../chain/registry.js";
 import { fetchJSON, sha3_256Hex } from "./ipfs.service.js";
 import type { DidDocumentRow, EntityRow } from "../types/index.js";
 import { OFFLINE } from "../chain/offline.js";
@@ -54,16 +54,32 @@ export async function saveDid(input: SaveDidInput): Promise<DidDocumentRow> {
   if (existing) throw conflict("DID này đã được ghi nhận");
 
   // (3) Giao dịch phải có thật trên chuỗi và do chính chủ gửi — đắt nhất, để cuối.
+  //     Tham số của chính giao dịch đó phải là DID/CID/hash đang ghi (S-02).
   await verifyTransaction(input.txHash, {
     expectedFunction: ENTRY.registerDid,
     expectedSender: entity.address,
+    args: [
+      { bytes: utf8ToHex(input.did) },
+      { bytes: utf8ToHex(input.documentCid) },
+      { bytes: input.documentHash },
+    ],
   });
 
-  // (4) Đối chiếu với bản ghi trên chuỗi.
+  // (4) Đối chiếu với bản ghi trên chuỗi. Ở chế độ nghiêm ngặt, KHÔNG đọc được
+  //     bản ghi thì dừng: trước đây bước này bị bỏ qua lặng lẽ, nên DID ghi trên
+  //     chuỗi bằng chuỗi khác (hoặc fullnode lỗi) vẫn được ghi và resolve ra
+  //     "active" từ bản lưu (P-10). Chế độ offline đọc từ chỉ mục — DID mới thì
+  //     chưa có, nên vẫn cho qua như cũ.
   const onChain = await resolveDidOnChain(input.did);
+  if (!onChain && !OFFLINE) {
+    throw badRequest("Không đọc được DID này trên chuỗi — giao dịch register_did chưa ghi đúng DID của tài khoản");
+  }
   if (onChain) {
     if (onChain.documentCid !== input.documentCid) {
       throw badRequest("CID khai báo không khớp CID đã ghi trên chuỗi");
+    }
+    if (!OFFLINE && onChain.documentHash.toLowerCase() !== input.documentHash) {
+      throw badRequest("Hash tài liệu khai báo không khớp hash đã ghi trên chuỗi");
     }
     if (onChain.status !== "active") {
       throw badRequest(`DID trên chuỗi đang ở trạng thái "${onChain.status}"`);

@@ -3,6 +3,7 @@ import { fetchJSON } from "./ipfs.service.js";
 import { getByVcId, effectiveStatus, vcTypeLabel } from "./vc.service.js";
 import { badRequest } from "../utils/errors.js";
 import { getTransaction } from "../chain/client.js";
+import { queryOne } from "../db/pool.js";
 
 export type LookupKind = "did" | "address" | "cid" | "vcId" | "txHash";
 
@@ -49,8 +50,14 @@ export async function lookup(raw: string) {
     }
 
     case "cid": {
+      // Chỉ trả nội dung khi CID là DID Document đã ghi nhận — tài liệu công khai
+      // theo bản chất. Nội dung văn bằng (MSSV, điểm…) là dữ liệu cá nhân: tuyến
+      // này không cần đăng nhập, và CID của mọi văn bằng nằm công khai trên chuỗi,
+      // nên trả thẳng là ai cũng liệt kê được hồ sơ của mọi sinh viên (S-03).
+      const isDidDoc = await queryOne("SELECT 1 FROM did_documents WHERE document_cid = $1", [q]);
+      if (!isDidDoc) return { kind, result: { cid: q, content: null, private: true } };
       const content = await fetchJSON(q);
-      return { kind, result: { cid: q, content } };
+      return { kind, result: { cid: q, content, private: false } };
     }
 
     case "vcId": {

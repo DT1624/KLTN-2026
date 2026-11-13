@@ -1,0 +1,143 @@
+# Render Blueprint — triển khai VNU-Trust lên gói FREE của Render.
+#
+# Tạo trên Render: New → Blueprint → chọn repo → Blueprint Path = vnu-trust/deploy/render.yaml
+# Hướng dẫn đầy đủ: vnu-trust/deploy/README.md
+#
+#   vnu-trust-web  (static) ── gọi thẳng ──► vnu-trust-ts  (Node)  ─┐
+#                                        └─► vnu-trust-go  (Go)    ─┴─► Postgres (Neon) + Movement testnet
+#
+# Địa chỉ hợp đồng chép từ vnu-trust/chain.env. Đổi chain.env thì sửa cả ở đây —
+# deploy/check.sh báo lệch nếu quên.
+
+envVarGroups:
+  - name: vnu-trust-shared
+    envVars:
+      # Hai backend PHẢI dùng chung khoá ký JWT thì token mới dùng chéo được.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRY
+        value: 8h
+      - key: NODE_ENV
+        value: production
+      # Chạy thật thì luôn kiểm chứng giao dịch trên chuỗi. Đặt false cùng
+      # NODE_ENV=production thì cả hai backend từ chối khởi động.
+      - key: VERIFY_ONCHAIN
+        value: "true"
+      - key: CONTRACT_ADDRESS
+        value: "0x0ede7f6b38caab7ddfe757765fddbf07221f8b776c6395562faae571250708e3"
+      - key: CHAIN_FULLNODE
+        value: https://testnet.movementnetwork.xyz/v1
+      - key: CHAIN_ID
+        value: "250"
+      # Render đặt đúng MỘT proxy trước server; số này để lấy IP thật của người
+      # dùng cho hạn mức, nếu sai thì mọi người chung một hạn mức.
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      # mock = nội dung IPFS lưu trong bảng ipfs_objects của Postgres, không cần
+      # tài khoản Pinata. Muốn ghim thật: đổi thành pinata và thêm PINATA_JWT.
+      - key: IPFS_PROVIDER
+        value: mock
+      - key: DB_SSLMODE
+        value: require
+      - key: DB_POOL_MAX
+        value: "5"
+      # Sửa nếu Render thêm hậu tố vào tên dịch vụ, hoặc thêm URL Vercel (phân cách bằng dấu phẩy).
+      - key: FRONTEND_ORIGIN
+        value: https://vnu-trust-web.onrender.com
+
+services:
+  # ---------- Backend Go ----------
+  - type: web
+    name: vnu-trust-go
+    runtime: go
+    plan: free
+    region: singapore
+    rootDir: vnu-trust/backend-go
+    buildCommand: go build -o bin/server ./cmd/server
+    startCommand: ./bin/server
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: vnu-trust-shared
+      # Thông tin Postgres — Render hỏi lúc tạo Blueprint, không nằm trong repo.
+      - key: DB_HOST
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+
+  # ---------- Backend TypeScript ----------
+  - type: web
+    name: vnu-trust-ts
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: vnu-trust/backend
+    # --include=dev vì tsc nằm trong devDependencies mà NODE_ENV=production thì npm bỏ qua.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: vnu-trust-shared
+      - key: NODE_VERSION
+        value: "20"
+      - key: DB_HOST
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+
+  # ---------- Frontend (trang tĩnh, không ngủ) ----------
+  - type: web
+    name: vnu-trust-web
+    runtime: static
+    rootDir: vnu-trust/frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      # Ứng dụng một trang: mọi đường dẫn trả index.html để React Router xử lý.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      # Ví giữ khoá riêng trong bộ nhớ tab: một XSS hay script lạ là lấy được khoá,
+      # và trang ví nhúng iframe được thì bị clickjacking (W-07). Thêm URL backend
+      # vào connect-src nếu không nằm dưới *.onrender.com.
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.onrender.com https://testnet.movementnetwork.xyz https://faucet.testnet.movementnetwork.xyz; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'"
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # URL của hai backend ở trên. Sửa nếu Render thêm hậu tố vào tên dịch vụ.
+      - key: VITE_API_TS_URL
+        value: https://vnu-trust-ts.onrender.com/api
+      - key: VITE_API_GO_URL
+        value: https://vnu-trust-go.onrender.com/api
+      - key: VITE_CONTRACT_ADDRESS
+        value: "0x0ede7f6b38caab7ddfe757765fddbf07221f8b776c6395562faae571250708e3"
+      - key: VITE_CHAIN_FULLNODE
+        value: https://testnet.movementnetwork.xyz/v1
+      - key: VITE_CHAIN_ID
+        value: "250"
+      - key: VITE_CHAIN_FAUCET
+        value: https://faucet.testnet.movementnetwork.xyz
+      - key: VITE_CHAIN_EXPLORER
+        value: https://explorer.movementnetwork.xyz/txn

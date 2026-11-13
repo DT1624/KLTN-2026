@@ -16,6 +16,7 @@ export const pool = new pg.Pool({
   user: cfg.DB_USER,
   password: cfg.DB_PASSWORD,
   max: cfg.DB_POOL_MAX,
+  ssl: cfg.DB_SSLMODE === "disable" ? false : { rejectUnauthorized: cfg.DB_SSLMODE === "verify-full" },
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
 });

@@ -3,10 +3,14 @@
 package httpx
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"time"
 )
 
@@ -47,6 +51,9 @@ func Conflict(format string, a ...any) *Error {
 func Gone(format string, a ...any) *Error {
 	return &Error{http.StatusGone, fmt.Sprintf(format, a...), "GONE"}
 }
+func TooLarge(format string, a ...any) *Error {
+	return &Error{http.StatusRequestEntityTooLarge, fmt.Sprintf(format, a...), "PAYLOAD_TOO_LARGE"}
+}
 func Upstream(format string, a ...any) *Error {
 	return &Error{http.StatusBadGateway, fmt.Sprintf(format, a...), "UPSTREAM_ERROR"}
 }
@@ -86,10 +93,25 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// reNUL bắt chuỗi thoát \u0000 (không tính "\\u0000" — dấu \ đã được thoát).
+// Postgres từ chối ký tự NUL trong TEXT và JSONB; để lọt xuống CSDL là 500.
+var reNUL = regexp.MustCompile(`(^|[^\\])(\\\\)*\\u0000`)
+
 // DecodeJSON đọc thân yêu cầu, chặn trường lạ và giới hạn kích thước.
+// Mã lỗi khớp bản TypeScript: quá 2 MB → 413, JSON hỏng hoặc có NUL → 400.
 func DecodeJSON(r *http.Request, dst any) error {
-	r.Body = http.MaxBytesReader(nil, r.Body, 2<<20) // 2 MB
-	dec := json.NewDecoder(r.Body)
+	raw, err := io.ReadAll(http.MaxBytesReader(nil, r.Body, 2<<20)) // 2 MB
+	if err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			return TooLarge("Thân yêu cầu vượt quá 2 MB")
+		}
+		return BadRequest("Thân yêu cầu không đọc được: %v", err)
+	}
+	if reNUL.Match(raw) {
+		return BadRequest("Dữ liệu không được chứa ký tự NUL (\\u0000)")
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		return BadRequest("Thân yêu cầu không đọc được: %v", err)

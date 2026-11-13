@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/vnu-trust/backend-go/internal/auth"
+	"github.com/vnu-trust/backend-go/internal/chain"
 	"github.com/vnu-trust/backend-go/internal/httpx"
 	"github.com/vnu-trust/backend-go/internal/middleware"
 	"github.com/vnu-trust/backend-go/internal/services"
@@ -156,13 +158,24 @@ func (a *API) SaveDID(w http.ResponseWriter, r *http.Request) error {
 		return httpx.Conflict("DID này đã được ghi nhận")
 	}
 	// (3) Giao dịch phải có thật và do chính chủ gửi — đắt nhất, để cuối.
-	if err := a.Chain.VerifyTransaction(r.Context(), txHash, a.Chain.EntryRegisterDID(), e.Address); err != nil {
+	//     Tham số của chính giao dịch đó phải là DID/CID/hash đang ghi (S-02).
+	if _, err := a.Chain.VerifyTransactionArgs(r.Context(), txHash, a.Chain.EntryRegisterDID(), e.Address,
+		[]chain.Arg{chain.ArgBytes(chain.UTF8ToHex(did)), chain.ArgBytes(chain.UTF8ToHex(cid)), chain.ArgBytes(hash)}); err != nil {
 		return err
 	}
-	// (4) Đối chiếu với bản ghi trên chuỗi.
-	if oc := a.Chain.ResolveDID(r.Context(), did); oc != nil {
+	// (4) Đối chiếu với bản ghi trên chuỗi. Ở chế độ nghiêm ngặt, KHÔNG đọc được
+	//     bản ghi thì dừng — trước đây bước này bị bỏ qua lặng lẽ (P-10). Chế độ
+	//     offline đọc từ chỉ mục, DID mới thì chưa có, nên vẫn cho qua như cũ.
+	oc := a.Chain.ResolveDID(r.Context(), did)
+	if oc == nil && !a.Chain.Offline() {
+		return httpx.BadRequest("Không đọc được DID này trên chuỗi — giao dịch register_did chưa ghi đúng DID của tài khoản")
+	}
+	if oc != nil {
 		if oc.DocumentCID != cid {
 			return httpx.BadRequest("CID khai báo không khớp CID đã ghi trên chuỗi")
+		}
+		if !a.Chain.Offline() && strings.ToLower(oc.DocumentHash) != hash {
+			return httpx.BadRequest("Hash tài liệu khai báo không khớp hash đã ghi trên chuỗi")
 		}
 		if oc.Status != "active" {
 			return httpx.BadRequest("DID trên chuỗi đang ở trạng thái %q", oc.Status)

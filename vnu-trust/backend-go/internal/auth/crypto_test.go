@@ -56,3 +56,20 @@ func TestVerifySignatureRejectsMalformed(t *testing.T) {
 		})
 	}
 }
+
+// Giá trị kỳ vọng lấy từ chính địa chỉ deployer trên chuỗi: khoá công khai
+// trong frontend/scripts/chain-probe.mjs dẫn xuất ra đúng địa chỉ này
+// (phép "Dẫn xuất địa chỉ từ khoá công khai đúng như ví làm").
+func TestDeriveAddressMatchesChain(t *testing.T) {
+	if got := DeriveAddress(probePublicKey); got != probeAddress {
+		t.Errorf("DeriveAddress = %s, mong %s", got, probeAddress)
+	}
+	if DeriveAddress("0x1234") != "" {
+		t.Error("khoá sai độ dài phải trả chuỗi rỗng")
+	}
+}
+
+const (
+	probePublicKey = "0x61ce325bb8fe57aa698412bfbe7b4ebc1f9c7673f44eae46d5595f7037679229"
+	probeAddress   = "0x0ede7f6b38caab7ddfe757765fddbf07221f8b776c6395562faae571250708e3"
+)

@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ResolvedDid } from "../../lib/api";
 import { maskLabel } from "../../lib/constants";
+import { useChainTx } from "../../hooks/useChain";
+import { ENTRY, bytesArg } from "../../lib/chain";
 import { Card, Alert, Mono, Badge, Field, Row } from "../../components/ui";
+import TxProgress from "../../components/ChainTx";
 
 export interface RoleSnapshot {
   address: string;
@@ -30,6 +33,7 @@ export default function IdentitiesTab() {
   return (
     <div className="space-y-6">
       <CheckAddressCard />
+      <ModerateDidCard />
       <ResolveDidCard />
     </div>
   );
@@ -96,6 +100,91 @@ function CheckAddressCard() {
           <p className="text-xs text-ink-400">
             Nguồn dữ liệu: {result.source === "chain" ? "đọc trực tiếp từ chuỗi" : "chỉ mục CSDL"}
           </p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Admin khoá / mở / thu hồi DID của một địa chỉ (admin_*_did).
+ *
+ * Hai hệ quả của hợp đồng cần nói rõ cho người bấm:
+ *  - Thu hồi DID thu hồi luôn quyền admin/issuer của địa chỉ đó (M-01) — chủ có
+ *    đăng ký DID mới thì cũng chỉ là một danh tính trắng.
+ *  - Chủ đã tự khoá thì admin vẫn khoá được (tiếp quản, M-08); khi đó chủ không
+ *    tự mở lại được nữa. Ngược lại, DID chủ tự khoá thì admin KHÔNG mở thay được.
+ * Admin thường không đụng được DID của root hay admin khác — hợp đồng sẽ từ chối.
+ */
+function ModerateDidCard() {
+  const qc = useQueryClient();
+  const tx = useChainTx();
+  const [address, setAddress] = useState("");
+  const [reason, setReason] = useState("");
+  const [did, setDid] = useState<ResolvedDid | null>(null);
+  const [err, setErr] = useState("");
+
+  const find = useMutation({
+    mutationFn: () => api.get<ResolvedDid>(`/did/by-address/${encodeURIComponent(address.trim())}`),
+    onSuccess: (d) => { setDid(d); setErr(""); tx.reset(); },
+    onError: (e) => { setErr((e as Error).message); setDid(null); },
+  });
+
+  const FN = { suspended: ENTRY.adminSuspendDid, active: ENTRY.adminReactivateDid, revoked: ENTRY.adminRevokeDid };
+  const act = (status: keyof typeof FN) => {
+    const target = address.trim();
+    void tx.run({
+      fn: FN[status],
+      args: [target, bytesArg(reason.trim())],
+      index: async (out) => {
+        const r = await api.post(`/admin/dids/${encodeURIComponent(target)}/status`,
+          { status, reason: reason.trim(), txHash: out.hash });
+        setReason("");
+        find.mutate();
+        qc.invalidateQueries({ queryKey: ["admin"] });
+        return r;
+      },
+    });
+  };
+  const ready = !!did && reason.trim().length >= 2 && !tx.busy;
+
+  return (
+    <Card title="Kiểm duyệt DID"
+      subtitle="Khoá, mở khoá hoặc thu hồi danh tính của một địa chỉ — ký bằng ví admin.">
+      <form className="flex flex-col sm:flex-row gap-3 sm:items-end"
+        onSubmit={(e) => { e.preventDefault(); find.mutate(); }}>
+        <div className="flex-1">
+          <Field label="Địa chỉ ví" value={address} onChange={setAddress} mono placeholder="0x…" required />
+        </div>
+        <button className="btn-primary sm:w-36" type="submit" disabled={find.isPending}>
+          {find.isPending ? "Đang tra…" : "Tra DID"}
+        </button>
+      </form>
+      {err && <div className="mt-4"><Alert tone="bad" title="Không tìm thấy DID">{err}</Alert></div>}
+
+      {did && (
+        <div className="mt-5 space-y-4">
+          <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <Row label="DID"><Mono value={did.did} /></Row>
+            <Row label="Trạng thái"><Badge tone={did.status === "active" ? "ok" : "warn"}>{did.status}</Badge></Row>
+          </dl>
+          <Field label="Lý do (bắt buộc, ghi lên chuỗi và nhật ký kiểm toán)" value={reason}
+            onChange={setReason} placeholder="Nghi lộ khoá riêng" />
+          <div className="flex flex-wrap gap-3">
+            <button className="btn-ghost" type="button" disabled={!ready || did.status === "revoked"}
+              onClick={() => act("suspended")}>Ký &amp; khoá</button>
+            <button className="btn-ghost" type="button" disabled={!ready || did.status !== "suspended"}
+              onClick={() => act("active")}>Ký &amp; mở khoá</button>
+            <button className="btn-danger" type="button" disabled={!ready || did.status === "revoked"}
+              onClick={() => act("revoked")}>Ký &amp; thu hồi</button>
+          </div>
+          <p className="text-xs text-ink-400">
+            Thu hồi là vĩnh viễn và <strong>thu hồi luôn quyền admin/issuer</strong> của địa chỉ này.
+            Văn bằng đã cấp không tự mất hiệu lực — thu hồi riêng ở tab Văn bằng nếu có gian lận.
+            DID do chính chủ tự khoá thì admin không mở thay được; admin khoá đè lên thì chủ
+            không tự mở được nữa.
+          </p>
+          <TxProgress tx={tx} okTitle="Đã cập nhật trạng thái DID" />
         </div>
       )}
     </Card>

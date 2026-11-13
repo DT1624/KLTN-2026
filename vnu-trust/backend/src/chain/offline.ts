@@ -195,11 +195,13 @@ export async function liveCountsOffline(
 ): Promise<{ issued: number; held: number }> {
   warnOnce();
   const r = await queryOne<{ issued: string; held: string }>(
+    // Khớp bộ đếm "sống" của contract: chỉ VC đang ACTIVE. Tạm ngưng cũng
+    // không tính — trước đây điều kiện `status <> 'revoked'` đếm cả VC tạm ngưng.
     `SELECT
        (SELECT count(*) FROM credentials
-         WHERE issuer_address = $1 AND status <> 'revoked') AS issued,
+         WHERE issuer_address = $1 AND status = 'active') AS issued,
        (SELECT count(*) FROM credentials
-         WHERE holder_address = $2 AND status <> 'revoked') AS held`,
+         WHERE holder_address = $2 AND status = 'active') AS held`,
     [normalizeAddress(issuer), normalizeAddress(holder)],
   );
   return { issued: Number(r?.issued ?? 0), held: Number(r?.held ?? 0) };

@@ -63,6 +63,46 @@ export interface OnChainTx {
   version: string;
   timestamp: string;
   payload?: { function?: string; arguments?: unknown[]; type?: string };
+  events?: { type?: string; data?: Record<string, unknown> }[];
+}
+
+/**
+ * Kỳ vọng cho từng tham số của hàm entry (bỏ qua signer). `null` = không kiểm.
+ * Fullnode trả address ở dạng rút gọn, u64 dạng chuỗi thập phân, vector<u8> dạng hex.
+ */
+export type ArgSpec = { address: string } | { u64: number | string } | { bytes: string } | null;
+
+function argMatches(actual: unknown, spec: Exclude<ArgSpec, null>): boolean {
+  try {
+    if ("address" in spec) return normalizeAddress(String(actual)) === normalizeAddress(spec.address);
+    if ("u64" in spec) return String(actual) === String(spec.u64);
+    return String(actual).toLowerCase() === spec.bytes.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Đưa định danh `địa_chỉ::module::tên` về dạng địa chỉ đầy đủ 64 hex.
+ * Fullnode in địa chỉ module ở dạng RÚT GỌN — gói tại 0x0ede7f… hiện ra là
+ * "0xede7f…::did_registry::register_did" — nên so chuỗi trực tiếp với ENTRY
+ * (dựng từ CONTRACT_ADDRESS đầy đủ) thì mọi giao dịch thật đều bị từ chối (S-04).
+ */
+export function normalizeMoveId(id: string): string {
+  const [addr, ...rest] = id.split("::");
+  if (!addr || rest.length === 0) return id;
+  try {
+    return [normalizeAddress(addr), ...rest].join("::");
+  } catch {
+    return id;
+  }
+}
+
+/** Sự kiện đầu tiên có kiểu `<địa_chỉ>::module::Tên` khớp (sau chuẩn hoá địa chỉ). */
+export function findEvent(tx: OnChainTx, type: string): Record<string, unknown> | null {
+  const want = normalizeMoveId(type);
+  const ev = (tx.events ?? []).find((e) => typeof e.type === "string" && normalizeMoveId(e.type) === want);
+  return ev?.data ?? null;
 }
 
 /** Lấy giao dịch theo hash. Trả null nếu fullnode chưa thấy giao dịch. */
@@ -82,6 +122,12 @@ export interface VerifyTxOptions {
   expectedFunction: string;
   /** Địa chỉ bắt buộc phải là người gửi giao dịch. */
   expectedSender: string;
+  /**
+   * Tham số giao dịch phải khớp đúng bản ghi đang ghi (S-02). Thiếu bước này thì
+   * một giao dịch thật bất kỳ của chính mình — hoặc của lần trước — đem dùng
+   * được cho bản ghi khác: phong issuer cho địa chỉ khác, DID với CID bịa…
+   */
+  args?: ArgSpec[];
 }
 
 /**
@@ -110,13 +156,20 @@ export async function verifyTransaction(hash: string, opts: VerifyTxOptions): Pr
   if (!tx.success) throw badRequest(`Giao dịch thất bại trên chuỗi: ${tx.vm_status}`);
 
   const fn = tx.payload?.function;
-  if (fn !== opts.expectedFunction) {
+  if (!fn || normalizeMoveId(fn) !== normalizeMoveId(opts.expectedFunction)) {
     throw badRequest(`Giao dịch gọi hàm "${fn ?? "?"}", cần "${opts.expectedFunction}"`);
   }
 
   if (normalizeAddress(tx.sender) !== normalizeAddress(opts.expectedSender)) {
     throw badRequest("Người gửi giao dịch không khớp với tài khoản đang đăng nhập");
   }
+
+  const actual = tx.payload?.arguments ?? [];
+  (opts.args ?? []).forEach((spec, i) => {
+    if (spec && !argMatches(actual[i], spec)) {
+      throw badRequest(`Tham số thứ ${i + 1} của giao dịch không khớp dữ liệu đang ghi`);
+    }
+  });
 
   return tx;
 }

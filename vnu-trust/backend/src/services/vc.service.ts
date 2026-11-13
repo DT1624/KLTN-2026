@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { query, queryOne } from "../db/pool.js";
 import { notFound, badRequest, conflict, forbidden } from "../utils/errors.js";
-import { verifyTransaction } from "../chain/client.js";
-import { ENTRY, VC_TYPE_LABEL } from "../chain/abi.js";
-import { getVcStatusOnChain } from "../chain/registry.js";
+import { verifyTransaction, findEvent } from "../chain/client.js";
+import { ENTRY, MODULE, VC_TYPE_LABEL } from "../chain/abi.js";
+import { getVcStatusOnChain, utf8ToHex, hexToUtf8 } from "../chain/registry.js";
 import { sha3_256Hex } from "./ipfs.service.js";
 import type { CredentialRow, EntityRow, VcStatus } from "../types/index.js";
 import { OFFLINE } from "../chain/offline.js";
@@ -54,10 +54,33 @@ export async function saveIssuedVc(input: IssueVcInput): Promise<CredentialRow> 
     throw conflict("VC này đã được ghi nhận");
   }
 
-  await verifyTransaction(input.txHash, {
+  // Tham số giao dịch phải đúng là văn bằng đang ghi (S-02): cùng holder, loại,
+  // vc_id_hash, CID, content_hash và hạn. Nếu không, một giao dịch thật dùng được
+  // cho bao nhiêu văn bằng tuỳ ý, với loại văn bằng mà issuer không được cấp.
+  const tx = await verifyTransaction(input.txHash, {
     expectedFunction: ENTRY.issueVc,
     expectedSender: issuer.address,
+    args: [
+      { address: input.holderAddress },
+      { u64: input.vcType },
+      { bytes: input.vcIdHash },
+      { bytes: utf8ToHex(input.ipfsCid) },
+      { bytes: input.contentHash },
+      { u64: input.expiresAt ? Math.floor(Date.parse(input.expiresAt) / 1000) : 0 },
+    ],
   });
+  // Số hiệu on-chain và DID holder lấy từ sự kiện của CHÍNH giao dịch, không tin
+  // con số client khai — bước xác minh thứ 7 đối chiếu nội dung theo số hiệu này.
+  if (!OFFLINE) {
+    const ev = findEvent(tx, `${MODULE.vcRegistry}::VCIssuedEvent`);
+    if (!ev) throw badRequest("Giao dịch không phát VCIssuedEvent");
+    if (String(ev.id) !== String(input.onChainVcId)) {
+      throw badRequest(`onChainVcId không khớp sự kiện trên chuỗi (chuỗi ghi ${String(ev.id)})`);
+    }
+    if (hexToUtf8(String(ev.holder_did ?? "")) !== input.holderDid) {
+      throw badRequest("holderDid không khớp DID của người nhận ghi trên chuỗi");
+    }
+  }
 
   const row = await queryOne<CredentialRow>(
     `INSERT INTO credentials
@@ -112,8 +135,13 @@ export async function listByIssuer(issuerDid: string, status?: VcStatus): Promis
 
 /**
  * Đổi trạng thái VC sau khi giao dịch tương ứng đã lên chuỗi.
- * Ràng buộc chuyển trạng thái được kiểm tra lại ở đây cho khớp contract:
- * revoked là trạng thái cuối, suspended chỉ đi từ active và ngược lại.
+ *
+ * Hai đường, khớp contract (vc_registry::set_status):
+ *  - admin/root: luôn dùng hàm `admin_*` — kể cả khi chính họ từng cấp VC này
+ *    (một địa chỉ không thể vừa là admin vừa là issuer còn sống);
+ *  - issuer đã cấp VC: `suspend_vc` / `revoke_vc`, KHÔNG kích hoạt lại được.
+ * Luật chuyển trạng thái kiểm lại ở đây cho khớp contract: revoked là cuối,
+ * suspended chỉ đi từ active và ngược lại.
  */
 export async function changeStatus(
   vcId: string,
@@ -124,8 +152,8 @@ export async function changeStatus(
 ): Promise<CredentialRow> {
   const vc = await requireByVcId(vcId);
 
-  const isIssuer = vc.issuer_address === actor.address;
   const isAdmin = actor.role === "admin" || actor.role === "root";
+  const isIssuer = vc.issuer_address === actor.address;
   if (!isIssuer && !isAdmin) throw forbidden("Chỉ issuer đã cấp hoặc admin mới đổi được trạng thái");
 
   if (vc.status === "revoked") throw conflict("VC đã bị thu hồi, không đổi được nữa");
@@ -139,18 +167,35 @@ export async function changeStatus(
   if (next === "active" && !isAdmin) {
     throw forbidden("Chỉ admin mới kích hoạt lại được VC đã tạm ngưng");
   }
+  // M-06 (issuer bị tạm ngưng/thu hồi hoặc DID không ACTIVE thì không tự đổi
+  // trạng thái VC) do contract chặn khi nối chuỗi; issuer bị thu hồi thì
+  // requireRole("issuer") đã chặn ở tuyến. Chế độ offline không mô hình hoá
+  // DID/tạm ngưng của vai trò (xem offline.ts), nên không kiểm thêm ở đây.
 
-  const expectedFn =
-    next === "revoked"
-      ? isAdmin && !isIssuer ? ENTRY.adminRevokeVc : ENTRY.revokeVc
-      : next === "suspended"
-        ? ENTRY.suspendVc
-        : ENTRY.adminReinstateVc;
+  const expectedFn = isAdmin
+    ? { revoked: ENTRY.adminRevokeVc, suspended: ENTRY.adminSuspendVc, active: ENTRY.adminReinstateVc }[next]
+    : next === "revoked" ? ENTRY.revokeVc : ENTRY.suspendVc;
 
+  // Giao dịch phải nhắm đúng VC này (S-02): một giao dịch revoke_vc thật trước
+  // đây dùng được để đánh dấu thu hồi BẤT KỲ VC nào trong chỉ mục.
+  if (!OFFLINE && vc.on_chain_vc_id === null) {
+    throw badRequest("VC này chưa có số hiệu on-chain — không đối chiếu được giao dịch");
+  }
   await verifyTransaction(txHash, {
     expectedFunction: expectedFn,
     expectedSender: actor.address,
+    args: vc.on_chain_vc_id === null ? [] : [{ u64: vc.on_chain_vc_id }],
   });
+
+  // Chống phát lại: giao dịch có thật nhưng CŨ (vd. suspend_vc trước lần admin
+  // kích hoạt lại) vẫn qua mọi phép kiểm trên. Chuỗi hiện tại phải đúng là trạng
+  // thái sắp ghi, nếu không chỉ mục sẽ nói dối về trạng thái văn bằng.
+  if (!OFFLINE && vc.on_chain_vc_id !== null) {
+    const onChain = await getVcStatusOnChain(vc.on_chain_vc_id);
+    if (onChain !== next) {
+      throw conflict(`Trên chuỗi VC đang "${onChain ?? "không đọc được"}", không phải "${next}" — giao dịch đã cũ`);
+    }
+  }
 
   const row = await queryOne<CredentialRow>(
     `UPDATE credentials
@@ -160,7 +205,7 @@ export async function changeStatus(
   );
   if (!row) throw new Error("Cập nhật trạng thái VC thất bại");
   const action = next === "revoked" ? "vc.revoke" : next === "suspended" ? "vc.suspend" : "vc.reinstate";
-  await record(actor.address, action, vcId, { reason, txHash, byAdmin: isAdmin && !isIssuer });
+  await record(actor.address, action, vcId, { reason, txHash, byAdmin: isAdmin });
   return row;
 }
 

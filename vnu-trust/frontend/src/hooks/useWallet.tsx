@@ -35,11 +35,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Khoá riêng chỉ sống trong bộ nhớ tab nên tải lại trang là ví đã khoá —
+    // token phiên còn trong sessionStorage thì xoá theo, kẻo phiên đăng nhập sống
+    // tiếp khi không còn ai mở ví (W-06).
+    session.clear();
     refreshKeystores().finally(() => setLoading(false));
   }, [refreshKeystores]);
 
   const lock = useCallback(() => {
-    setWallet(null);
+    // Ghi đè khoá riêng bằng 0 thay vì chỉ bỏ tham chiếu: closure nào còn giữ
+    // đối tượng ví cũ (giao dịch đang dở) cũng không ký được nữa (W-06).
+    setWallet((w) => { w?.keyPair.privateKey.fill(0); return null; });
     doLogout();
     qc.clear();
     setSeconds(null);
@@ -52,7 +58,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
    */
   const finishUnlock = useCallback(async (w: UnlockedWallet): Promise<UnlockedWallet> => {
     const { role } = await login(w);
-    const synced = role === w.role ? w : { ...w, role };
+    // Cụm từ ghi nhớ chỉ để hiển thị một lần lúc tạo ví — không mang vào context
+    // toàn cục, nơi mọi component (và React DevTools) đọc được suốt phiên (W-03).
+    const { mnemonic: _shownOnce, ...rest } = w;
+    void _shownOnce;
+    const synced: UnlockedWallet = { ...rest, role };
     if (role !== w.role) await updateKeystoreRole(w.address, role);
     qc.clear();
     setWallet(synced);

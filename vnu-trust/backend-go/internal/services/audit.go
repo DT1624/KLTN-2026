@@ -17,13 +17,17 @@ import (
 // (backend/src/services/audit.service.ts), nếu không lịch sử sẽ vỡ thành hai
 // loại tuỳ theo backend nào xử lý yêu cầu.
 const (
-	AuditDIDSave     = "did.save"
-	AuditVCIssue     = "vc.issue"
-	AuditVCRevoke    = "vc.revoke"
-	AuditVCSuspend   = "vc.suspend"
-	AuditVCReinstate = "vc.reinstate"
-	AuditShareCreate = "share.create"
-	AuditShareRevoke = "share.revoke"
+	AuditDIDSave = "did.save"
+	// Admin kiểm duyệt DID — cùng tên với backend TypeScript.
+	AuditDIDSuspend    = "did.suspend"
+	AuditDIDReactivate = "did.reactivate"
+	AuditDIDRevoke     = "did.revoke"
+	AuditVCIssue       = "vc.issue"
+	AuditVCRevoke      = "vc.revoke"
+	AuditVCSuspend     = "vc.suspend"
+	AuditVCReinstate   = "vc.reinstate"
+	AuditShareCreate   = "share.create"
+	AuditShareRevoke   = "share.revoke"
 
 	// Quản trị quyền hạn trên chuỗi
 	AuditGrantAdmin         = "authority.grant_admin"

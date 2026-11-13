@@ -17,6 +17,19 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
+  // Lỗi của body-parser: JSON hỏng → 400, quá giới hạn → 413 — giống bản Go.
+  // Trước đây rơi xuống nhánh 500 và (ngoài production) trả nguyên thông điệp của
+  // trình phân tích (L-02).
+  const bp = (err as { type?: string } | null)?.type;
+  if (bp === "entity.parse.failed") {
+    res.status(400).json(fail("Thân yêu cầu không phải JSON hợp lệ"));
+    return;
+  }
+  if (bp === "entity.too.large") {
+    res.status(413).json(fail("Thân yêu cầu vượt quá 2 MB"));
+    return;
+  }
+
   if (err instanceof AppError) {
     // Lỗi 4xx là lỗi phía người dùng, không cần ghi log mức error.
     if (err.status >= 500) logger.error({ err, path: req.path }, err.message);

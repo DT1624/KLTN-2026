@@ -17,7 +17,12 @@ const zReasonTx = z.object({
 });
 
 const router = Router();
-router.use(requireAuth, requireRole("admin", "root"));
+// V1 (13/11/2026): MỌI tuyến admin đối chiếu quyền trên chuỗi, không riêng tuyến
+// ghi. Trước đây tuyến đọc (nhật ký, toàn văn văn bằng, số liệu) chỉ xem vai trò
+// trong CSDL — admin bị thu hồi NGOÀI ứng dụng (CLI, client khác) vẫn đọc được dữ
+// liệu riêng tư của mọi người cho tới khi chỉ mục được sửa tay. Offline thì
+// isActiveAdmin đọc CSDL nên hành vi không đổi.
+router.use(requireAuth, requireRole("admin", "root"), requireOnChainRole("admin"));
 
 /** Bảng điều khiển quản trị: đối chiếu số liệu ứng dụng với số liệu trên chuỗi. */
 router.get("/overview", async (_req, res, next) => {
@@ -119,7 +124,7 @@ router.get("/credentials/:vcId", async (req, res, next) => {
 });
 
 /** Admin cưỡng chế thu hồi một VC (gian lận, quyết định hành chính). */
-router.post("/credentials/:vcId/revoke", requireOnChainRole("admin"), async (req, res, next) => {
+router.post("/credentials/:vcId/revoke", async (req, res, next) => {
   try {
     const { reason, txHash } = z
       .object({ reason: z.string().trim().min(2).max(500), txHash: zTxHash })
@@ -133,8 +138,37 @@ router.post("/credentials/:vcId/revoke", requireOnChainRole("admin"), async (req
   }
 });
 
+/** Admin tạm ngưng VC của bất kỳ issuer nào (admin_suspend_vc). */
+router.post("/credentials/:vcId/suspend", async (req, res, next) => {
+  try {
+    const { reason, txHash } = zReasonTx.strict().parse(req.body);
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await changeStatus(param(req.params, "vcId"), actor, "suspended", reason, txHash));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * Admin khoá / mở / thu hồi DID của một địa chỉ (admin_suspend_did,
+ * admin_reactivate_did, admin_revoke_did). Thu hồi DID thu hồi luôn vai trò.
+ */
+router.post("/dids/:address/status", async (req, res, next) => {
+  try {
+    const address = zAddress.parse(param(req.params, "address"));
+    const { status, reason, txHash } = zReasonTx
+      .extend({ status: z.enum(["suspended", "active", "revoked"]) })
+      .strict()
+      .parse(req.body);
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await authority.moderateDid(actor, address, status, reason, txHash));
+  } catch (e) {
+    next(e);
+  }
+});
+
 /** Admin kích hoạt lại VC đang tạm ngưng. */
-router.post("/credentials/:vcId/reinstate", requireOnChainRole("admin"), async (req, res, next) => {
+router.post("/credentials/:vcId/reinstate", async (req, res, next) => {
   try {
     const { reason, txHash } = z
       .object({ reason: z.string().trim().min(2).max(500), txHash: zTxHash })
@@ -200,7 +234,7 @@ router.post("/authority/admins/:address/revoke", async (req, res, next) => {
 });
 
 /** Root hoặc admin phê duyệt issuer. */
-router.post("/authority/issuers", requireOnChainRole("admin"), async (req, res, next) => {
+router.post("/authority/issuers", async (req, res, next) => {
   try {
     const { address, vcTypeMask, expiresAt, txHash } = z
       .object({
@@ -220,7 +254,7 @@ router.post("/authority/issuers", requireOnChainRole("admin"), async (req, res, 
 });
 
 /** Tạm ngưng / kích hoạt lại / thu hồi quyền issuer. */
-router.post("/authority/issuers/:address/status", requireOnChainRole("admin"), async (req, res, next) => {
+router.post("/authority/issuers/:address/status", async (req, res, next) => {
   try {
     const address = zAddress.parse(param(req.params, "address"));
     const { status, reason, txHash } = zReasonTx

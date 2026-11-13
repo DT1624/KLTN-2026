@@ -174,9 +174,10 @@ func (o *offlineDB) liveCounts(ctx context.Context, issuer, holder string) (issu
 	if err1 != nil || err2 != nil {
 		return 0, 0
 	}
+	// Khớp bộ đếm "sống" của contract: chỉ VC đang ACTIVE (tạm ngưng không tính).
 	_ = o.pool.QueryRow(ctx, `SELECT
-		  (SELECT count(*) FROM credentials WHERE issuer_address = $1 AND status <> 'revoked'),
-		  (SELECT count(*) FROM credentials WHERE holder_address = $2 AND status <> 'revoked')`,
+		  (SELECT count(*) FROM credentials WHERE issuer_address = $1 AND status = 'active'),
+		  (SELECT count(*) FROM credentials WHERE holder_address = $2 AND status = 'active')`,
 		ia, ha).Scan(&issued, &held)
 	return
 }

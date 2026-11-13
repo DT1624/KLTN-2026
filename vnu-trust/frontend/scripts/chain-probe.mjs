@@ -172,6 +172,43 @@ if (encoded.status === 200) {
     reached && /Move abort|Executed successfully/i.test(status), status);
 }
 
+console.log("\n=== Dịch mã abort (mô phỏng accept_root, KHÔNG gửi lên chuỗi) ===");
+
+// Lấy đúng regex và bảng mã mà giao diện dùng, đọc thẳng từ chain.ts — chép
+// lại ở đây thì hai bản sẽ trôi khỏi nhau. Bảng cũ bắt theo TÊN lỗi và ghi
+// nhầm mã root là 0x1f4, mà vm_status thật không hề kèm tên.
+const chainSrc = readFileSync(join(root, "frontend", "src", "lib", "chain.ts"), "utf8");
+const reSrc = /raw\.match\(\/(.+?)\/i\)/.exec(chainSrc)?.[1];
+const abortRe = reSrc ? new RegExp(reSrc, "i") : null;
+const mapBody = /ABORT_MESSAGES[^{]*\{([\s\S]*?)\n\};/.exec(chainSrc)?.[1] ?? "";
+const uiCodes = [...mapBody.matchAll(/^\s*(\d+):/gm)].map((m) => Number(m[1]));
+const errSrc = readFileSync(join(root, "contracts", "sources", "utils", "errors.move"), "utf8");
+const moveCodes = new Set([...errSrc.matchAll(/const E_\w+:\s*u64\s*=\s*(\d+);/g)].map((m) => Number(m[1])));
+const stray = uiCodes.filter((c) => !moveCodes.has(c));
+check("Mọi mã trong bảng dịch của giao diện đều có trong errors.move",
+  uiCodes.length > 0 && stray.length === 0,
+  stray.length ? `mã lạ: ${stray.join(", ")}` : `${uiCodes.length} mã`);
+
+if (acct.status === 200) {
+  // Gói vừa publish không có đề cử root nào đang chờ, nên accept_root phải
+  // abort E_NO_PENDING_ROOT (1014). Nếu một ngày có đề cử đang chờ cho chính
+  // địa chỉ này thì mô phỏng sẽ thành công — phép dưới báo rõ chứ không đoán.
+  const sim = await post("/transactions/simulate", {
+    sender: SENDER,
+    sequence_number: acct.body.sequence_number,
+    max_gas_amount: "200000",
+    gas_unit_price: "100",
+    expiration_timestamp_secs: String(Math.floor(Date.now() / 1000) + 120),
+    payload: { type: "entry_function_payload", function: `${CONTRACT}::authority::accept_root`, type_arguments: [], arguments: [] },
+    signature: { type: "ed25519_signature", public_key: SENDER_PUB, signature: "0x" + "0".repeat(128) },
+  });
+  const vm = (Array.isArray(sim.body) ? sim.body[0] : sim.body)?.vm_status ?? "";
+  const m = abortRe ? vm.match(abortRe) : null;
+  const code = m ? parseInt(m[1], 16) : null;
+  check("Regex của giao diện rút được mã từ vm_status thật", code === 1014, `${vm} → ${code}`);
+  check("Mã đó có câu dịch trong bảng", code !== null && uiCodes.includes(code));
+}
+
 const failed = rows.filter((r) => !r.ok);
 console.log(`\n${rows.length - failed.length}/${rows.length} PASS` +
   (failed.length ? `  — ${failed.length} FAIL:\n  ${failed.map((f) => f.name).join("\n  ")}` : ""));
