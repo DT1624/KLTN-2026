@@ -77,7 +77,6 @@ CREATE TABLE IF NOT EXISTS credentials (
   vc_id_hash       TEXT        NOT NULL,
   content_hash     TEXT        NOT NULL,
   proof_value      TEXT        NOT NULL,
-  vc_json          JSONB       NOT NULL,
   status           vc_status   NOT NULL DEFAULT 'active',
   status_reason    TEXT,
   issued_at        TIMESTAMPTZ NOT NULL,
@@ -156,3 +155,32 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor, created_at DESC);
+
+-- ---------- Nâng cấp 13/11/2026: cấp lại văn bằng (C3) và chuyển danh tính (P4.2) ----------
+-- Thêm bằng ALTER … IF NOT EXISTS để chạy lại tệp này lên CSDL đang có dữ liệu
+-- mà không phải xoá volume. Liên kết cũ ↔ mới là CHỈ MỤC: nguồn sự thật là
+-- ReplacementRegistry trên chuỗi (vc_registry::get_replacement / get_replaced).
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS replaces_vc_id    TEXT;
+ALTER TABLE credentials ADD COLUMN IF NOT EXISTS replaced_by_vc_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_vc_issuer_address ON credentials(issuer_address, status);
+
+-- Holder mất khoá lập ví mới; admin xác minh danh tính ngoài hệ thống rồi ghi
+-- liên kết ví cũ → ví mới ở ĐÂY (không ghi lên chuỗi: một mối nối công khai
+-- vĩnh viễn giữa hai ví của cùng một người là thông tin cá nhân — xem C3).
+CREATE TABLE IF NOT EXISTS identity_migrations (
+  id           BIGSERIAL   PRIMARY KEY,
+  old_address  TEXT        NOT NULL UNIQUE,
+  new_address  TEXT        NOT NULL,
+  old_did      TEXT        NOT NULL,
+  new_did      TEXT        NOT NULL,
+  recorded_by  TEXT        NOT NULL,
+  note         TEXT        NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_migration_new ON identity_migrations(new_address);
+
+-- ---------- P3 (13/11/2026): máy chủ KHÔNG giữ nội dung văn bằng dạng rõ ----------
+-- Nội dung nằm trong phong bì mã hoá trên IPFS (ipfs_cid); chỉ holder và issuer giải
+-- mã được trên thiết bị. Bỏ hẳn cột thay vì để trống: không còn chỗ nào để một đường
+-- mã tương lai lỡ ghi bản rõ vào.
+ALTER TABLE credentials DROP COLUMN IF EXISTS vc_json;
