@@ -2,6 +2,10 @@ module github.com/vnu-trust/backend-go
 
 go 1.25.0
 
+// Thư viện chuẩn go1.26.4 dính 18 lỗ hổng (govulncheck, SECURITY_REVIEW D-01); Go và Render
+// tự tải đúng toolchain này khi build (GOTOOLCHAIN=auto).
+toolchain go1.26.11
+
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0

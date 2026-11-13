@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"sync"
 
 	"github.com/google/uuid"
 
@@ -142,10 +143,19 @@ func (a *API) AuthMe(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	ctx := r.Context()
-	hasDID := a.Chain.HasActiveDID(ctx, e.Address)
-	isAdmin := a.Chain.IsActiveAdmin(ctx, e.Address)
-	isIssuer := a.Chain.IsActiveIssuer(ctx, e.Address)
-	canDelegate := a.Chain.CanDelegate(ctx, e.Address)
+	// P5: bốn câu hỏi độc lập — chạy song song (trước đây tuần tự, 4 vòng fullnode).
+	var hasDID, isAdmin, isIssuer, canDelegate bool
+	var wg sync.WaitGroup
+	for _, f := range []func(){
+		func() { hasDID = a.Chain.HasActiveDID(ctx, e.Address) },
+		func() { isAdmin = a.Chain.IsActiveAdmin(ctx, e.Address) },
+		func() { isIssuer = a.Chain.IsActiveIssuer(ctx, e.Address) },
+		func() { canDelegate = a.Chain.CanDelegate(ctx, e.Address) },
+	} {
+		wg.Add(1)
+		go func(f func()) { defer wg.Done(); f() }(f)
+	}
+	wg.Wait()
 
 	consistent := hasDID
 	switch e.Role {

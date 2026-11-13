@@ -124,6 +124,37 @@ func (o *offlineDB) vcStatus(ctx context.Context, id int64) string {
 	return s
 }
 
+func (o *offlineDB) vcRecords(ctx context.Context, ids []int64) map[int64]VCLite {
+	o.warnOnce()
+	out := map[int64]VCLite{}
+	rows, err := o.pool.Query(ctx,
+		`SELECT on_chain_vc_id, status, content_hash FROM credentials WHERE on_chain_vc_id = ANY($1)`, ids)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var st, h string
+		if rows.Scan(&id, &st, &h) == nil {
+			out[id] = VCLite{Status: st, ContentHash: strings.ToLower(h)}
+		}
+	}
+	return out
+}
+
+func (o *offlineDB) replacement(ctx context.Context, id int64) (int64, bool) {
+	o.warnOnce()
+	var n *int64
+	if o.pool.QueryRow(ctx,
+		`SELECT n.on_chain_vc_id FROM credentials o
+		   JOIN credentials n ON n.vc_id = o.replaced_by_vc_id
+		  WHERE o.on_chain_vc_id = $1`, id).Scan(&n) != nil || n == nil {
+		return 0, false
+	}
+	return *n, true
+}
+
 func (o *offlineDB) vcIntegrity(ctx context.Context, id int64, hash string) bool {
 	o.warnOnce()
 	var stored string

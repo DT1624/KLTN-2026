@@ -69,6 +69,37 @@ func RequireRole(roleOf RoleLookup, next httpx.Handler, roles ...string) httpx.H
 	}
 }
 
+// RoleCacheTTL — P5 (13/11/2026): mọi tuyến admin hỏi is_active_admin ở MỖI yêu cầu (V1),
+// một vòng fullnode mỗi lần; đệm theo địa chỉ trong RoleCacheTTL. Cửa sổ rủi ro: người vừa
+// bị thu hồi quyền ngoài ứng dụng còn đọc được tuyến admin tối đa RoleCacheTTL. Thao tác
+// GHI không bị ảnh hưởng: giao dịch của họ vẫn bị hợp đồng từ chối, và backend vẫn xác minh
+// giao dịch + hỏi lại trạng thái chuỗi (quyết định #19, không đệm). Khớp TypeScript (5 s).
+const RoleCacheTTL = 5 * time.Second
+
+type roleEntry struct {
+	ok bool
+	at time.Time
+}
+
+var roleCache sync.Map // "kind|địa chỉ" -> roleEntry
+
+func cachedRole(ctx context.Context, cc *chain.Client, kind, addr string) bool {
+	key := kind + "|" + addr
+	if v, hit := roleCache.Load(key); hit {
+		if e := v.(roleEntry); time.Since(e.at) < RoleCacheTTL {
+			return e.ok
+		}
+	}
+	var ok bool
+	if kind == "admin" {
+		ok = cc.IsActiveAdmin(ctx, addr)
+	} else {
+		ok = cc.IsActiveIssuer(ctx, addr)
+	}
+	roleCache.Store(key, roleEntry{ok: ok, at: time.Now()})
+	return ok
+}
+
 // RequireOnChainRole kiểm quyền THẬT trên chuỗi, không chỉ dựa vào JWT.
 // JWT chỉ nói người dùng khai là gì; chuỗi mới nói họ thực sự có quyền gì.
 func RequireOnChainRole(cc *chain.Client, kind string, next httpx.Handler) httpx.Handler {
@@ -77,12 +108,7 @@ func RequireOnChainRole(cc *chain.Client, kind string, next httpx.Handler) httpx
 		if c == nil {
 			return httpx.Unauthorized("")
 		}
-		ok := false
-		if kind == "admin" {
-			ok = cc.IsActiveAdmin(r.Context(), c.Address)
-		} else {
-			ok = cc.IsActiveIssuer(r.Context(), c.Address)
-		}
+		ok := cachedRole(r.Context(), cc, kind, c.Address)
 		if !ok {
 			if kind == "admin" {
 				return httpx.Forbidden("Địa chỉ này không phải admin đang hoạt động trên chuỗi")

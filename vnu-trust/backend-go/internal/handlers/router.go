@@ -45,6 +45,7 @@ func (a *API) Routes() http.Handler {
 	mux.Handle("GET /api/stats", httpx.Handler(a.Stats))
 	mux.Handle("GET /api/lookup", httpx.Handler(a.Lookup))
 	mux.Handle("GET /api/did/resolve", httpx.Handler(a.ResolveDIDHandler))
+	mux.Handle("GET /api/ipfs/{cid}", httpx.Handler(a.GetIPFS))
 	mux.Handle("GET /api/did/by-address/{address}", httpx.Handler(a.ResolveDIDByAddressHandler))
 	mux.Handle("POST /api/entities/register", httpx.Handler(a.RegisterEntity))
 	mux.Handle("GET /api/entities/by-address/{address}", httpx.Handler(a.EntityByAddressPublic))
@@ -57,6 +58,7 @@ func (a *API) Routes() http.Handler {
 	mux.Handle("GET /api/auth/me", authed(a.AuthMe))
 	mux.Handle("POST /api/ipfs/pin", authed(a.PinIPFS))
 	mux.Handle("POST /api/did/save", authed(a.SaveDID))
+	mux.Handle("POST /api/did/self-status", authed(a.SelfDIDStatus))
 
 	// --- Issuer ---
 	mux.Handle("GET /api/issuer/stats", role(a.IssuerStats, "issuer"))
@@ -65,6 +67,11 @@ func (a *API) Routes() http.Handler {
 	mux.Handle("POST /api/issuer/credentials", onchain(a.IssueCredential, "issuer", "issuer"))
 	mux.Handle("POST /api/issuer/credentials/{vcId}/revoke", role(a.ChangeVCStatus("revoked"), "issuer"))
 	mux.Handle("POST /api/issuer/credentials/{vcId}/suspend", role(a.ChangeVCStatus("suspended"), "issuer"))
+	// C3: cấp lại; P4.2: ví mới của holder; C2: issuer cha xem xét VC của sub-issuer.
+	mux.Handle("POST /api/issuer/credentials/{vcId}/reissue", onchain(a.ReissueCredential, "issuer", "issuer"))
+	mux.Handle("GET /api/issuer/holders/{address}/migration", role(a.IssuerHolderMigration, "issuer"))
+	mux.Handle("GET /api/issuer/review/{address}/credentials", role(a.ParentReviewCredentials, "issuer"))
+	mux.Handle("POST /api/issuer/review/batch", role(a.ParentBatch, "issuer"))
 	// Uỷ quyền: issuer có bit VC_DELEGATION cấp và quản lý sub-issuer.
 	mux.Handle("GET /api/issuer/delegation", role(a.IssuerDelegation, "issuer"))
 	mux.Handle("POST /api/issuer/sub-issuers", role(a.ApproveSubIssuer, "issuer"))
@@ -102,6 +109,14 @@ func (a *API) Routes() http.Handler {
 	mux.Handle("POST /api/admin/credentials/{vcId}/reinstate",
 		onchain(a.ChangeVCStatus("active"), "admin", "admin", "root"))
 	mux.Handle("GET /api/admin/audit", onchain(a.AdminAudit, "admin", "admin", "root"))
+	// C2/C3/P4.2 (nâng cấp 13/11): xem xét theo lô, nối liên kết cấp lại, chuyển ví.
+	mux.Handle("GET /api/admin/issuers/{address}/credentials",
+		onchain(a.AdminIssuerCredentials, "admin", "admin", "root"))
+	mux.Handle("POST /api/admin/credentials/batch", onchain(a.AdminBatch, "admin", "admin", "root"))
+	mux.Handle("POST /api/admin/credentials/{vcId}/replacement",
+		onchain(a.AdminLinkReplacement, "admin", "admin", "root"))
+	mux.Handle("POST /api/admin/identity-migrations", onchain(a.AdminRecordMigration, "admin", "admin", "root"))
+	mux.Handle("GET /api/admin/identity-migrations/{address}", onchain(a.AdminMigration, "admin", "admin", "root"))
 
 	// --- Quản trị quyền hạn trên chuỗi ---
 	// Đường dẫn phải khớp từng ký tự với backend TypeScript

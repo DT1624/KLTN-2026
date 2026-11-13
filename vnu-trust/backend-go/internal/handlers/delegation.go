@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"sync"
 
 	"time"
 
@@ -43,20 +44,44 @@ func (a *API) IssuerDelegation(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	// P5: trước đây hỏi chuỗi TUẦN TỰ 2 lần mỗi sub-issuer; nay song song (trần 8), hai
+	// câu hỏi của cùng địa chỉ chạy cùng lúc, thứ tự kết quả giữ nguyên — giống bản TS.
+	found := make([]*subIssuer, len(targets))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for i, t := range targets {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, t string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			var parent string
+			var info *chain.OnChainRole
+			var inner sync.WaitGroup
+			inner.Add(2)
+			go func() { defer inner.Done(); parent = a.Chain.GetDelegator(ctx, t) }()
+			go func() { defer inner.Done(); info = a.Chain.RoleInfo(ctx, t) }()
+			inner.Wait()
+			if parent != me {
+				return // đã được root/admin cấp lại
+			}
+			item := subIssuer{Address: t, Status: "unknown"}
+			if info != nil {
+				item.VCTypeMask, item.ExpiresAt, item.Status = info.VCTypeMask, info.ExpiresAt, info.Status
+			}
+			if e, _ := a.Store.EntityByAddress(ctx, t); e != nil {
+				label := e.Label
+				item.Label = &label
+			}
+			found[i] = &item
+		}(i, t)
+	}
+	wg.Wait()
 	subs := []subIssuer{}
-	for _, t := range targets {
-		if a.Chain.GetDelegator(ctx, t) != me {
-			continue // đã được root/admin cấp lại
+	for _, s := range found {
+		if s != nil {
+			subs = append(subs, *s)
 		}
-		item := subIssuer{Address: t, Status: "unknown"}
-		if info := a.Chain.RoleInfo(ctx, t); info != nil {
-			item.VCTypeMask, item.ExpiresAt, item.Status = info.VCTypeMask, info.ExpiresAt, info.Status
-		}
-		if e, _ := a.Store.EntityByAddress(ctx, t); e != nil {
-			label := e.Label
-			item.Label = &label
-		}
-		subs = append(subs, item)
 	}
 	httpx.OK(w, http.StatusOK, map[string]any{
 		"canDelegate":   a.Chain.CanDelegate(ctx, me),

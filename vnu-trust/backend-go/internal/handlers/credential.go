@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -28,6 +29,29 @@ func (a *API) effectiveStatus(r *http.Request, c *db.Credential) (status, source
 		}
 	}
 	return c.Status, "db"
+}
+
+// effectiveFrom: cùng luật effectiveStatus nhưng dùng bản ghi đã đọc theo lô (P5).
+func (a *API) effectiveFrom(c *db.Credential, recs map[int64]chain.VCLite) (status, source string) {
+	if c.ExpiresAt != nil && !c.ExpiresAt.After(time.Now()) {
+		return "expired", "db"
+	}
+	if c.OnChainVCID != nil {
+		if rec, ok := recs[*c.OnChainVCID]; ok {
+			return rec.Status, a.chainSource()
+		}
+	}
+	return c.Status, "db"
+}
+
+func onChainIDs(rows []*db.Credential) []int64 {
+	ids := []int64{}
+	for _, c := range rows {
+		if c != nil && c.OnChainVCID != nil {
+			ids = append(ids, *c.OnChainVCID)
+		}
+	}
+	return ids
 }
 
 func (a *API) withStatus(r *http.Request, c *db.Credential) credentialWithStatus {
@@ -100,139 +124,173 @@ func (a *API) AdminCredential(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (a *API) IssueCredential(w http.ResponseWriter, r *http.Request) error {
-	var body struct {
-		VCID          string         `json:"vcId"`
-		OnChainVCID   int64          `json:"onChainVcId"`
-		HolderDID     string         `json:"holderDid"`
-		HolderAddress string         `json:"holderAddress"`
-		VCType        int            `json:"vcType"`
-		IPFSCid       string         `json:"ipfsCid"`
-		VCIDHash      string         `json:"vcIdHash"`
-		ContentHash   string         `json:"contentHash"`
-		ProofValue    string         `json:"proofValue"`
-		VCJSON        map[string]any `json:"vcJson"`
-		IssuedAt      string         `json:"issuedAt"`
-		ExpiresAt     *string        `json:"expiresAt"`
-		TxHash        string         `json:"txHash"`
-	}
-	if err := httpx.DecodeJSON(r, &body); err != nil {
-		return err
-	}
+// issueBody là thân yêu cầu ghi một VC vừa lên chuỗi — dùng chung cho cấp mới
+// và cấp lại (C3), giống zIssueBody bên TypeScript.
+type issueBody struct {
+	VCID          string `json:"vcId"`
+	OnChainVCID   int64  `json:"onChainVcId"`
+	HolderDID     string `json:"holderDid"`
+	HolderAddress string `json:"holderAddress"`
+	VCType        int    `json:"vcType"`
+	IPFSCid       string `json:"ipfsCid"`
+	VCIDHash      string `json:"vcIdHash"`
+	ContentHash   string `json:"contentHash"`
+	ProofValue    string `json:"proofValue"`
+	// P3: KHÔNG còn vcJson — nội dung nằm trong phong bì mã hoá tại ipfsCid.
+	IssuedAt  string  `json:"issuedAt"`
+	ExpiresAt *string `json:"expiresAt"`
+	TxHash    string  `json:"txHash"`
+}
 
+// issueInput là issueBody đã qua kiểm định dạng.
+type issueInput struct {
+	body                                         issueBody
+	holderDID, holderAddr, cid, vcIDHash, txHash string
+	contentHash                                  string
+	vcType                                       int
+	issuedAt                                     time.Time
+	expiresAt                                    *time.Time
+}
+
+func parseIssueBody(r *http.Request) (*issueInput, error) {
+	var in issueInput
+	body := &in.body
+	if err := httpx.DecodeJSON(r, body); err != nil {
+		return nil, err
+	}
 	if len(body.VCID) < 8 || len(body.VCID) > 200 {
-		return httpx.BadRequest("vcId: phải dài 8..200 ký tự")
+		return nil, httpx.BadRequest("vcId: phải dài 8..200 ký tự")
 	}
-	holderDID, err := httpx.DID(body.HolderDID, "holderDid")
-	if err != nil {
-		return err
+	var err error
+	if in.holderDID, err = httpx.DID(body.HolderDID, "holderDid"); err != nil {
+		return nil, err
 	}
-	holderAddr, err := httpx.Address(body.HolderAddress, "holderAddress")
-	if err != nil {
-		return err
+	if in.holderAddr, err = httpx.Address(body.HolderAddress, "holderAddress"); err != nil {
+		return nil, err
 	}
-	vcType, err := httpx.VCType(body.VCType, "vcType")
-	if err != nil {
-		return err
+	if in.vcType, err = httpx.VCType(body.VCType, "vcType"); err != nil {
+		return nil, err
 	}
-	cid, err := httpx.CID(body.IPFSCid, "ipfsCid")
-	if err != nil {
-		return err
+	if in.cid, err = httpx.CID(body.IPFSCid, "ipfsCid"); err != nil {
+		return nil, err
 	}
-	vcIDHash, err := httpx.Hash32(body.VCIDHash, "vcIdHash")
-	if err != nil {
-		return err
+	if in.vcIDHash, err = httpx.Hash32(body.VCIDHash, "vcIdHash"); err != nil {
+		return nil, err
 	}
-	contentHash, err := httpx.Hash32(body.ContentHash, "contentHash")
-	if err != nil {
-		return err
+	if in.contentHash, err = httpx.Hash32(body.ContentHash, "contentHash"); err != nil {
+		return nil, err
 	}
-	txHash, err := httpx.TxHash(body.TxHash, "txHash")
-	if err != nil {
-		return err
+	if in.txHash, err = httpx.TxHash(body.TxHash, "txHash"); err != nil {
+		return nil, err
 	}
 	if len(body.ProofValue) < 16 {
-		return httpx.BadRequest("proofValue: chữ ký quá ngắn")
-	}
-	if body.VCJSON == nil {
-		return httpx.BadRequest("vcJson: bắt buộc")
+		return nil, httpx.BadRequest("proofValue: chữ ký quá ngắn")
 	}
 	issuedAt, perr := time.Parse(time.RFC3339, body.IssuedAt)
 	if perr != nil {
-		return httpx.BadRequest("issuedAt: phải theo định dạng RFC3339")
+		return nil, httpx.BadRequest("issuedAt: phải theo định dạng RFC3339")
 	}
-	var expiresAt *time.Time
+	in.issuedAt = issuedAt
 	if body.ExpiresAt != nil && *body.ExpiresAt != "" {
 		t, perr := time.Parse(time.RFC3339, *body.ExpiresAt)
 		if perr != nil {
-			return httpx.BadRequest("expiresAt: phải theo định dạng RFC3339")
+			return nil, httpx.BadRequest("expiresAt: phải theo định dạng RFC3339")
 		}
 		if !t.After(issuedAt) {
-			return httpx.BadRequest("Thời điểm hết hạn phải sau thời điểm cấp")
+			return nil, httpx.BadRequest("Thời điểm hết hạn phải sau thời điểm cấp")
 		}
-		expiresAt = &t
+		in.expiresAt = &t
 	}
+	return &in, nil
+}
 
-	claims := middleware.ClaimsFrom(r.Context())
-	if holderAddr == claims.Address {
+// assertIssueInput: các phép kiểm trước khi chạm chuỗi, đúng thứ tự bên TypeScript
+// (vc.service.ts assertIssueInput): tự cấp → hash vcId → trùng → phong bì.
+// P3: máy chủ không còn thấy nội dung nên không tính lại contentHash (envelope.go).
+func (a *API) assertIssueInput(ctx context.Context, in *issueInput, issuerAddr string) error {
+	if in.holderAddr == issuerAddr {
 		return httpx.BadRequest("Đơn vị cấp không được tự cấp văn bằng cho chính mình")
 	}
-	// Rẻ trước, đắt sau — giống hệt thứ tự bên TypeScript.
-	if got := auth.SHA3256Hex(body.VCJSON); got != contentHash {
-		return httpx.BadRequest("Hash nội dung VC không khớp (tính được %s)", got)
-	}
-	if got := auth.SHA3256String(body.VCID); got != vcIDHash {
+	if got := auth.SHA3256String(in.body.VCID); got != in.vcIDHash {
 		return httpx.BadRequest("Hash của vcId không khớp (tính được %s)", got)
 	}
-	if existing, err := a.Store.VCByID(r.Context(), body.VCID); err != nil {
+	if existing, err := a.Store.VCByID(ctx, in.body.VCID); err != nil {
 		return err
 	} else if existing != nil {
 		return httpx.Conflict("VC này đã được ghi nhận")
 	}
+	return a.assertEnvelope(ctx, in.cid, in.vcIDHash, in.holderAddr, issuerAddr)
+}
 
+// issueArgs: sáu tham số của issue_vc sau signer (S-02); reissue_vc dùng đúng sáu
+// tham số này sau old_vc_id.
+func (a *API) issueArgs(in *issueInput) []chain.Arg {
+	var expUnix int64
+	if in.expiresAt != nil {
+		expUnix = in.expiresAt.Unix()
+	}
+	return []chain.Arg{
+		chain.ArgAddress(in.holderAddr), chain.ArgU64(int64(in.vcType)), chain.ArgBytes(in.vcIDHash),
+		chain.ArgBytes(chain.UTF8ToHex(in.cid)), chain.ArgBytes(in.contentHash), chain.ArgU64(expUnix),
+	}
+}
+
+// assertIssuedEvent: số hiệu on-chain và DID holder lấy từ sự kiện của CHÍNH giao dịch.
+func (a *API) assertIssuedEvent(tx *chain.Transaction, in *issueInput) error {
+	if a.Chain.Offline() {
+		return nil
+	}
+	ev := chain.FindEvent(tx, a.Chain.Module("vc_registry")+"::VCIssuedEvent")
+	if ev == nil {
+		return httpx.BadRequest("Giao dịch không phát VCIssuedEvent")
+	}
+	if fmt.Sprint(ev["id"]) != strconv.FormatInt(in.body.OnChainVCID, 10) {
+		return httpx.BadRequest("onChainVcId không khớp sự kiện trên chuỗi (chuỗi ghi %v)", ev["id"])
+	}
+	if hd, _ := ev["holder_did"].(string); chain.HexToUTF8(hd) != in.holderDID {
+		return httpx.BadRequest("holderDid không khớp DID của người nhận ghi trên chuỗi")
+	}
+	return nil
+}
+
+func (in *issueInput) saveInput(issuer *db.Entity) services.SaveVCInput {
+	return services.SaveVCInput{
+		VCID: in.body.VCID, OnChainVCID: in.body.OnChainVCID,
+		IssuerDID: issuer.DID, IssuerAddress: issuer.Address,
+		HolderDID: in.holderDID, HolderAddress: in.holderAddr,
+		VCType: in.vcType, IPFSCid: in.cid, VCIDHash: in.vcIDHash, ContentHash: in.contentHash,
+		ProofValue: in.body.ProofValue,
+		IssuedAt:   in.issuedAt, ExpiresAt: in.expiresAt, TxHash: in.txHash,
+	}
+}
+
+func (a *API) IssueCredential(w http.ResponseWriter, r *http.Request) error {
+	in, err := parseIssueBody(r)
+	if err != nil {
+		return err
+	}
+	claims := middleware.ClaimsFrom(r.Context())
+	// Rẻ trước, đắt sau — giống hệt thứ tự bên TypeScript.
+	if err := a.assertIssueInput(r.Context(), in, claims.Address); err != nil {
+		return err
+	}
 	issuer, err := a.Store.RequireEntity(r.Context(), claims.Address)
 	if err != nil {
 		return err
 	}
-	// Tham số giao dịch phải đúng là văn bằng đang ghi (S-02).
-	var expUnix int64
-	if expiresAt != nil {
-		expUnix = expiresAt.Unix()
-	}
-	tx, err := a.Chain.VerifyTransactionArgs(r.Context(), txHash, a.Chain.EntryIssueVC(), issuer.Address, []chain.Arg{
-		chain.ArgAddress(holderAddr), chain.ArgU64(int64(vcType)), chain.ArgBytes(vcIDHash),
-		chain.ArgBytes(chain.UTF8ToHex(cid)), chain.ArgBytes(contentHash), chain.ArgU64(expUnix),
-	})
+	tx, err := a.Chain.VerifyTransactionArgs(r.Context(), in.txHash, a.Chain.EntryIssueVC(), issuer.Address, a.issueArgs(in))
 	if err != nil {
 		return err
 	}
-	// Số hiệu on-chain và DID holder lấy từ sự kiện của CHÍNH giao dịch, không tin client.
-	if !a.Chain.Offline() {
-		ev := chain.FindEvent(tx, a.Chain.Module("vc_registry")+"::VCIssuedEvent")
-		if ev == nil {
-			return httpx.BadRequest("Giao dịch không phát VCIssuedEvent")
-		}
-		if fmt.Sprint(ev["id"]) != strconv.FormatInt(body.OnChainVCID, 10) {
-			return httpx.BadRequest("onChainVcId không khớp sự kiện trên chuỗi (chuỗi ghi %v)", ev["id"])
-		}
-		if hd, _ := ev["holder_did"].(string); chain.HexToUTF8(hd) != holderDID {
-			return httpx.BadRequest("holderDid không khớp DID của người nhận ghi trên chuỗi")
-		}
+	if err := a.assertIssuedEvent(tx, in); err != nil {
+		return err
 	}
-
-	row, err := a.Store.SaveVC(r.Context(), services.SaveVCInput{
-		VCID: body.VCID, OnChainVCID: body.OnChainVCID,
-		IssuerDID: issuer.DID, IssuerAddress: issuer.Address,
-		HolderDID: holderDID, HolderAddress: holderAddr,
-		VCType: vcType, IPFSCid: cid, VCIDHash: vcIDHash, ContentHash: contentHash,
-		ProofValue: body.ProofValue, VCJSON: body.VCJSON,
-		IssuedAt: issuedAt, ExpiresAt: expiresAt, TxHash: txHash,
-	})
+	row, err := a.Store.SaveVC(r.Context(), in.saveInput(issuer))
 	if err != nil {
 		return err
 	}
-	a.Store.Audit(r.Context(), issuer.Address, services.AuditVCIssue, &body.VCID,
-		map[string]any{"holderDid": holderDID, "vcType": vcType, "txHash": txHash})
+	a.Store.Audit(r.Context(), issuer.Address, services.AuditVCIssue, &in.body.VCID,
+		map[string]any{"holderDid": in.holderDID, "vcType": in.vcType, "txHash": in.txHash})
 	httpx.OK(w, http.StatusCreated, row)
 	return nil
 }
@@ -363,9 +421,17 @@ func (a *API) HolderCredentials(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	out := make([]credentialWithStatus, 0, len(rows))
+	// P5: một lần đọc lô thay cho N lần get_vc_status (trước đây còn gọi TUẦN TỰ).
+	ptrs := make([]*db.Credential, len(rows))
 	for i := range rows {
-		out = append(out, a.withStatus(r, &rows[i]))
+		ptrs[i] = &rows[i]
+	}
+	recs := a.Chain.VCRecords(r.Context(), onChainIDs(ptrs))
+	out := make([]credentialWithStatus, 0, len(rows))
+	for _, c := range ptrs {
+		st, src := a.effectiveFrom(c, recs)
+		out = append(out, credentialWithStatus{Credential: c,
+			Effective: map[string]any{"status": st, "source": src, "drift": src != "db" && st != c.Status}})
 	}
 	httpx.OK(w, http.StatusOK, out)
 	return nil
@@ -450,6 +516,10 @@ func (a *API) CreatePresentation(w http.ResponseWriter, r *http.Request) error {
 		if st, _ := a.effectiveStatus(r, vc); st != "active" {
 			return httpx.BadRequest("VC %s đang ở trạng thái %q, không thể đưa vào VP", id, st)
 		}
+	}
+	// P3: IPFS chỉ giữ bản trình bày ĐÃ MÃ HOÁ (khoá nằm trong fragment liên kết).
+	if err := a.assertShareBlob(r.Context(), cid); err != nil {
+		return err
 	}
 
 	buf := make([]byte, 24)

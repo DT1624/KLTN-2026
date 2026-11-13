@@ -3,8 +3,10 @@ package chain
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Tên hàm entry và view — đối chiếu đúng ABI đã deploy. Gom về một chỗ vì đây
@@ -48,6 +50,31 @@ func (c *Client) EntryRevokeIssuer() string { return c.Module("authority") + "::
 // là khoá chết toàn bộ cây quyền lực (F-00).
 func (c *Client) EntryProposeRoot() string { return c.Module("authority") + "::propose_root" }
 func (c *Client) EntryAcceptRoot() string  { return c.Module("authority") + "::accept_root" }
+
+// C2 (nâng cấp 13/11): xử lý theo lô — admin mọi VC, issuer cha VC của sub-issuer.
+func (c *Client) EntryAdminSuspendVCs() string {
+	return c.Module("vc_registry") + "::admin_suspend_vcs"
+}
+func (c *Client) EntryAdminRevokeVCs() string { return c.Module("vc_registry") + "::admin_revoke_vcs" }
+func (c *Client) EntryDelegatorSuspendVCs() string {
+	return c.Module("vc_registry") + "::delegator_suspend_vcs"
+}
+func (c *Client) EntryDelegatorRevokeVCs() string {
+	return c.Module("vc_registry") + "::delegator_revoke_vcs"
+}
+
+// C3: cấp lại có liên kết cũ → mới.
+func (c *Client) EntryReissueVC() string { return c.Module("vc_registry") + "::reissue_vc" }
+func (c *Client) EntryAdminLinkReplacement() string {
+	return c.Module("vc_registry") + "::admin_link_replacement"
+}
+
+// P4.1: chủ DID tự khoá / tự mở.
+func (c *Client) EntrySuspendOwnDID() string { return c.Module("did_registry") + "::suspend_own_did" }
+func (c *Client) EntryReactivateOwnDID() string {
+	return c.Module("did_registry") + "::reactivate_own_did"
+}
+
 func (c *Client) EntryCancelRootTransfer() string {
 	return c.Module("authority") + "::cancel_root_transfer"
 }
@@ -170,6 +197,88 @@ func (c *Client) VCStatus(ctx context.Context, onChainVCID int64) string {
 		return ""
 	}
 	return vcStatus[n]
+}
+
+// VCLite là trạng thái hiệu lực + content_hash của một VC; ContentHash rỗng khi chỉ
+// đọc được trạng thái (đường dự phòng từng VC).
+type VCLite struct{ Status, ContentHash string }
+
+// VCRecords đọc trạng thái hiệu lực + content_hash của NHIỀU VC trong MỘT lần gọi view
+// (P5, 13/11): get_vcs_paginated(min, span) khi các id nằm trong khoảng ≤ 200 — thay cho
+// cả get_vc_status lẫn verify_integrity. Khoảng rộng hơn / view lỗi thì quay về gọi từng
+// VC (song song, trần 8). Khớp backend TypeScript (registry.ts vcRecordsOnChain).
+func (c *Client) VCRecords(ctx context.Context, ids []int64) map[int64]VCLite {
+	out := map[int64]VCLite{}
+	seen := map[int64]bool{}
+	uniq := []int64{}
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			uniq = append(uniq, id)
+		}
+	}
+	if len(uniq) == 0 {
+		return out
+	}
+	sort.Slice(uniq, func(i, j int) bool { return uniq[i] < uniq[j] })
+	if c.offline != nil {
+		return c.offline.vcRecords(ctx, uniq)
+	}
+	if span := uniq[len(uniq)-1] - uniq[0] + 1; span <= 200 {
+		raw := c.ViewOrNil(ctx, c.Module("vc_registry")+"::get_vcs_paginated",
+			strconv.FormatInt(uniq[0], 10), strconv.FormatInt(span, 10))
+		var recs []struct {
+			ID          string `json:"id"`
+			Status      int    `json:"status"`
+			ContentHash string `json:"content_hash"`
+		}
+		if len(raw) > 0 && json.Unmarshal(raw[0], &recs) == nil {
+			for _, rec := range recs {
+				id, err := strconv.ParseInt(rec.ID, 10, 64)
+				if st := vcStatus[rec.Status]; err == nil && seen[id] && st != "" {
+					out[id] = VCLite{Status: st, ContentHash: strings.ToLower(rec.ContentHash)}
+				}
+			}
+			return out
+		}
+	}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for _, id := range uniq {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(id int64) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if st := c.VCStatus(ctx, id); st != "" {
+				mu.Lock()
+				out[id] = VCLite{Status: st}
+				mu.Unlock()
+			}
+		}(id)
+	}
+	wg.Wait()
+	return out
+}
+
+// VCReplacement trả số hiệu on-chain của VC thay thế cho onChainVCID (C3) và
+// true, hoặc (0, false) nếu chưa bị thay. Offline đọc chỉ mục CSDL.
+func (c *Client) VCReplacement(ctx context.Context, onChainVCID int64) (int64, bool) {
+	if c.offline != nil {
+		return c.offline.replacement(ctx, onChainVCID)
+	}
+	raw := c.ViewOrNil(ctx, c.Module("vc_registry")+"::get_replacement", strconv.FormatInt(onChainVCID, 10))
+	if len(raw) < 2 {
+		return 0, false
+	}
+	var has bool
+	var id string
+	if json.Unmarshal(raw[0], &has) != nil || !has || json.Unmarshal(raw[1], &id) != nil {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(id, 10, 64)
+	return n, err == nil
 }
 
 func (c *Client) countView(ctx context.Context, fn string) int {

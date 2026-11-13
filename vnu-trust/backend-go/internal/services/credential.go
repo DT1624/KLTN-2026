@@ -65,15 +65,16 @@ func (s *Store) SaveDID(ctx context.Context, in SaveDIDInput) (*db.DIDDocument, 
 }
 
 const vcCols = `id, vc_id, on_chain_vc_id, issuer_did, issuer_address, holder_did, holder_address,
-	vc_type, ipfs_cid, vc_id_hash, content_hash, proof_value, vc_json, status, status_reason,
-	issued_at, expires_at, tx_hash, status_tx_hash, created_at, updated_at`
+	vc_type, ipfs_cid, vc_id_hash, content_hash, proof_value, status, status_reason,
+	issued_at, expires_at, tx_hash, status_tx_hash, created_at, updated_at,
+	replaces_vc_id, replaced_by_vc_id`
 
 func scanVC(row pgx.Row) (*db.Credential, error) {
 	var c db.Credential
 	err := row.Scan(&c.ID, &c.VCID, &c.OnChainVCID, &c.IssuerDID, &c.IssuerAddress,
 		&c.HolderDID, &c.HolderAddress, &c.VCType, &c.IPFSCid, &c.VCIDHash, &c.ContentHash,
-		&c.ProofValue, &c.VCJSON, &c.Status, &c.StatusReason, &c.IssuedAt, &c.ExpiresAt,
-		&c.TxHash, &c.StatusTxHash, &c.CreatedAt, &c.UpdatedAt)
+		&c.ProofValue, &c.Status, &c.StatusReason, &c.IssuedAt, &c.ExpiresAt,
+		&c.TxHash, &c.StatusTxHash, &c.CreatedAt, &c.UpdatedAt, &c.ReplacesVCID, &c.ReplacedByVCID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -99,7 +100,11 @@ func (s *Store) RequireVC(ctx context.Context, vcID string) (*db.Credential, err
 }
 
 func (s *Store) listVCs(ctx context.Context, where string, args ...any) ([]db.Credential, error) {
-	rows, err := s.DB.Pool.Query(ctx, `SELECT `+vcCols+` FROM credentials WHERE `+where+` ORDER BY issued_at DESC`, args...)
+	return s.listVCsOrdered(ctx, where, "issued_at DESC", args...)
+}
+
+func (s *Store) listVCsOrdered(ctx context.Context, where, order string, args ...any) ([]db.Credential, error) {
+	rows, err := s.DB.Pool.Query(ctx, `SELECT `+vcCols+` FROM credentials WHERE `+where+` ORDER BY `+order, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -107,14 +112,11 @@ func (s *Store) listVCs(ctx context.Context, where string, args ...any) ([]db.Cr
 
 	out := []db.Credential{}
 	for rows.Next() {
-		var c db.Credential
-		if err := rows.Scan(&c.ID, &c.VCID, &c.OnChainVCID, &c.IssuerDID, &c.IssuerAddress,
-			&c.HolderDID, &c.HolderAddress, &c.VCType, &c.IPFSCid, &c.VCIDHash, &c.ContentHash,
-			&c.ProofValue, &c.VCJSON, &c.Status, &c.StatusReason, &c.IssuedAt, &c.ExpiresAt,
-			&c.TxHash, &c.StatusTxHash, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		c, err := scanVC(rows)
+		if err != nil {
 			return nil, err
 		}
-		out = append(out, c)
+		out = append(out, *c)
 	}
 	return out, rows.Err()
 }
@@ -138,22 +140,32 @@ type SaveVCInput struct {
 	HolderDID, HolderAddress                   string
 	VCType                                     int
 	IPFSCid, VCIDHash, ContentHash, ProofValue string
-	VCJSON                                     map[string]any
 	IssuedAt                                   time.Time
 	ExpiresAt                                  *time.Time
 	TxHash                                     string
+	ReplacesVCID                               *string
+}
+
+// querier là phần chung của pool và pgx.Tx, để cùng một câu INSERT chạy được
+// cả trong lẫn ngoài giao dịch CSDL (cấp lại ghi hai bản ghi một lượt).
+type querier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 func (s *Store) SaveVC(ctx context.Context, in SaveVCInput) (*db.Credential, error) {
-	c, err := scanVC(s.DB.Pool.QueryRow(ctx,
+	return saveVC(ctx, s.DB.Pool, in)
+}
+
+func saveVC(ctx context.Context, q querier, in SaveVCInput) (*db.Credential, error) {
+	c, err := scanVC(q.QueryRow(ctx,
 		`INSERT INTO credentials
 		   (vc_id, on_chain_vc_id, issuer_did, issuer_address, holder_did, holder_address,
-		    vc_type, ipfs_cid, vc_id_hash, content_hash, proof_value, vc_json,
-		    issued_at, expires_at, tx_hash)
+		    vc_type, ipfs_cid, vc_id_hash, content_hash, proof_value,
+		    issued_at, expires_at, tx_hash, replaces_vc_id)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING `+vcCols,
 		in.VCID, in.OnChainVCID, in.IssuerDID, in.IssuerAddress, in.HolderDID, in.HolderAddress,
-		in.VCType, in.IPFSCid, in.VCIDHash, in.ContentHash, in.ProofValue, in.VCJSON,
-		in.IssuedAt, in.ExpiresAt, in.TxHash))
+		in.VCType, in.IPFSCid, in.VCIDHash, in.ContentHash, in.ProofValue,
+		in.IssuedAt, in.ExpiresAt, in.TxHash, in.ReplacesVCID))
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, httpx.Conflict("VC này đã được ghi nhận")

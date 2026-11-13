@@ -29,27 +29,29 @@ type DIDDocument struct {
 }
 
 type Credential struct {
-	ID            string         `json:"id"`
-	VCID          string         `json:"vc_id"`
-	OnChainVCID   *int64         `json:"on_chain_vc_id"`
-	IssuerDID     string         `json:"issuer_did"`
-	IssuerAddress string         `json:"issuer_address"`
-	HolderDID     string         `json:"holder_did"`
-	HolderAddress string         `json:"holder_address"`
-	VCType        int            `json:"vc_type"`
-	IPFSCid       string         `json:"ipfs_cid"`
-	VCIDHash      string         `json:"vc_id_hash"`
-	ContentHash   string         `json:"content_hash"`
-	ProofValue    string         `json:"proof_value"`
-	VCJSON        map[string]any `json:"vc_json"`
-	Status        string         `json:"status"`
-	StatusReason  *string        `json:"status_reason"`
-	IssuedAt      time.Time      `json:"issued_at"`
-	ExpiresAt     *time.Time     `json:"expires_at"`
-	TxHash        string         `json:"tx_hash"`
-	StatusTxHash  *string        `json:"status_tx_hash"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
+	ID            string     `json:"id"`
+	VCID          string     `json:"vc_id"`
+	OnChainVCID   *int64     `json:"on_chain_vc_id"`
+	IssuerDID     string     `json:"issuer_did"`
+	IssuerAddress string     `json:"issuer_address"`
+	HolderDID     string     `json:"holder_did"`
+	HolderAddress string     `json:"holder_address"`
+	VCType        int        `json:"vc_type"`
+	IPFSCid       string     `json:"ipfs_cid"`
+	VCIDHash      string     `json:"vc_id_hash"`
+	ContentHash   string     `json:"content_hash"`
+	ProofValue    string     `json:"proof_value"`
+	Status        string     `json:"status"`
+	StatusReason  *string    `json:"status_reason"`
+	IssuedAt      time.Time  `json:"issued_at"`
+	ExpiresAt     *time.Time `json:"expires_at"`
+	TxHash        string     `json:"tx_hash"`
+	StatusTxHash  *string    `json:"status_tx_hash"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	// C3: vc_id của văn bằng mà văn bằng này thay thế / văn bằng thay cho nó.
+	ReplacesVCID   *string `json:"replaces_vc_id"`
+	ReplacedByVCID *string `json:"replaced_by_vc_id"`
 }
 
 type Presentation struct {

@@ -26,8 +26,12 @@ const (
 	AuditVCRevoke      = "vc.revoke"
 	AuditVCSuspend     = "vc.suspend"
 	AuditVCReinstate   = "vc.reinstate"
-	AuditShareCreate   = "share.create"
-	AuditShareRevoke   = "share.revoke"
+	// Nâng cấp 13/11: cấp lại (C3) và chuyển danh tính khi mất khoá (P4.2)
+	AuditVCReissue   = "vc.reissue"
+	AuditVCLink      = "vc.link"
+	AuditDIDMigrate  = "did.migrate"
+	AuditShareCreate = "share.create"
+	AuditShareRevoke = "share.revoke"
 
 	// Quản trị quyền hạn trên chuỗi
 	AuditGrantAdmin         = "authority.grant_admin"

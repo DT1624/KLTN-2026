@@ -119,7 +119,31 @@ func ArgAddress(a string) Arg { return Arg{"address", a} }
 func ArgU64(n int64) Arg      { return Arg{"u64", strconv.FormatInt(n, 10)} }
 func ArgBytes(h string) Arg   { return Arg{"bytes", h} }
 
+// ArgU64s là vector<u64>: fullnode trả mảng chuỗi thập phân; so đúng thứ tự, đúng độ dài.
+func ArgU64s(ns []int64) Arg {
+	parts := make([]string, len(ns))
+	for i, n := range ns {
+		parts[i] = strconv.FormatInt(n, 10)
+	}
+	return Arg{"u64s", strings.Join(parts, ",")}
+}
+
 func argMatches(actual any, want Arg) bool {
+	if want.Kind == "u64s" {
+		arr, ok := actual.([]any)
+		if !ok {
+			return false
+		}
+		got := make([]string, len(arr))
+		for i, v := range arr {
+			s, ok := v.(string)
+			if !ok {
+				return false
+			}
+			got[i] = s
+		}
+		return strings.Join(got, ",") == want.Val
+	}
 	s, ok := actual.(string)
 	if !ok {
 		return false

@@ -109,6 +109,24 @@ func (a *API) computeStats(ctx context.Context) (map[string]any, error) {
 const maxPinBytes = 256 << 10
 
 // PinIPFS ghim JSON lên IPFS. Cần đăng nhập để không bị lạm dụng làm kho lưu trữ.
+// GetIPFS: đọc nội dung đã ghim theo CID — như một gateway IPFS. Từ P3, thứ nằm ở
+// đây là DID Document (công khai), phong bì văn bằng và bản trình bày ĐÃ MÃ HOÁ.
+func (a *API) GetIPFS(w http.ResponseWriter, r *http.Request) error {
+	cid, err := httpx.CID(r.PathValue("cid"), "cid")
+	if err != nil {
+		return err
+	}
+	v, err := a.IPFS.FetchJSON(r.Context(), cid)
+	if err != nil {
+		return err
+	}
+	if !isPublicPinned(v) {
+		return httpx.NotFound("Không có nội dung công khai tại CID này")
+	}
+	httpx.OK(w, http.StatusOK, v)
+	return nil
+}
+
 func (a *API) PinIPFS(w http.ResponseWriter, r *http.Request) error {
 	var body struct {
 		JSON map[string]any `json:"json"`
