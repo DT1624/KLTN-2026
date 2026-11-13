@@ -24,6 +24,8 @@ static_checks() {
   run "Frontend: typecheck"     "cd '$ROOT/frontend' && npx tsc --noEmit"
   run "Ví: bảng kiểu BCS ↔ Move" "cd '$ROOT/frontend' && ../backend/node_modules/.bin/tsx scripts/bcs-check.ts | tail -1"
   run "Ví: khôi phục từ cụm từ"  "cd '$ROOT/frontend' && ../backend/node_modules/.bin/tsx scripts/wallet-restore.ts | tail -1"
+  run "Mã hoá văn bằng (P3)"     "cd '$ROOT/frontend' && ../backend/node_modules/.bin/tsx scripts/vc-crypto-check.ts | tail -1"
+  run "Nhắc sao lưu (P4.3)"      "cd '$ROOT/frontend' && ../backend/node_modules/.bin/tsx scripts/backup-check.ts | tail -1"
 }
 
 cleanup() {

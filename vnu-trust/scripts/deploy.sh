@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Publish gói Move lên Movement testnet rồi cập nhật CONTRACT_ADDRESS cho cả hệ thống.
 #
-#   ./scripts/deploy.sh                 # dùng profile mặc định "vnu-trust"
-#   ./scripts/deploy.sh --profile tên   # dùng profile khác trong ~/.aptos/config.yaml
-#   ./scripts/deploy.sh --init          # tạo profile mới trước khi publish
+#   ./scripts/deploy.sh                 # profile mặc định "deployer" (= root hiện tại)
+#   ./scripts/deploy.sh --profile tên   # profile khác trong $KEY_DIR/.movement/config.yaml
+#   ./scripts/deploy.sh --init          # tạo profile mới trước khi publish (địa chỉ MỚI)
+#
+# Cùng địa chỉ với CONTRACT_ADDRESS trong chain.env => NÂNG CẤP tại chỗ (compatible).
+# Nên mô phỏng trước: build-publish-payload rồi /transactions/simulate (README).
 #
 # VÌ SAO KHÔNG TỰ ĐỘNG CHẠY: publish là thao tác không lùi được và tạo ra hiện
 # vật công khai. Ngoài ra `init_module` chỉ chạy MỘT LẦN cho mỗi địa chỉ, nên
@@ -12,14 +15,17 @@
 # AI THÀNH ROOT: Move.toml để root_admin = "_"; script truyền root_admin=0x0,
 # khi đó `init_module` lấy CHÍNH NGƯỜI PUBLISH làm root (bản sửa F-00). Nghĩa là
 # khoá riêng của profile bạn dùng ở đây chính là khoá root của toàn hệ thống.
-# Khoá được lưu ở $KEY_DIR/.aptos/config.yaml (mặc định ~/.vnu-trust-deployer), quyền 600.
+# Khoá được lưu ở $KEY_DIR/.movement/config.yaml (mặc định ~/.vnu-trust-deployer), quyền 600.
+# Từ 13/11/2026 khoá của deployer (0x0ede7f6b…) nằm ở đó — đã chuyển ra khỏi ~/KLTN (M-09).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 
-PROFILE=vnu-trust
-# Khoá riêng của profile nằm ở đây — NGOÀI mọi repo git. aptos đọc/ghi .aptos/ theo
-# thư mục đang đứng, nên mọi lệnh aptos đều chạy từ KEY_DIR, không từ dự án.
+PROFILE=deployer
+# Khoá riêng của profile nằm ở đây — NGOÀI mọi repo git. CLI đọc/ghi .movement/ theo
+# thư mục đang đứng, nên mọi lệnh CLI đều chạy từ KEY_DIR, không từ dự án.
+# Dùng Movement CLI (bytecode v6, đúng loại chuỗi đang chạy), không dùng aptos 7.x.
+CLI=${VNU_CLI:-movement}
 KEY_DIR=${VNU_KEY_DIR:-$HOME/.vnu-trust-deployer}
 DO_INIT=0
 ASSUME_YES=0
@@ -32,7 +38,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-command -v aptos >/dev/null || { echo "Không tìm thấy lệnh 'aptos'. Cài Aptos CLI trước."; exit 1; }
+command -v "$CLI" >/dev/null || { echo "Không tìm thấy lệnh '$CLI'. Cài Movement CLI trước."; exit 1; }
 
 mkdir -p "$KEY_DIR" && chmod 700 "$KEY_DIR"
 if git -C "$KEY_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -46,15 +52,17 @@ set -a; . "$ROOT/chain.env"; set +a
 if [ "$DO_INIT" = 1 ]; then
   echo "Tạo profile '$PROFILE' trỏ vào $CHAIN_FULLNODE…"
   # Lọc mọi dòng nhắc tới khoá riêng khỏi đầu ra cho chắc.
-  rc=0; aptos init --profile "$PROFILE" --network custom \
+  rc=0; "$CLI" init --profile "$PROFILE" --network custom \
     --rest-url "$CHAIN_FULLNODE" --faucet-url "$CHAIN_FAUCET" --assume-yes >init.log 2>&1 || rc=$?
   grep -vi "private" init.log || true; rm -f init.log
   [ "$rc" = 0 ] || exit "$rc"
-  chmod 600 "$KEY_DIR/.aptos/config.yaml"
+  chmod 600 "$KEY_DIR/.movement/config.yaml"
 fi
 
-ADDR=$(aptos config show-profiles --profile "$PROFILE" 2>/dev/null \
-  | grep -oE '"account": "[0-9a-fx]+"' | grep -oE '[0-9a-fx]+$' | head -1)
+ADDR=$("$CLI" config show-profiles --profile "$PROFILE" 2>/dev/null \
+  | grep -oE '"account": "[0-9a-fx]+"' | grep -oE '[0-9a-fx]{2,}' | tail -1)
+# (Bản cũ lấy '[0-9a-fx]+$' trên chuỗi còn dấu " ở cuối nên luôn rỗng — script chưa
+#  từng chạy tới bước publish; lần publish 11/11 và 13/11 đều gõ lệnh tay.)
 [ -n "$ADDR" ] || { echo "Không đọc được địa chỉ của profile '$PROFILE'. Chạy lại với --init."; exit 1; }
 case "$ADDR" in 0x*) ;; *) ADDR="0x$ADDR" ;; esac
 
@@ -64,9 +72,14 @@ echo "  Địa chỉ publish : $ADDR"
 echo "  Số dư           : ${BAL:-0} octas"
 echo "  Fullnode        : $CHAIN_FULLNODE (chain id $CHAIN_ID)"
 echo
-echo "  Sau khi publish, $ADDR sẽ là ROOT_ADMIN của hệ thống."
-echo "  Địa chỉ hợp đồng cũ ($CONTRACT_ADDRESS) sẽ KHÔNG còn được dùng;"
-echo "  toàn bộ DID và văn bằng đã neo ở đó bị bỏ lại."
+if [ "$ADDR" = "$CONTRACT_ADDRESS" ]; then
+  echo "  NÂNG CẤP tại chỗ gói đang chạy. init_module KHÔNG chạy lại: resource mới"
+  echo "  phải được khởi tạo bằng entry riêng ngay sau khi publish. Root không đổi."
+else
+  echo "  Sau khi publish, $ADDR sẽ là ROOT_ADMIN của hệ thống."
+  echo "  Địa chỉ hợp đồng cũ ($CONTRACT_ADDRESS) sẽ KHÔNG còn được dùng;"
+  echo "  toàn bộ DID và văn bằng đã neo ở đó bị bỏ lại."
+fi
 echo
 if [ "$ASSUME_YES" != 1 ]; then
   read -r -p "Tiếp tục publish? [nhập 'publish' để xác nhận] " ans
@@ -81,7 +94,7 @@ if [ "${BAL:-0}" -lt 50000000 ] 2>/dev/null; then
 fi
 
 echo "Đang publish…"
-( aptos move publish \
+( "$CLI" move publish \
     --package-dir "$ROOT/contracts" \
     --profile "$PROFILE" \
     --named-addresses "vnu=$ADDR,root_admin=0x0" \

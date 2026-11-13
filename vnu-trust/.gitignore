@@ -18,3 +18,7 @@ frontend/.tmp-*.mjs
 # Cấu hình CLI chứa khoá riêng — không bao giờ commit.
 .aptos/
 .movement/
+
+# Sinh ra khi chạy công cụ kiểm thử (đo độ phủ Move, đột biến bằng Python)
+.coverage_map.mvcov
+__pycache__/

@@ -17,6 +17,7 @@ key.txt
 # Môi trường / editor
 .vscode/
 .idea/
+.claude/
 .DS_Store
 *.log
 
