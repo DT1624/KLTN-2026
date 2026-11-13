@@ -1,11 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { query, queryOne, withTx } from "../db/pool.js";
 import { notFound, badRequest, gone, forbidden } from "../utils/errors.js";
-import { fetchJSON, sha3_256Hex, canonicalize } from "./ipfs.service.js";
-import { effectiveStatus, getByVcId, vcTypeLabel } from "./vc.service.js";
-import { isActiveIssuer, verifyVcIntegrity } from "../chain/registry.js";
+import { sha3_256Hex, canonicalize } from "./ipfs.service.js";
+import { assertShareBlob } from "./envelope.service.js";
+import { effectiveStatus, effectiveStatuses, getByVcId, vcTypeLabel } from "./vc.service.js";
+import { isActiveIssuer, verifyVcIntegrity, getReplacementOnChain, vcRecordsOnChain } from "../chain/registry.js";
 import { verifyEd25519 } from "../utils/ed25519.js";
 import { record } from "./audit.service.js";
+import { OFFLINE } from "../chain/offline.js";
 import { resolve as resolveDid } from "./did.service.js";
 import { getByDid } from "./entity.service.js";
 import type { PresentationRow, ShareTokenRow, EntityRow, CredentialRow } from "../types/index.js";
@@ -49,6 +51,9 @@ export async function createPresentation(
       throw badRequest(`VC ${vcId} đang ở trạng thái "${eff.status}", không thể đưa vào VP`);
     }
   }
+
+  // P3: IPFS chỉ giữ bản trình bày ĐÃ MÃ HOÁ (khoá nằm trong fragment liên kết).
+  await assertShareBlob(input.ipfsCid);
 
   const token = randomBytes(24).toString("base64url");
   const expiresAt = new Date(Date.now() + input.ttlSeconds * 1000);
@@ -129,6 +134,11 @@ export interface CheckResult {
   name: string;
   passed: boolean;
   detail: string;
+  /**
+   * Bước CẢNH BÁO: hiện cho người xác minh nhưng không quyết định overallValid.
+   * Hiện chỉ có bước 6 (đơn vị cấp còn được tin cậy) — quyết định 13/11/2026, C2.
+   */
+  advisory?: boolean;
 }
 
 export interface VerificationReport {
@@ -136,7 +146,8 @@ export interface VerificationReport {
   holderDid: string;
   overallValid: boolean;
   checks: CheckResult[];
-  credentials: Array<{ vcId: string; status: string; issuerDid: string; typeLabel: string }>;
+  /** replacedBy (C3): vc_id của văn bằng thay thế — chỉ khi chuỗi xác nhận liên kết. */
+  credentials: Array<{ vcId: string; status: string; issuerDid: string; typeLabel: string; replacedBy: string | null }>;
   verifiedAt: string;
 }
 
@@ -144,16 +155,20 @@ export interface VerificationReport {
  * Xác minh đầy đủ một VP. Bảy bước kiểm tra độc lập, mỗi bước trả về
  * kết quả riêng để giao diện hiển thị rõ ràng chỗ nào hỏng, thay vì
  * chỉ một chữ "không hợp lệ".
+ *
+ * P3 (13/11/2026): IPFS chỉ giữ bản trình bày ĐÃ MÃ HOÁ; khoá nằm trong fragment
+ * liên kết mà máy chủ không bao giờ nhận. Trình duyệt người xác minh giải mã rồi gửi
+ * bản rõ `vpDoc` lên đây; máy chủ chạy 7 bước trên chính bản đó và KHÔNG lưu nó
+ * (chỉ lưu báo cáo). Bản rõ bịa thì bước 2 (hash) và bước 3 (chữ ký) đỏ.
  */
-export async function verifyPresentation(token: string): Promise<VerificationReport> {
+export async function verifyPresentation(token: string, vpDoc: Record<string, unknown>): Promise<VerificationReport> {
   const share = await openShareToken(token);
   const checks: CheckResult[] = [];
 
-  // 1. Lấy được VP từ IPFS
-  let vpDoc: Record<string, unknown> | null = null;
+  // 1. Bản trình bày đã mã hoá còn nằm trên IPFS, đúng định dạng.
   try {
-    vpDoc = (await fetchJSON(share.ipfsCid)) as Record<string, unknown>;
-    checks.push({ name: "Tải VP từ IPFS", passed: true, detail: `CID ${share.ipfsCid}` });
+    await assertShareBlob(share.ipfsCid);
+    checks.push({ name: "Tải VP từ IPFS", passed: true, detail: `Bản mã tại CID ${share.ipfsCid}` });
   } catch (e) {
     checks.push({ name: "Tải VP từ IPFS", passed: false, detail: (e as Error).message });
   }
@@ -202,22 +217,30 @@ export async function verifyPresentation(token: string): Promise<VerificationRep
   let allVcValid = vpRow !== null && vpRow.vc_ids.length > 0;
   // Giữ lại hàng đã đọc để bước 5b dùng lại: đọc hai lần cùng một VC là nhân
   // đôi số truy vấn CSDL cho mỗi văn bằng trong bản trình bày.
-  const fetched: { vcId: string; row: CredentialRow | null }[] = [];
-  for (const vcId of vpRow?.vc_ids ?? []) {
-    const vc = await getByVcId(vcId);
-    fetched.push({ vcId, row: vc });
+  // P5: MỘT câu truy vấn cho mọi VC và MỘT lần đọc lô trên chuỗi (trạng thái + hash),
+  // dùng chung cho bước 5 và 7 — trước đây là 2 view mỗi văn bằng.
+  const ids = vpRow?.vc_ids ?? [];
+  const byId = new Map((ids.length
+    ? await query<CredentialRow>("SELECT * FROM credentials WHERE vc_id = ANY($1)", [ids])
+    : []).map((r) => [r.vc_id, r]));
+  const fetched = ids.map((vcId) => ({ vcId, row: byId.get(vcId) ?? null }));
+  const present = fetched.flatMap((f) => (f.row ? [f.row] : []));
+  const chainRecs = await vcRecordsOnChain(present.flatMap((r) => (r.on_chain_vc_id === null ? [] : [r.on_chain_vc_id])));
+  const effs = await effectiveStatuses(present, chainRecs);
+  for (const { vcId, row: vc } of fetched) {
     if (!vc) {
       allVcValid = false;
-      credentials.push({ vcId, status: "không tìm thấy", issuerDid: "-", typeLabel: "-" });
+      credentials.push({ vcId, status: "không tìm thấy", issuerDid: "-", typeLabel: "-", replacedBy: null });
       continue;
     }
-    const eff = await effectiveStatus(vc);
+    const eff = effs.get(vc.vc_id)!;
     if (eff.status !== "active") allVcValid = false;
     credentials.push({
       vcId,
       status: eff.status,
       issuerDid: vc.issuer_did,
       typeLabel: vcTypeLabel(vc.vc_type),
+      replacedBy: await confirmedReplacement(vc),
     });
   }
   checks.push({
@@ -229,17 +252,30 @@ export async function verifyPresentation(token: string): Promise<VerificationRep
   // 5b. Nội dung văn bằng vẫn khớp bản đã neo trên chuỗi.
   //
   // Bước 5 mới chỉ hỏi "văn bằng này còn hiệu lực không". Nó KHÔNG phát hiện
-  // được việc nội dung bị sửa sau khi cấp: đổi điểm trong vc_json rồi ghim lại
-  // IPFS thì trạng thái vẫn "active". Ở đây ta băm lại chính nội dung đang giữ
-  // rồi hỏi chuỗi xem có đúng hash đã neo không.
+  // được việc nội dung bị sửa sau khi cấp: đổi điểm trong văn bằng rồi trình bày
+  // thì trạng thái vẫn "active". Ở đây ta băm lại CHÍNH nội dung có trong bản
+  // trình bày rồi hỏi chuỗi xem có đúng hash đã neo không (P3: máy chủ không còn
+  // giữ bản rõ — dùng bản người xác minh nhận được, đúng thứ cần kiểm).
+  const presented = new Map<string, Record<string, unknown>>();
+  const embedded = Array.isArray(vpDoc.verifiableCredential) ? vpDoc.verifiableCredential : [];
+  for (const v of embedded) {
+    if (v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string") {
+      presented.set((v as { id: string }).id, v as Record<string, unknown>);
+    }
+  }
   let allIntact = credentials.length > 0;
   let intactCount = 0;
   // Các VC độc lập với nhau nên hỏi chuỗi song song: tuần tự thì một bản trình
   // bày 5 văn bằng phải chờ 5 vòng mạng nối tiếp.
   const intactResults = await Promise.all(
-    fetched.map(async ({ row }) => {
-      if (!row || row.on_chain_vc_id === null) return false;
-      return verifyVcIntegrity(row.on_chain_vc_id, sha3_256Hex(row.vc_json));
+    fetched.map(async ({ vcId, row }) => {
+      const doc = presented.get(vcId);
+      if (!row || row.on_chain_vc_id === null || !doc) return false;
+      const rec = chainRecs.get(row.on_chain_vc_id);
+      // Bản ghi lô đã có content_hash: so tại chỗ, cùng ngữ nghĩa verify_integrity
+      // (online: ACTIVE và hash khớp; offline giữ đúng hành vi cũ: chỉ so hash).
+      if (rec?.contentHash) return (OFFLINE || rec.status === "active") && rec.contentHash === sha3_256Hex(doc).toLowerCase();
+      return verifyVcIntegrity(row.on_chain_vc_id, sha3_256Hex(doc));
     }),
   );
   for (const ok of intactResults) {
@@ -253,23 +289,45 @@ export async function verifyPresentation(token: string): Promise<VerificationRep
   });
 
   // 6. Issuer của từng VC còn được tin cậy trên chuỗi
-  const rows = fetched.map((f) => f.row).filter((r): r is CredentialRow => r !== null);
-  const trusted = await Promise.all(rows.map((r) => isActiveIssuer(r.issuer_address)));
-  const allIssuersTrusted = rows.length > 0 && rows.length === credentials.length && trusted.every(Boolean);
+  // P5: hỏi mỗi issuer MỘT lần — một bản trình bày thường gồm nhiều văn bằng cùng đơn vị.
+  const rows = present;
+  const issuers = [...new Set(rows.map((r) => r.issuer_address))];
+  const trust = new Map(await Promise.all(issuers.map(async (a) => [a, await isActiveIssuer(a)] as const)));
+  const allIssuersTrusted = rows.length > 0 && rows.length === credentials.length && rows.every((r) => trust.get(r.issuer_address));
+  // C2 (13/11/2026): thu hồi / tạm ngưng một đơn vị KHÔNG làm văn bằng họ đã cấp mất
+  // hiệu lực — văn bằng thật của người học. Cấp trên xem xét rồi thu hồi theo lô; khi
+  // đó bước 5 mới đỏ. Bước này vì vậy chỉ là CẢNH BÁO, không quyết định kết quả.
   checks.push({
     name: "Đơn vị cấp còn được tin cậy",
     passed: allIssuersTrusted,
-    detail: allIssuersTrusted ? "Tất cả issuer đang hoạt động trên chuỗi" : "Có issuer đã bị thu hồi/tạm ngưng",
+    detail: allIssuersTrusted
+      ? "Tất cả issuer đang hoạt động trên chuỗi"
+      : "Có issuer đã bị thu hồi/tạm ngưng — văn bằng vẫn hiệu lực cho tới khi cấp trên xem xét",
+    advisory: true,
   });
 
+  const normalized = checks.map((c) => ({ ...c, advisory: c.advisory === true }));
   return {
     vpId: share.vpId,
     holderDid: share.holderDid,
-    overallValid: checks.every((c) => c.passed),
-    checks,
+    overallValid: normalized.every((c) => c.passed || c.advisory),
+    checks: normalized,
     credentials,
     verifiedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Văn bằng thay thế cho `vc` (C3) — chỉ trả khi chuỗi xác nhận đúng liên kết đó.
+ * Chỉ mục CSDL nói "đã thay bằng X" mà chuỗi không ghi thì KHÔNG báo cho người
+ * xác minh: đó chính là chỗ một chỉ mục bị sửa sẽ nói dối.
+ */
+async function confirmedReplacement(vc: CredentialRow): Promise<string | null> {
+  if (!vc.replaced_by_vc_id) return null;
+  if (OFFLINE) return vc.replaced_by_vc_id;
+  const repl = await getByVcId(vc.replaced_by_vc_id);
+  if (!repl || repl.on_chain_vc_id === null || vc.on_chain_vc_id === null) return null;
+  return (await getReplacementOnChain(vc.on_chain_vc_id)) === repl.on_chain_vc_id ? repl.vc_id : null;
 }
 
 export async function saveVerification(

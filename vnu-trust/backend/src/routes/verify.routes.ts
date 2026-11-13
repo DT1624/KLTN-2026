@@ -20,10 +20,18 @@ router.get("/share/:token", async (req, res, next) => {
   }
 });
 
+/**
+ * Thân yêu cầu xác minh (P3): bản trình bày mà TRÌNH DUYỆT người xác minh vừa giải
+ * mã bằng khoá trong fragment liên kết. Máy chủ chạy 7 bước trên bản này rồi bỏ đi —
+ * không lưu bản rõ, chỉ lưu báo cáo.
+ */
+const zVerifyBody = z.object({ vp: z.record(z.unknown()) }).strict();
+
 /** Công khai: chạy đủ 7 bước xác minh cho một liên kết chia sẻ. */
 router.post("/share/:token", async (req, res, next) => {
   try {
-    sendOk(res, await verifyPresentation(param(req.params, "token")));
+    const { vp } = zVerifyBody.parse(req.body);
+    sendOk(res, await verifyPresentation(param(req.params, "token"), vp));
   } catch (e) {
     next(e);
   }
@@ -33,7 +41,8 @@ router.post("/share/:token", async (req, res, next) => {
 router.post("/share/:token/record", requireAuth, requireRole("verifier", "admin", "root"),
   async (req, res, next) => {
     try {
-      const report = await verifyPresentation(param(req.params, "token"));
+      const { vp } = zVerifyBody.parse(req.body);
+      const report = await verifyPresentation(param(req.params, "token"), vp);
       await saveVerification(report.vpId, req.user!.address, report);
       sendOk(res, report);
     } catch (e) {

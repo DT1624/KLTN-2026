@@ -8,10 +8,40 @@ import { requireAuth, requireRole, requireOnChainRole } from "../middleware/auth
 import { sendOk, param } from "../utils/http.js";
 import { forbidden } from "../utils/errors.js";
 import * as authority from "../services/authority.service.js";
+import * as review from "../services/review.service.js";
 import { zAddress, zCid, zDid, zHash32, zTxHash, zVcType } from "../utils/validate.js";
 
 const router = Router();
 router.use(requireAuth, requireRole("issuer"));
+
+/** Thân yêu cầu ghi một VC vừa lên chuỗi — dùng chung cho cấp mới và cấp lại (C3). */
+const zIssueBody = z
+  .object({
+    vcId: z.string().trim().min(8).max(200),
+    onChainVcId: z.coerce.number().int().min(0),
+    holderDid: zDid,
+    holderAddress: zAddress,
+    vcType: zVcType,
+    ipfsCid: zCid,
+    vcIdHash: zHash32,
+    contentHash: zHash32,
+    proofValue: z.string().trim().min(16),
+    // P3: KHÔNG còn vcJson — nội dung nằm trong phong bì mã hoá tại ipfsCid.
+    issuedAt: z.string().datetime(),
+    expiresAt: z.string().datetime().nullable().default(null),
+    txHash: zTxHash,
+  })
+  .strict();
+
+/** Thân yêu cầu của thao tác theo lô (C2) — giống hệt tuyến admin. */
+export const zBatchBody = z
+  .object({
+    action: z.enum(["suspend", "revoke"]),
+    vcIds: z.array(z.string().trim().min(8).max(200)).min(1).max(100),
+    reason: z.string().trim().min(2).max(500),
+    txHash: zTxHash,
+  })
+  .strict();
 
 router.get("/stats", async (req, res, next) => {
   try {
@@ -46,26 +76,41 @@ router.get("/credentials/:vcId", async (req, res, next) => {
 /** Cấp VC — bắt buộc quyền issuer còn hiệu lực trên chuỗi. */
 router.post("/credentials", requireOnChainRole("issuer"), async (req, res, next) => {
   try {
-    const body = z
-      .object({
-        vcId: z.string().trim().min(8).max(200),
-        onChainVcId: z.coerce.number().int().min(0),
-        holderDid: zDid,
-        holderAddress: zAddress,
-        vcType: zVcType,
-        ipfsCid: zCid,
-        vcIdHash: zHash32,
-        contentHash: zHash32,
-        proofValue: z.string().trim().min(16),
-        vcJson: z.record(z.unknown()),
-        issuedAt: z.string().datetime(),
-        expiresAt: z.string().datetime().nullable().default(null),
-        txHash: zTxHash,
-      })
-      .strict()
-      .parse(req.body);
+    const body = zIssueBody.parse(req.body);
     const issuer = await requireByAddress(req.user!.address);
     sendOk(res, await saveIssuedVc({ issuer, ...body }), 201);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * Cấp lại văn bằng (reissue_vc, C3): cấp mới + thu hồi văn bằng cũ với lý do
+ * "replaced" + ghi liên kết, trong một giao dịch. Người gọi là issuer gốc hoặc
+ * issuer cha; đổi sang ví mới khi holder cũ đã bị khoá/thu hồi DID (P4.2).
+ */
+router.post("/credentials/:vcId/reissue", requireOnChainRole("issuer"), async (req, res, next) => {
+  try {
+    const body = zIssueBody.parse(req.body);
+    const issuer = await requireByAddress(req.user!.address);
+    sendOk(res, await review.reissueVc(param(req.params, "vcId"), { issuer, ...body }), 201);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * Ví mới của holder (nếu admin đã ghi nhận chuyển danh tính) — chỉ cho issuer đã
+ * cấp văn bằng cho ví cũ: mối nối hai ví là thông tin cá nhân.
+ */
+router.get("/holders/:address/migration", async (req, res, next) => {
+  try {
+    const address = zAddress.parse(param(req.params, "address"));
+    const actor = await requireByAddress(req.user!.address);
+    if (!(await review.issuedToHolder(actor.address, address))) {
+      throw forbidden("Bạn chưa cấp văn bằng nào cho ví này");
+    }
+    sendOk(res, await review.migrationOf(address));
   } catch (e) {
     next(e);
   }
@@ -146,6 +191,31 @@ router.post("/sub-issuers/:address/status", async (req, res, next) => {
       .parse(req.body);
     const actor = await requireByAddress(req.user!.address);
     sendOk(res, await authority.setSubIssuerStatus(actor, address, status, reason, txHash));
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// C2: issuer cha xem xét văn bằng do sub-issuer của mình cấp.
+// ---------------------------------------------------------------------------
+
+router.get("/review/:address/credentials", async (req, res, next) => {
+  try {
+    const address = zAddress.parse(param(req.params, "address"));
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await review.listSubIssuerVcs(actor, address));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** delegator_suspend_vcs / delegator_revoke_vcs. Kích hoạt lại vẫn chỉ admin. */
+router.post("/review/batch", async (req, res, next) => {
+  try {
+    const { action, vcIds, reason, txHash } = zBatchBody.parse(req.body);
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await review.batchChangeStatus(actor, "parent", action, vcIds, reason, txHash));
   } catch (e) {
     next(e);
   }

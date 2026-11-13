@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { listByHolder, requireByVcId, effectiveStatus } from "../services/vc.service.js";
+import { listByHolder, requireByVcId, effectiveStatus, effectiveStatuses } from "../services/vc.service.js";
 import {
   createPresentation, listByHolder as listVps, listShareTokens, revokeShareToken,
 } from "../services/vp.service.js";
@@ -17,10 +17,9 @@ router.use(requireAuth, requireRole("holder"));
 router.get("/credentials", async (req, res, next) => {
   try {
     const rows = await listByHolder(req.user!.did);
-    const withStatus = await Promise.all(
-      rows.map(async (vc) => ({ ...vc, effective: await effectiveStatus(vc) })),
-    );
-    sendOk(res, withStatus);
+    // P5: một lần đọc lô thay cho N lần get_vc_status.
+    const eff = await effectiveStatuses(rows);
+    sendOk(res, rows.map((vc) => ({ ...vc, effective: eff.get(vc.vc_id) })));
   } catch (e) {
     next(e);
   }

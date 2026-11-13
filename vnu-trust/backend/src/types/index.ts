@@ -50,13 +50,15 @@ export interface CredentialRow {
   vc_id_hash: string;
   content_hash: string;
   proof_value: string;
-  vc_json: Record<string, unknown>;
   status: VcStatus;
   status_reason: string | null;
   issued_at: Date;
   expires_at: Date | null;
   tx_hash: string;
   status_tx_hash: string | null;
+  /** C3: vc_id của văn bằng mà văn bằng này thay thế / văn bằng thay cho nó. */
+  replaces_vc_id: string | null;
+  replaced_by_vc_id: string | null;
   created_at: Date;
   updated_at: Date;
 }

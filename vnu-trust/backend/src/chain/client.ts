@@ -70,12 +70,22 @@ export interface OnChainTx {
  * Kỳ vọng cho từng tham số của hàm entry (bỏ qua signer). `null` = không kiểm.
  * Fullnode trả address ở dạng rút gọn, u64 dạng chuỗi thập phân, vector<u8> dạng hex.
  */
-export type ArgSpec = { address: string } | { u64: number | string } | { bytes: string } | null;
+export type ArgSpec =
+  | { address: string }
+  | { u64: number | string }
+  | { bytes: string }
+  /** vector<u64>: fullnode trả mảng chuỗi thập phân; so đúng thứ tự, đúng độ dài. */
+  | { u64s: (number | string)[] }
+  | null;
 
 function argMatches(actual: unknown, spec: Exclude<ArgSpec, null>): boolean {
   try {
     if ("address" in spec) return normalizeAddress(String(actual)) === normalizeAddress(spec.address);
     if ("u64" in spec) return String(actual) === String(spec.u64);
+    if ("u64s" in spec) {
+      return Array.isArray(actual) && actual.length === spec.u64s.length
+        && actual.every((v, i) => String(v) === String(spec.u64s[i]));
+    }
     return String(actual).toLowerCase() === spec.bytes.toLowerCase();
   } catch {
     return false;

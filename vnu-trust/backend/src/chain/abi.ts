@@ -46,6 +46,14 @@ export const ENTRY = {
   adminSuspendVc: `${MODULE.vcRegistry}::admin_suspend_vc`,
   adminRevokeVc: `${MODULE.vcRegistry}::admin_revoke_vc`,
   adminReinstateVc: `${MODULE.vcRegistry}::admin_reinstate_vc`,
+  // C2 (nâng cấp 13/11): xử lý theo lô — admin mọi VC, issuer cha VC của sub-issuer.
+  adminSuspendVcs: `${MODULE.vcRegistry}::admin_suspend_vcs`,
+  adminRevokeVcs: `${MODULE.vcRegistry}::admin_revoke_vcs`,
+  delegatorSuspendVcs: `${MODULE.vcRegistry}::delegator_suspend_vcs`,
+  delegatorRevokeVcs: `${MODULE.vcRegistry}::delegator_revoke_vcs`,
+  // C3: cấp lại có liên kết cũ → mới.
+  reissueVc: `${MODULE.vcRegistry}::reissue_vc`,
+  adminLinkReplacement: `${MODULE.vcRegistry}::admin_link_replacement`,
 } as const;
 
 export const VIEW = {
@@ -71,6 +79,8 @@ export const VIEW = {
   totalVcs: `${MODULE.vcRegistry}::total_vcs`,
   getLiveCounts: `${MODULE.vcRegistry}::get_live_counts`,
   getVcsPaginated: `${MODULE.vcRegistry}::get_vcs_paginated`,
+  /** (có bản thay thế?, id VC thay thế) cho một VC cũ — C3. */
+  getReplacement: `${MODULE.vcRegistry}::get_replacement`,
 
   getDidsPaginated: `${MODULE.didRegistry}::get_dids_paginated`,
 } as const;

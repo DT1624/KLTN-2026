@@ -20,6 +20,10 @@ export type AuditAction =
   | "vc.revoke"
   | "vc.suspend"
   | "vc.reinstate"
+  // Nâng cấp 13/11: cấp lại (C3) và chuyển danh tính khi mất khoá (P4.2)
+  | "vc.reissue"
+  | "vc.link"
+  | "did.migrate"
   | "share.create"
   | "share.revoke"
   // Quản trị quyền hạn trên chuỗi

@@ -1,6 +1,7 @@
 import { view, viewOrNull, normalizeAddress } from "./client.js";
 import { VIEW, DID_STATUS, VC_STATUS, ROLE_STATUS, NO_PENDING_ROOT } from "./abi.js";
 import * as offline from "./offline.js";
+import { mapLimit } from "../utils/ttl-cache.js";
 
 /**
  * Fullnode nhận tham số `vector<u8>` dưới dạng CHUỖI HEX, không phải mảng số.
@@ -82,6 +83,56 @@ export async function getVcStatusOnChain(onChainVcId: number) {
   if (offline.OFFLINE) return offline.vcStatusOffline(onChainVcId);
   const r = await viewOrNull<[number]>(VIEW.getVcStatus, [String(onChainVcId)]);
   return r ? (VC_STATUS[Number(r[0])] ?? null) : null;
+}
+
+export interface OnChainVcLite {
+  status: "active" | "suspended" | "expired" | "revoked";
+  /** "" khi chỉ đọc được trạng thái (đường dự phòng từng VC) — khi đó hỏi verify_integrity riêng. */
+  contentHash: string;
+}
+
+/**
+ * Trạng thái hiệu lực + content_hash của NHIỀU VC trong MỘT lần gọi view (P5, 13/11):
+ * `get_vcs_paginated(min, span)` khi các id nằm trong một khoảng ≤ 200. Bản ghi trả về
+ * đã mang trạng thái hiệu lực (có tính hết hạn) và content_hash, nên thay được cả
+ * `get_vc_status` lẫn `verify_integrity` (cùng ngữ nghĩa: ACTIVE và hash khớp). Khoảng
+ * rộng hơn hoặc view lỗi thì quay về gọi từng VC. Khớp backend Go (registry.go VCRecords).
+ */
+export async function vcRecordsOnChain(ids: number[]): Promise<Map<number, OnChainVcLite>> {
+  const uniq = [...new Set(ids)].sort((a, b) => a - b);
+  const out = new Map<number, OnChainVcLite>();
+  if (uniq.length === 0) return out;
+  if (offline.OFFLINE) return offline.vcRecordsOffline(uniq);
+  const span = uniq[uniq.length - 1]! - uniq[0]! + 1;
+  if (span <= 200) {
+    const r = await viewOrNull<[Array<{ id: string; status: number; content_hash: string }>]>(
+      VIEW.getVcsPaginated, [String(uniq[0]), String(span)],
+    );
+    if (r && Array.isArray(r[0])) {
+      const want = new Set(uniq);
+      for (const rec of r[0]) {
+        const id = Number(rec.id);
+        const status = VC_STATUS[Number(rec.status)];
+        if (want.has(id) && status) out.set(id, { status, contentHash: String(rec.content_hash).toLowerCase() });
+      }
+      return out;
+    }
+  }
+  await mapLimit(uniq, 8, async (id) => {
+    const status = await getVcStatusOnChain(id);
+    if (status) out.set(id, { status, contentHash: "" });
+  });
+  return out;
+}
+
+/**
+ * Số hiệu on-chain của VC thay thế cho `onChainVcId` (C3), hoặc null nếu chưa bị
+ * thay. Nguồn sự thật là ReplacementRegistry; offline đọc chỉ mục CSDL.
+ */
+export async function getReplacementOnChain(onChainVcId: number): Promise<number | null> {
+  if (offline.OFFLINE) return offline.replacementOffline(onChainVcId);
+  const r = await viewOrNull<[boolean, string]>(VIEW.getReplacement, [String(onChainVcId)]);
+  return r?.[0] === true ? Number(r[1]) : null;
 }
 
 /** Đối chiếu hash nội dung VC lưu trên chuỗi với hash tính lại từ nội dung thật. */

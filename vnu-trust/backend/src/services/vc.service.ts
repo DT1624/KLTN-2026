@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
 import { query, queryOne } from "../db/pool.js";
 import { notFound, badRequest, conflict, forbidden } from "../utils/errors.js";
-import { verifyTransaction, findEvent } from "../chain/client.js";
+import { verifyTransaction, findEvent, type ArgSpec, type OnChainTx } from "../chain/client.js";
+import type { PoolClient } from "pg";
 import { ENTRY, MODULE, VC_TYPE_LABEL } from "../chain/abi.js";
-import { getVcStatusOnChain, utf8ToHex, hexToUtf8 } from "../chain/registry.js";
+import { getVcStatusOnChain, utf8ToHex, hexToUtf8, vcRecordsOnChain } from "../chain/registry.js";
 import { sha3_256Hex } from "./ipfs.service.js";
 import type { CredentialRow, EntityRow, VcStatus } from "../types/index.js";
 import { OFFLINE } from "../chain/offline.js";
 import { record } from "./audit.service.js";
+import { assertEnvelope } from "./envelope.service.js";
 
 export interface IssueVcInput {
   issuer: EntityRow;
@@ -20,7 +22,6 @@ export interface IssueVcInput {
   vcIdHash: string;
   contentHash: string;
   proofValue: string;
-  vcJson: Record<string, unknown>;
   issuedAt: string;
   expiresAt: string | null;
   txHash: string;
@@ -33,26 +34,7 @@ export interface IssueVcInput {
  */
 export async function saveIssuedVc(input: IssueVcInput): Promise<CredentialRow> {
   const { issuer } = input;
-
-  if (input.holderAddress === issuer.address) {
-    throw badRequest("Đơn vị cấp không được tự cấp văn bằng cho chính mình");
-  }
-  if (input.expiresAt && new Date(input.expiresAt) <= new Date(input.issuedAt)) {
-    throw badRequest("Thời điểm hết hạn phải sau thời điểm cấp");
-  }
-  const recomputed = sha3_256Hex(input.vcJson);
-  if (recomputed !== input.contentHash) {
-    throw badRequest(`Hash nội dung VC không khớp (tính được ${recomputed})`);
-  }
-  // Contract dùng hash của vc_id làm khoá chống trùng.
-  const idHash = "0x" + createHash("sha3-256").update(input.vcId).digest("hex");
-  if (idHash !== input.vcIdHash) {
-    throw badRequest(`Hash của vcId không khớp (tính được ${idHash})`);
-  }
-
-  if (await queryOne("SELECT 1 FROM credentials WHERE vc_id = $1", [input.vcId])) {
-    throw conflict("VC này đã được ghi nhận");
-  }
+  await assertIssueInput(input);
 
   // Tham số giao dịch phải đúng là văn bằng đang ghi (S-02): cùng holder, loại,
   // vc_id_hash, CID, content_hash và hạn. Nếu không, một giao dịch thật dùng được
@@ -60,47 +42,92 @@ export async function saveIssuedVc(input: IssueVcInput): Promise<CredentialRow> 
   const tx = await verifyTransaction(input.txHash, {
     expectedFunction: ENTRY.issueVc,
     expectedSender: issuer.address,
-    args: [
-      { address: input.holderAddress },
-      { u64: input.vcType },
-      { bytes: input.vcIdHash },
-      { bytes: utf8ToHex(input.ipfsCid) },
-      { bytes: input.contentHash },
-      { u64: input.expiresAt ? Math.floor(Date.parse(input.expiresAt) / 1000) : 0 },
-    ],
+    args: issueArgs(input),
   });
-  // Số hiệu on-chain và DID holder lấy từ sự kiện của CHÍNH giao dịch, không tin
-  // con số client khai — bước xác minh thứ 7 đối chiếu nội dung theo số hiệu này.
-  if (!OFFLINE) {
-    const ev = findEvent(tx, `${MODULE.vcRegistry}::VCIssuedEvent`);
-    if (!ev) throw badRequest("Giao dịch không phát VCIssuedEvent");
-    if (String(ev.id) !== String(input.onChainVcId)) {
-      throw badRequest(`onChainVcId không khớp sự kiện trên chuỗi (chuỗi ghi ${String(ev.id)})`);
-    }
-    if (hexToUtf8(String(ev.holder_did ?? "")) !== input.holderDid) {
-      throw badRequest("holderDid không khớp DID của người nhận ghi trên chuỗi");
-    }
-  }
+  assertIssuedEvent(tx, input);
 
-  const row = await queryOne<CredentialRow>(
-    `INSERT INTO credentials
-       (vc_id, on_chain_vc_id, issuer_did, issuer_address, holder_did, holder_address,
-        vc_type, ipfs_cid, vc_id_hash, content_hash, proof_value, vc_json,
-        issued_at, expires_at, tx_hash)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-    [
-      input.vcId, input.onChainVcId, issuer.did, issuer.address,
-      input.holderDid, input.holderAddress, input.vcType, input.ipfsCid,
-      input.vcIdHash, input.contentHash, input.proofValue, input.vcJson,
-      input.issuedAt, input.expiresAt, input.txHash,
-    ],
-  );
-  if (!row) throw new Error("Chèn credentials thất bại");
+  const row = await insertCredential(input, null);
   await record(issuer.address, "vc.issue", input.vcId, {
     holderDid: input.holderDid,
     vcType: input.vcType,
     txHash: input.txHash,
   });
+  return row;
+}
+
+/**
+ * Các phép kiểm của việc cấp VC trước khi chạm chuỗi (dùng chung cho issue_vc và
+ * reissue_vc), đúng thứ tự backend Go: tự cấp → hạn → hash vcId → trùng → phong bì.
+ *
+ * P3 (13/11/2026): máy chủ KHÔNG còn thấy nội dung văn bằng nên không tính lại được
+ * `contentHash` — phép kiểm đó đã bỏ (xem envelope.service.ts về rào thay thế).
+ */
+export async function assertIssueInput(input: IssueVcInput): Promise<void> {
+  if (input.holderAddress === input.issuer.address) {
+    throw badRequest("Đơn vị cấp không được tự cấp văn bằng cho chính mình");
+  }
+  if (input.expiresAt && new Date(input.expiresAt) <= new Date(input.issuedAt)) {
+    throw badRequest("Thời điểm hết hạn phải sau thời điểm cấp");
+  }
+  // Contract dùng hash của vc_id làm khoá chống trùng.
+  const idHash = "0x" + createHash("sha3-256").update(input.vcId).digest("hex");
+  if (idHash !== input.vcIdHash) {
+    throw badRequest(`Hash của vcId không khớp (tính được ${idHash})`);
+  }
+  if (await queryOne("SELECT 1 FROM credentials WHERE vc_id = $1", [input.vcId])) {
+    throw conflict("VC này đã được ghi nhận");
+  }
+  await assertEnvelope(input.ipfsCid, input.vcIdHash, input.holderAddress, input.issuer.address);
+}
+
+/** Sáu tham số của issue_vc sau signer — reissue_vc dùng đúng sáu tham số này sau old_vc_id. */
+export function issueArgs(input: IssueVcInput): ArgSpec[] {
+  return [
+    { address: input.holderAddress },
+    { u64: input.vcType },
+    { bytes: input.vcIdHash },
+    { bytes: utf8ToHex(input.ipfsCid) },
+    { bytes: input.contentHash },
+    { u64: input.expiresAt ? Math.floor(Date.parse(input.expiresAt) / 1000) : 0 },
+  ];
+}
+
+/**
+ * Số hiệu on-chain và DID holder lấy từ sự kiện của CHÍNH giao dịch, không tin
+ * con số client khai — bước xác minh thứ 7 đối chiếu nội dung theo số hiệu này.
+ */
+export function assertIssuedEvent(tx: OnChainTx, input: IssueVcInput): void {
+  if (OFFLINE) return;
+  const ev = findEvent(tx, `${MODULE.vcRegistry}::VCIssuedEvent`);
+  if (!ev) throw badRequest("Giao dịch không phát VCIssuedEvent");
+  if (String(ev.id) !== String(input.onChainVcId)) {
+    throw badRequest(`onChainVcId không khớp sự kiện trên chuỗi (chuỗi ghi ${String(ev.id)})`);
+  }
+  if (hexToUtf8(String(ev.holder_did ?? "")) !== input.holderDid) {
+    throw badRequest("holderDid không khớp DID của người nhận ghi trên chuỗi");
+  }
+}
+
+export async function insertCredential(
+  input: IssueVcInput,
+  replacesVcId: string | null,
+  db: Pick<PoolClient, "query"> | null = null,
+): Promise<CredentialRow> {
+  const sql = `INSERT INTO credentials
+       (vc_id, on_chain_vc_id, issuer_did, issuer_address, holder_did, holder_address,
+        vc_type, ipfs_cid, vc_id_hash, content_hash, proof_value,
+        issued_at, expires_at, tx_hash, replaces_vc_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`;
+  const params = [
+    input.vcId, input.onChainVcId, input.issuer.did, input.issuer.address,
+    input.holderDid, input.holderAddress, input.vcType, input.ipfsCid,
+    input.vcIdHash, input.contentHash, input.proofValue,
+    input.issuedAt, input.expiresAt, input.txHash, replacesVcId,
+  ];
+  const row = db
+    ? ((await db.query<CredentialRow>(sql, params)).rows[0] ?? null)
+    : await queryOne<CredentialRow>(sql, params);
+  if (!row) throw new Error("Chèn credentials thất bại");
   return row;
 }
 
@@ -228,6 +255,31 @@ export async function effectiveStatus(vc: CredentialRow): Promise<{
     }
   }
   return { status: vc.status, source: "db", drift: false };
+}
+
+type Effective = { status: VcStatus; source: "chain" | "db-index" | "db"; drift: boolean };
+
+/**
+ * Trạng thái hiệu lực của NHIỀU VC với MỘT lần gọi view (P5) — cùng luật với
+ * effectiveStatus: hết hạn theo CSDL trước, rồi trạng thái chuỗi (ưu tiên khi lệch).
+ */
+export async function effectiveStatuses(
+  rows: CredentialRow[],
+  pre?: Map<number, { status: VcStatus }>,
+): Promise<Map<string, Effective>> {
+  const chain = pre ?? await vcRecordsOnChain(rows.flatMap((r) => (r.on_chain_vc_id === null ? [] : [r.on_chain_vc_id])));
+  const out = new Map<string, Effective>();
+  for (const vc of rows) {
+    if (vc.expires_at && vc.expires_at.getTime() <= Date.now()) {
+      out.set(vc.vc_id, { status: "expired", source: "db", drift: false });
+      continue;
+    }
+    const c = vc.on_chain_vc_id === null ? undefined : chain.get(vc.on_chain_vc_id);
+    out.set(vc.vc_id, c
+      ? { status: c.status, source: OFFLINE ? "db-index" : "chain", drift: c.status !== vc.status }
+      : { status: vc.status, source: "db", drift: false });
+  }
+  return out;
 }
 
 /** Số liệu cho biểu đồ: theo trạng thái, theo tháng (12 tháng gần nhất) và theo loại. */

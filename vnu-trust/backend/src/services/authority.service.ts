@@ -1,3 +1,4 @@
+import { mapLimit } from "../utils/ttl-cache.js";
 import { query, queryOne } from "../db/pool.js";
 import { badRequest, conflict, forbidden } from "../utils/errors.js";
 import { verifyTransaction, normalizeAddress, type ArgSpec } from "../chain/client.js";
@@ -297,18 +298,20 @@ export async function delegationSnapshot(actor: EntityRow) {
       WHERE actor = $1 AND action = 'authority.approve_issuer' AND target IS NOT NULL`,
     [me],
   );
-  const subIssuers = [];
-  for (const { target } of rows) {
-    if ((await getDelegator(target)) !== me) continue; // đã được root/admin cấp lại
-    const [role, entity] = await Promise.all([getRoleInfo(target), getByAddress(target)]);
-    subIssuers.push({
+  // P5: trước đây hỏi chuỗi TUẦN TỰ 2 lần mỗi sub-issuer; nay song song (trần 8),
+  // hai câu hỏi của cùng một địa chỉ chạy cùng lúc, thứ tự kết quả giữ nguyên.
+  const found = await mapLimit(rows, 8, async ({ target }) => {
+    const [parent, role, entity] = await Promise.all([getDelegator(target), getRoleInfo(target), getByAddress(target)]);
+    if (parent !== me) return null; // đã được root/admin cấp lại
+    return {
       address: target,
       label: entity?.label ?? null,
       vcTypeMask: role?.vcTypeMask ?? 0,
       expiresAt: role?.expiresAt ?? 0,
       status: role?.status ?? "unknown",
-    });
-  }
+    };
+  });
+  const subIssuers = found.filter((x): x is NonNullable<typeof x> => x !== null);
   return {
     canDelegate: allowed,
     /** Bit loại văn bằng được phép giao cho sub-issuer (mask của mình, bỏ bit uỷ quyền). */

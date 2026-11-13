@@ -1,5 +1,5 @@
 import { cfg } from "../config/index.js";
-import { queryOne } from "../db/pool.js";
+import { query, queryOne } from "../db/pool.js";
 import { normalizeAddress } from "./client.js";
 import { logger } from "../utils/logger.js";
 
@@ -123,6 +123,28 @@ export async function vcStatusOffline(onChainVcId: number): Promise<OfflineVcSta
     [onChainVcId],
   );
   return r?.status ?? null;
+}
+
+export async function vcRecordsOffline(
+  ids: number[],
+): Promise<Map<number, { status: OfflineVcStatus; contentHash: string }>> {
+  warnOnce();
+  const rows = await query<{ on_chain_vc_id: number; status: OfflineVcStatus; content_hash: string }>(
+    "SELECT on_chain_vc_id, status, content_hash FROM credentials WHERE on_chain_vc_id = ANY($1)",
+    [ids],
+  );
+  return new Map(rows.map((r) => [Number(r.on_chain_vc_id), { status: r.status, contentHash: r.content_hash.toLowerCase() }]));
+}
+
+export async function replacementOffline(onChainVcId: number): Promise<number | null> {
+  warnOnce();
+  const r = await queryOne<{ on_chain_vc_id: number | null }>(
+    `SELECT n.on_chain_vc_id FROM credentials o
+       JOIN credentials n ON n.vc_id = o.replaced_by_vc_id
+      WHERE o.on_chain_vc_id = $1`,
+    [onChainVcId],
+  );
+  return r?.on_chain_vc_id ?? null;
 }
 
 export async function vcIntegrityOffline(onChainVcId: number, hash: string): Promise<boolean> {

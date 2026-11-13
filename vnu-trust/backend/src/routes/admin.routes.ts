@@ -8,6 +8,8 @@ import { sendOk, param } from "../utils/http.js";
 import { query } from "../db/pool.js";
 import { authorityStats, getRootAdmin, isActiveAdmin, isActiveIssuer } from "../chain/registry.js";
 import * as authority from "../services/authority.service.js";
+import * as review from "../services/review.service.js";
+import { zBatchBody } from "./issuer.routes.js";
 import { zAddress, zTxHash, zPagination } from "../utils/validate.js";
 
 /** Thân yêu cầu chung của mọi thao tác quản trị quyền: lý do + mã giao dịch. */
@@ -162,6 +164,66 @@ router.post("/dids/:address/status", async (req, res, next) => {
       .parse(req.body);
     const actor = await requireByAddress(req.user!.address);
     sendOk(res, await authority.moderateDid(actor, address, status, reason, txHash));
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// C2/C3/P4.2 (nâng cấp 13/11): xem xét theo lô, nối liên kết cấp lại, chuyển ví.
+// ---------------------------------------------------------------------------
+
+/** Mọi VC do một issuer cấp — để xem xét sau khi issuer bị thu hồi. */
+router.get("/issuers/:address/credentials", async (req, res, next) => {
+  try {
+    sendOk(res, await review.listIssuedBy(zAddress.parse(param(req.params, "address"))));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** admin_suspend_vcs / admin_revoke_vcs. */
+router.post("/credentials/batch", async (req, res, next) => {
+  try {
+    const { action, vcIds, reason, txHash } = zBatchBody.parse(req.body);
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await review.batchChangeStatus(actor, "admin", action, vcIds, reason, txHash));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** admin_link_replacement: issuer gốc đã mất quyền, issuer khác cấp mới, admin nối. */
+router.post("/credentials/:vcId/replacement", async (req, res, next) => {
+  try {
+    const { newVcId, txHash } = z
+      .object({ newVcId: z.string().trim().min(8).max(200), txHash: zTxHash })
+      .strict()
+      .parse(req.body);
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await review.linkReplacement(actor, param(req.params, "vcId"), newVcId, txHash));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** P4.2: ghi liên kết ví cũ → ví mới sau khi đã xác minh danh tính ngoài hệ thống. */
+router.post("/identity-migrations", async (req, res, next) => {
+  try {
+    const { oldAddress, newAddress, note } = z
+      .object({ oldAddress: zAddress, newAddress: zAddress, note: z.string().trim().min(2).max(500) })
+      .strict()
+      .parse(req.body);
+    const actor = await requireByAddress(req.user!.address);
+    sendOk(res, await review.recordMigration(actor, oldAddress, newAddress, note), 201);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/identity-migrations/:address", async (req, res, next) => {
+  try {
+    sendOk(res, await review.migrationOf(zAddress.parse(param(req.params, "address"))));
   } catch (e) {
     next(e);
   }

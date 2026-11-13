@@ -3,6 +3,7 @@ import { z } from "zod";
 import { saveDid, resolve, resolveByAddress } from "../services/did.service.js";
 import { requireByAddress } from "../services/entity.service.js";
 import { requireAuth } from "../middleware/auth.js";
+import { selfDidStatus } from "../services/review.service.js";
 import { sendOk, param } from "../utils/http.js";
 import { zDid, zCid, zHash32, zTxHash, zAddress } from "../utils/validate.js";
 
@@ -41,6 +42,20 @@ router.post("/save", requireAuth, async (req, res, next) => {
       .parse(req.body);
     const entity = await requireByAddress(req.user!.address);
     sendOk(res, await saveDid({ entity, ...body }), 201);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** P4.1: chủ DID tự khoá (suspend_own_did) / tự mở (reactivate_own_did). */
+router.post("/self-status", requireAuth, async (req, res, next) => {
+  try {
+    const { status, txHash } = z
+      .object({ status: z.enum(["suspended", "active"]), txHash: zTxHash })
+      .strict()
+      .parse(req.body);
+    const entity = await requireByAddress(req.user!.address);
+    sendOk(res, await selfDidStatus(entity, status, txHash));
   } catch (e) {
     next(e);
   }

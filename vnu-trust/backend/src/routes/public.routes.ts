@@ -1,13 +1,15 @@
 import { Router } from "express";
 import { z } from "zod";
 import { lookup } from "../services/resolver.service.js";
-import { pinJSON, canonicalize } from "../services/ipfs.service.js";
-import { AppError } from "../utils/errors.js";
+import { pinJSON, canonicalize, fetchJSON } from "../services/ipfs.service.js";
+import { zCid } from "../utils/validate.js";
+import { isPublicPinned } from "../services/envelope.service.js";
+import { AppError, notFound } from "../utils/errors.js";
 
 /** Giới hạn một lần ghim — khớp maxPinBytes bên Go. */
 const MAX_PIN_BYTES = 256 * 1024;
 import { requireAuth } from "../middleware/auth.js";
-import { sendOk } from "../utils/http.js";
+import { sendOk, param } from "../utils/http.js";
 import { authorityStats, totalDids, totalVcs, getRootAdmin } from "../chain/registry.js";
 import { chainHealth } from "../chain/client.js";
 import { cfg } from "../config/index.js";
@@ -53,6 +55,21 @@ const cachedStats = ttlCache(5_000, async () => {
 router.get("/stats", async (_req, res, next) => {
   try {
     sendOk(res, await cachedStats());
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * Công khai: đọc nội dung đã ghim theo CID — như một gateway IPFS. Từ P3, thứ nằm
+ * ở đây là DID Document (công khai theo thiết kế), phong bì văn bằng và bản trình
+ * bày ĐÃ MÃ HOÁ; trình duyệt tải về rồi tự giải mã.
+ */
+router.get("/ipfs/:cid", async (req, res, next) => {
+  try {
+    const content = await fetchJSON(zCid.parse(param(req.params, "cid")));
+    if (!isPublicPinned(content)) throw notFound("Không có nội dung công khai tại CID này");
+    sendOk(res, content);
   } catch (e) {
     next(e);
   }
