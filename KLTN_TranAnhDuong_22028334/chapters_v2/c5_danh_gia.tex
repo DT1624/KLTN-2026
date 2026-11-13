@@ -106,7 +106,7 @@ Hình \ref{fig:v2-scale} cho thấy hai nhóm hành vi tách bạch. Phân giả
 
 \input{source/v2/chart/tab-scale}
 
-Nguyên nhân được xác định bằng kế hoạch thực thi của PostgreSQL (Bảng \ref{tab:v2-explain}). Truy vấn trạng thái theo \texttt{on\_chain\_vc\_id} luôn là quét tuần tự, đọc và loại bỏ toàn bộ bảng để lấy một dòng: 0,05\,ms ở bậc nhỏ nhất, 4,4\,ms ở $10^4$ và 49\,ms ở $10^5$. Mỗi văn bằng trong bản trình bày kéo theo hai lượt quét như vậy (bước 5 và bước 6 khi chạy ở chế độ không phụ thuộc chuỗi), và tuyến danh sách văn bằng gọi phép kiểm trạng thái cho từng văn bằng. Cột này không có chỉ mục vì ở chế độ on-chain câu hỏi được trả lời bằng view function; chỉ mục chỉ trở nên cần thiết khi chỉ mục cơ sở dữ liệu thay vai trò của chuỗi.
+Nguyên nhân được xác định bằng kế hoạch thực thi của PostgreSQL (Bảng \ref{tab:v2-explain}). Truy vấn trạng thái theo \texttt{on\_chain\_vc\_id} luôn là quét tuần tự, đọc và loại bỏ toàn bộ bảng để lấy một dòng: 0,05\,ms ở bậc nhỏ nhất, 4,4\,ms ở $10^4$ và 49\,ms ở $10^5$. Mỗi văn bằng trong bản trình bày kéo theo hai lượt quét như vậy (bước 5 và bước 6 khi chạy ở chế độ không phụ thuộc chuỗi), và tuyến danh sách văn bằng gọi phép kiểm trạng thái cho từng văn bằng. Lúc đo, cột này chưa có chỉ mục vì ở chế độ on-chain câu hỏi được trả lời bằng view function; chỉ mục chỉ trở nên cần thiết khi chỉ mục cơ sở dữ liệu thay vai trò của chuỗi. Sau thí nghiệm này, lược đồ đã được bổ sung chỉ mục \texttt{idx\_vc\_onchain} trên cột đó.
 
 \input{source/v2/chart/fig-scale-k}
 

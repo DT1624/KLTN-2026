@@ -57,7 +57,7 @@ Quá trình thực hiện để lại một số bài học về cách đánh gi
 \section{Hướng phát triển}
 \label{sec:huong-phat-trien}
 
-\textbf{Sửa ngay các điểm mà thực nghiệm chỉ ra.} Việc giảm số vòng gọi chuỗi ở bước 5 và ở tuyến danh sách văn bằng đã được thực hiện (Mục \ref{sec:truy-van-chuoi}). Còn hai thay đổi có chi phí thấp và lợi ích đã đo được: thêm chỉ mục trên \texttt{on\_chain\_vc\_id} (một dòng trong lược đồ, giảm hai bậc thời gian xác minh ở $10^5$ bản ghi); và thêm một trường muối ngẫu nhiên 128 bit vào nội dung chứng thực, giữ bí mật cùng nội dung, để định danh chứng thực không còn là thứ duy nhất ngăn tấn công từ điển.
+\textbf{Sửa ngay các điểm mà thực nghiệm chỉ ra.} Việc giảm số vòng gọi chuỗi ở bước 5 và ở tuyến danh sách văn bằng đã được thực hiện (Mục \ref{sec:truy-van-chuoi}). Chỉ mục trên \texttt{on\_chain\_vc\_id} (một dòng trong lược đồ, giảm hai bậc thời gian xác minh ở $10^5$ bản ghi trong thí nghiệm bóc tách) cũng đã được thêm. Còn một thay đổi có chi phí thấp: thêm một trường muối ngẫu nhiên 128 bit vào nội dung chứng thực, giữ bí mật cùng nội dung, để định danh chứng thực không còn là thứ duy nhất ngăn tấn công từ điển.
 
 \textbf{Sao lưu khoá không phụ thuộc trí nhớ.} Mã hoá cụm từ ghi nhớ bằng một khoá sinh từ passkey qua phần mở rộng PRF của WebAuthn và lưu bản mã ở tầng dịch vụ: kẻ chiếm được máy chủ có bản mã nhưng không dò được khoá như dò một mật khẩu. Cần một đường dự phòng bằng mật khẩu khôi phục vì không phải trình duyệt nào cũng hỗ trợ PRF.
 
