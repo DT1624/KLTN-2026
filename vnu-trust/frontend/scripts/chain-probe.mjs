@@ -72,7 +72,7 @@ check("Gói đã deploy có hàm register_did", Boolean(registerDid),
   registerDid ? `${registerDid.params.length} tham số` : "không tìm thấy");
 
 // Số tham số đã deploy so với mã nguồn hiện tại. Lệch là dấu hiệu gói trên
-// chuỗi đã cũ — đúng tình trạng hiện nay của issue_vc (6 vs 7 tham số).
+// chuỗi đã cũ (gói 0x4a6666… đã bỏ từng có issue_vc 6 tham số; gói hiện tại 7).
 const vcModule = await node(`/accounts/${CONTRACT}/module/vc_registry`);
 const issueVc = vcModule.body?.abi?.exposed_functions?.find((f) => f.name === "issue_vc");
 const moveSrc = readFileSync(join(root, "contracts", "sources", "vc_registry.move"), "utf8");
@@ -91,7 +91,7 @@ console.log("\n=== Ký và mô phỏng register_did (KHÔNG gửi lên chuỗi) 
 
 // Người gửi trong phép mô phỏng: tài khoản `deployer` đã có sẵn trên chuỗi.
 // Chỉ dùng KHOÁ CÔNG KHAI của nó (dữ liệu công khai, đọc từ
-// vnu-chain/contracts/.movement/config.yaml) — không cần và không dùng khoá riêng.
+// lịch sử giao dịch của deployer) — không cần và không dùng khoá riêng.
 const SENDER_PUB = "0x61ce325bb8fe57aa698412bfbe7b4ebc1f9c7673f44eae46d5595f7037679229";
 const pubBytes = new Uint8Array(
   (SENDER_PUB.slice(2).match(/../g) ?? []).map((h) => parseInt(h, 16)),
@@ -207,6 +207,37 @@ if (acct.status === 200) {
   const code = m ? parseInt(m[1], 16) : null;
   check("Regex của giao diện rút được mã từ vm_status thật", code === 1014, `${vm} → ${code}`);
   check("Mã đó có câu dịch trong bảng", code !== null && uiCodes.includes(code));
+}
+
+console.log("\n=== Hàm entry của bản nâng cấp 13/11 (mô phỏng, KHÔNG gửi lên chuỗi) ===");
+// Người gửi là deployer (= root, nên qua mọi phép kiểm admin) với số hiệu KHÔNG
+// tồn tại: kỳ vọng abort của HỢP ĐỒNG với đúng mã — chứng minh tham số (kể cả
+// vector<u64>) giải mã được và đã vào tới thân hàm, không dừng ở lỗi tham số.
+if (acct.status === 200 && abortRe) {
+  const simulate = async (fn, args) => {
+    const sim = await post("/transactions/simulate", {
+      sender: SENDER, sequence_number: acct.body.sequence_number, max_gas_amount: "200000", gas_unit_price: "100",
+      expiration_timestamp_secs: String(Math.floor(Date.now() / 1000) + 120),
+      payload: { type: "entry_function_payload", function: `${CONTRACT}::${fn}`, type_arguments: [], arguments: args },
+      signature: { type: "ed25519_signature", public_key: SENDER_PUB, signature: "0x" + "0".repeat(128) },
+    });
+    const vm = (Array.isArray(sim.body) ? sim.body[0] : sim.body)?.vm_status ?? JSON.stringify(sim.body).slice(0, 160);
+    const m = vm.match(abortRe);
+    return { vm, code: m ? parseInt(m[1], 16) : null };
+  };
+  const h32 = "0x" + "ab".repeat(32);
+  const cases = [
+    ["vc_registry::admin_revoke_vcs (lô rỗng)", "vc_registry::admin_revoke_vcs", [[], bytesArg("xem xet")], 3011],
+    ["vc_registry::admin_suspend_vcs (id không tồn tại)", "vc_registry::admin_suspend_vcs", [["999999"], bytesArg("xem xet")], 3001],
+    ["vc_registry::delegator_revoke_vcs (id không tồn tại)", "vc_registry::delegator_revoke_vcs", [["999999"], bytesArg("xem xet")], 3001],
+    ["vc_registry::reissue_vc (VC cũ không tồn tại)", "vc_registry::reissue_vc", ["999999", SENDER, "1", h32, bytesArg(cid), h32, "0"], 3001],
+    ["vc_registry::admin_link_replacement (VC không tồn tại)", "vc_registry::admin_link_replacement", ["999998", "999999"], 3001],
+    ["vc_registry::init_replacement_registry (đã khởi tạo)", "vc_registry::init_replacement_registry", [], 4006],
+  ];
+  for (const [name, fn, args, want] of cases) {
+    const { vm, code } = await simulate(fn, args);
+    check(`${name} → abort ${want}, có câu dịch`, code === want && uiCodes.includes(code), `${vm} → ${code}`);
+  }
 }
 
 const failed = rows.filter((r) => !r.ok);

@@ -53,7 +53,7 @@ const ok0 = reg.status === 403 && /chuỗi/i.test(reg.data?.error ?? "");
 console.log(`  ${ok0?"PASS":"FAIL"}  VERIFY_ONCHAIN=true: đăng ký tự khai admin bị từ chối  → HTTP ${reg.status} "${reg.data?.error}"`);
 
 const tok2 = await account("Chi muc lech issuer", "issuer");
-const issue = await call("POST","/issuer/credentials",{vcId:`urn:uuid:${randomUUID()}`,onChainVcId:999999,holderDid:did,holderAddress:address,vcType:1,ipfsCid:pin.data.data.cid,vcIdHash:sha3("x"),contentHash:sha3("y"),proofValue:"0x00",vcJson:{},issuedAt:new Date().toISOString(),expiresAt:null,txHash:fakeTx},tok2);
+const issue = await call("POST","/issuer/credentials",{vcId:`urn:uuid:${randomUUID()}`,onChainVcId:999999,holderDid:did,holderAddress:address,vcType:1,ipfsCid:pin.data.data.cid,vcIdHash:sha3("x"),contentHash:sha3("y"),proofValue:"0x00",issuedAt:new Date().toISOString(),expiresAt:null,txHash:fakeTx},tok2);
 const ok2 = issue.status === 403;
 console.log(`  ${ok2?"PASS":"FAIL"}  VERIFY_ONCHAIN=true: chỉ mục ghi issuer nhưng chuỗi không công nhận → 403  → HTTP ${issue.status}`);
 

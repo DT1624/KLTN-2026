@@ -15,6 +15,14 @@ const GO = process.env.GO_BASE ?? "http://localhost:4001/api";
 const hex = (b) => "0x" + Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
 const rows = [];
 
+// P3: phong bì ĐÚNG CẤU TRÚC (byte ngẫu nhiên) — backend chỉ kiểm cấu trúc, không giải mã.
+const b64r = (n) => { const a = new Uint8Array(n); crypto.getRandomValues(a); return btoa(String.fromCharCode(...a)); };
+const envelopeFor = (vcIdHash, holderAddr, issuerAddr) => ({
+  v: 1, alg: "A256GCM", aad: `vnu-vc:${vcIdHash}`, iv: b64r(12), ct: b64r(96),
+  recipients: [{ kid: holderAddr, role: "holder", epk: b64r(32), iv: b64r(12), wk: b64r(48) },
+               { kid: issuerAddr, role: "issuer", epk: b64r(32), iv: b64r(12), wk: b64r(48) }],
+});
+
 async function call(base, method, path, body, token) {
   const r = await fetch(base + path, {
     method,
@@ -303,8 +311,15 @@ compare("GET /verify/share/{token} không tồn tại",
   await call(TS, "GET", "/verify/share/khong-ton-tai-gi-ca"),
   await call(GO, "GET", "/verify/share/khong-ton-tai-gi-ca"));
 compare("POST /verify/share/{token} không tồn tại",
+  await call(TS, "POST", "/verify/share/khong-ton-tai-gi-ca", { vp: {} }),
+  await call(GO, "POST", "/verify/share/khong-ton-tai-gi-ca", { vp: {} }));
+// P3: trình duyệt người xác minh phải gửi bản trình bày đã giải mã.
+compare("POST /verify/share/{token} thiếu vp → 400",
   await call(TS, "POST", "/verify/share/khong-ton-tai-gi-ca"),
   await call(GO, "POST", "/verify/share/khong-ton-tai-gi-ca"));
+compare("POST /verify/share/{token} kèm trường lạ → 400",
+  await call(TS, "POST", "/verify/share/khong-ton-tai-gi-ca", { vp: {}, thua: 1 }),
+  await call(GO, "POST", "/verify/share/khong-ton-tai-gi-ca", { vp: {}, thua: 1 }));
 
 console.log("\n=== I. Tra một văn bằng theo mã ===");
 // Ba tuyến này từng CHỈ CÓ ở bản TypeScript: bản Go không đăng ký route nên
@@ -362,6 +377,15 @@ async function callRaw(base, method, path, raw) {
   const noLeak = ![lTS, lGO].some((r) => JSON.stringify(r.data).includes("SV-PARITY"));
   rows.push({ name: "S-03 không bên nào lộ nội dung văn bằng qua /lookup", ok: noLeak });
   console.log(`  ${noLeak ? "KHỚP" : "LỆCH"}  S-03 không bên nào lộ nội dung văn bằng qua /lookup`);
+  // P3: gateway công khai chỉ phát DID Document và bản mã, không phát lại JSON dạng rõ.
+  compare("S-03b GET /ipfs/{cid} — JSON dạng rõ đã ghim → 404",
+    await call(TS, "GET", `/ipfs/${cTS}`), await call(GO, "GET", `/ipfs/${cTS}`));
+  const envCid = (await call(TS, "POST", "/ipfs/pin",
+    { json: envelopeFor("0x" + "e".repeat(64), holder.address, "0x" + "1".repeat(64)), name: "vc" }, holder.tokenTS)).data?.data?.cid;
+  compare("S-03b GET /ipfs/{cid} — phong bì mã hoá → 200",
+    await call(TS, "GET", `/ipfs/${envCid}`), await call(GO, "GET", `/ipfs/${envCid}`));
+  compare("S-03b GET /ipfs/{cid} — CID sai định dạng → 400",
+    await call(TS, "GET", "/ipfs/khong-phai-cid"), await call(GO, "GET", "/ipfs/khong-phai-cid"));
 
   // P-05: hồ sơ công khai không có tên hiển thị.
   const eTS = await call(TS, "GET", `/entities/by-address/${holder.address}`);
@@ -505,11 +529,197 @@ const vcIss = await withDid(await makeActor("issuer", "Issuer kiem loai van bang
 const multiBit = {
   vcId: "urn:uuid:doi-chieu-nhieu-bit", onChainVcId: 1, holderDid: holder.did, holderAddress: holder.address,
   vcType: 3, ipfsCid: "bafkrei" + "a".repeat(52), vcIdHash: "0x" + "1".repeat(64), contentHash: "0x" + "2".repeat(64),
-  proofValue: "0x" + "c".repeat(128), vcJson: { x: 1 }, issuedAt: new Date().toISOString(), expiresAt: null, txHash: fakeTx,
+  proofValue: "0x" + "c".repeat(128), issuedAt: new Date().toISOString(), expiresAt: null, txHash: fakeTx,
 };
 compare("POST /issuer/credentials — vcType nhiều bit → 400",
   await call(TS, "POST", "/issuer/credentials", multiBit, vcIss.tokenTS),
   await call(GO, "POST", "/issuer/credentials", multiBit, vcIss.tokenGO));
+
+console.log("\n=== L. Nâng cấp 13/11/2026: xem xét theo lô (C2), cấp lại (C3), chuyển ví (P4.2), tự khoá DID (P4.1) ===");
+// Chế độ offline đi được HẾT luồng (không xác minh giao dịch), nên ở đây ghi thật
+// rồi so cả GIÁ TRỊ ở những chỗ quyết định, không chỉ mã trạng thái. Mỗi bên một
+// bộ actor và văn bằng riêng — hai backend dùng chung CSDL (bài học #7).
+const canon = (v) => v === null || typeof v !== "object" ? JSON.stringify(v)
+  : Array.isArray(v) ? "[" + v.map(canon).join(",") + "]"
+    : "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}";
+const sha3hex = (str) => hex(sha3_256(new TextEncoder().encode(str)));
+let chainSeq = 900000 + Math.floor(Math.random() * 1e6) * 10;
+// P3: nội dung chỉ nằm trong phong bì mã hoá; phong bì ghim qua ĐÚNG backend và mang
+// ĐÚNG issuer sẽ gọi (pin = [base, issuer, khoá token]) — máy chủ kiểm điều đó trước.
+async function vcBody(holderActor, vcType, extra, [base, issuerActor, tok]) {
+  const vcId = `urn:uuid:${crypto.randomUUID()}`;
+  const vcJson = { id: vcId, credentialSubject: { id: holderActor.did, "vnu:degreeName": "Cu nhan doi chieu" }, ...extra };
+  const pin = await call(base, "POST", "/ipfs/pin",
+    { json: envelopeFor(sha3hex(vcId), holderActor.address, issuerActor.address), name: "vc" }, issuerActor[tok]);
+  return {
+    vcId, onChainVcId: chainSeq++, holderDid: holderActor.did, holderAddress: holderActor.address,
+    vcType, ipfsCid: pin.data?.data?.cid, vcIdHash: sha3hex(vcId), contentHash: sha3hex(canon(vcJson)),
+    proofValue: "0x" + "c".repeat(128), issuedAt: new Date().toISOString(), expiresAt: null, txHash: fakeTx,
+  };
+}
+const valueCheck = (name, ok, detail) => {
+  rows.push({ name, ok });
+  console.log(`  ${ok ? "KHỚP" : "LỆCH"}  ${name}  → ${detail}`);
+};
+async function both(name, method, pTS, bTS, tTS, pGO, bGO, tGO) {
+  const a = await call(TS, method, pTS, bTS, tTS);
+  const b = await call(GO, method, pGO, bGO, tGO);
+  compare(name, a, b);
+  return [a, b];
+}
+
+if (!live) {
+  // Mỗi bên: một issuer, hai holder (ví cũ, ví mới), một admin dùng chung.
+  const side = async (tag) => {
+    const iss = await withDid(await makeActor("issuer", `Issuer L ${tag}`));
+    const h1 = await withDid(await makeActor("holder", `Holder cu L ${tag}`));
+    const h2 = await withDid(await makeActor("holder", `Holder moi L ${tag}`));
+    const tok = tag === "TS" ? "tokenTS" : "tokenGO";
+    const base = tag === "TS" ? TS : GO;
+    const vcs = [];
+    for (let i = 0; i < 4; i++) {
+      const b = await vcBody(h1, 1, {}, [base, iss, tok]);
+      const r = await call(base, "POST", "/issuer/credentials", b, iss[tok]);
+      if (r.status !== 201) throw new Error(`cấp VC ${tag} lỗi ${r.status}: ${JSON.stringify(r.data)}`);
+      vcs.push(b);
+    }
+    return { iss, h1, h2, vcs, tok };
+  };
+  const T = await side("TS");
+  const G = await side("GO");
+  const A = modAdmin;
+  const enc = encodeURIComponent;
+
+  // --- C2: danh sách VC của một issuer + lô ---
+  await both("GET /admin/issuers/{addr}/credentials — admin",
+    "GET", `/admin/issuers/${T.iss.address}/credentials`, null, A.tokenTS,
+    `/admin/issuers/${G.iss.address}/credentials`, null, A.tokenGO);
+  await both("GET /admin/issuers/{addr}/credentials — vai trò holder → 403",
+    "GET", `/admin/issuers/${T.iss.address}/credentials`, null, holder.tokenTS,
+    `/admin/issuers/${G.iss.address}/credentials`, null, holder.tokenGO);
+  const batch = (S, ids, extra = {}) => ({ action: "revoke", vcIds: ids, reason: "Xem xet sau thu hoi", txHash: fakeTx, ...extra });
+  for (const [name, mk] of [
+    ["lô rỗng → 400", (S) => batch(S, [])],
+    ["mã trùng → 400", (S) => batch(S, [S.vcs[0].vcId, S.vcs[0].vcId])],
+    ["action lạ → 400", (S) => batch(S, [S.vcs[0].vcId], { action: "xoa" })],
+    ["kèm trường lạ → 400", (S) => batch(S, [S.vcs[0].vcId], { thua: 1 })],
+    ["mã không tồn tại → 404", (S) => batch(S, [S.vcs[0].vcId, "urn:uuid:khong-ton-tai-l"])],
+  ]) {
+    await both(`POST /admin/credentials/batch — ${name}`, "POST",
+      "/admin/credentials/batch", mk(T), A.tokenTS, "/admin/credentials/batch", mk(G), A.tokenGO);
+  }
+  // VC[3] bị issuer tự thu hồi trước → lô phải BỎ QUA nó, đổi VC[2].
+  for (const S of [T, G]) {
+    const base = S === T ? TS : GO;
+    await call(base, "POST", `/issuer/credentials/${enc(S.vcs[3].vcId)}/revoke`, { reason: "Tu thu hoi", txHash: fakeTx }, S.iss[S.tok]);
+  }
+  const [bT, bG] = await both("POST /admin/credentials/batch — thu hồi 2 mục, 1 mục đã thu hồi", "POST",
+    "/admin/credentials/batch", batch(T, [T.vcs[2].vcId, T.vcs[3].vcId]), A.tokenTS,
+    "/admin/credentials/batch", batch(G, [G.vcs[2].vcId, G.vcs[3].vcId]), A.tokenGO);
+  const cnt = (r) => `${r.data?.data?.changed?.length}/${r.data?.data?.skipped?.length}/${r.data?.data?.stale?.length}`;
+  valueCheck("Lô: đổi 1, bỏ qua 1, cũ 0 ở cả hai", cnt(bT) === "1/1/0" && cnt(bG) === "1/1/0", `TS=${cnt(bT)} GO=${cnt(bG)}`);
+  await both("POST /admin/credentials/batch — vai trò issuer → 403", "POST",
+    "/admin/credentials/batch", batch(T, [T.vcs[1].vcId]), T.iss.tokenTS,
+    "/admin/credentials/batch", batch(G, [G.vcs[1].vcId]), G.iss.tokenGO);
+  // Issuer cha: offline không biết quan hệ uỷ quyền → từ chối thẳng, không đoán.
+  await both("POST /issuer/review/batch — offline không có quan hệ uỷ quyền → 403", "POST",
+    "/issuer/review/batch", batch(T, [T.vcs[1].vcId]), T.iss.tokenTS,
+    "/issuer/review/batch", batch(G, [G.vcs[1].vcId]), G.iss.tokenGO);
+  await both("GET /issuer/review/{addr}/credentials — offline → 403", "GET",
+    `/issuer/review/${T.iss.address}/credentials`, null, T.iss.tokenTS,
+    `/issuer/review/${G.iss.address}/credentials`, null, G.iss.tokenGO);
+
+  // --- C3: cấp lại ---
+  const re = (S, holderActor, vcType = 1, by = S.iss) =>
+    vcBody(holderActor, vcType, { "vnu:replaces": S.vcs[0].vcId }, [S === T ? TS : GO, by, S === T ? "tokenTS" : "tokenGO"]);
+  const reT = await re(T, T.h1), reG = await re(G, G.h1);
+  await both("POST /issuer/credentials/{vcId}/reissue — khác loại → 400", "POST",
+    `/issuer/credentials/${enc(T.vcs[0].vcId)}/reissue`, await re(T, T.h1, 2), T.iss.tokenTS,
+    `/issuer/credentials/${enc(G.vcs[0].vcId)}/reissue`, await re(G, G.h1, 2), G.iss.tokenGO);
+  await both("POST /issuer/credentials/{vcId}/reissue — sang ví mới khi ví cũ còn DID → 409", "POST",
+    `/issuer/credentials/${enc(T.vcs[0].vcId)}/reissue`, await re(T, T.h2), T.iss.tokenTS,
+    `/issuer/credentials/${enc(G.vcs[0].vcId)}/reissue`, await re(G, G.h2), G.iss.tokenGO);
+  await both("POST /issuer/credentials/{vcId}/reissue — issuer khác → 403", "POST",
+    `/issuer/credentials/${enc(T.vcs[0].vcId)}/reissue`, await re(T, T.h1, 1, G.iss), G.iss.tokenTS,
+    `/issuer/credentials/${enc(G.vcs[0].vcId)}/reissue`, await re(G, G.h1, 1, T.iss), T.iss.tokenGO);
+  await both("POST /issuer/credentials/{vcId}/reissue — VC đã thu hồi → 409", "POST",
+    `/issuer/credentials/${enc(T.vcs[3].vcId)}/reissue`, await re(T, T.h1), T.iss.tokenTS,
+    `/issuer/credentials/${enc(G.vcs[3].vcId)}/reissue`, await re(G, G.h1), G.iss.tokenGO);
+  await both("POST /issuer/credentials/{vcId}/reissue — cùng holder → 201", "POST",
+    `/issuer/credentials/${enc(T.vcs[0].vcId)}/reissue`, reT, T.iss.tokenTS,
+    `/issuer/credentials/${enc(G.vcs[0].vcId)}/reissue`, reG, G.iss.tokenGO);
+  const oldT = (await call(TS, "GET", `/admin/credentials/${enc(T.vcs[0].vcId)}`, null, A.tokenTS)).data?.data;
+  const oldG = (await call(GO, "GET", `/admin/credentials/${enc(G.vcs[0].vcId)}`, null, A.tokenGO)).data?.data;
+  const st = (o, n) => `${o?.status}/${o?.status_reason}/${o?.replaced_by_vc_id === n}`;
+  valueCheck("Cấp lại: VC cũ revoked/replaced/trỏ đúng VC mới ở cả hai",
+    st(oldT, reT.vcId) === "revoked/replaced/true" && st(oldG, reG.vcId) === "revoked/replaced/true",
+    `TS=${st(oldT, reT.vcId)} GO=${st(oldG, reG.vcId)}`);
+  await both("POST /issuer/credentials/{vcId}/reissue — cấp lại lần hai → 409", "POST",
+    `/issuer/credentials/${enc(T.vcs[0].vcId)}/reissue`, await re(T, T.h1), T.iss.tokenTS,
+    `/issuer/credentials/${enc(G.vcs[0].vcId)}/reissue`, await re(G, G.h1), G.iss.tokenGO);
+
+  // --- P4.2: chuyển ví ---
+  const mig = (S, extra = {}) => ({ oldAddress: S.h1.address, newAddress: S.h2.address, note: "Doi chieu CCCD", ...extra });
+  await both("POST /admin/identity-migrations — ví cũ còn DID → 409", "POST",
+    "/admin/identity-migrations", mig(T), A.tokenTS, "/admin/identity-migrations", mig(G), A.tokenGO);
+  await both("POST /admin/identity-migrations — kèm trường lạ → 400", "POST",
+    "/admin/identity-migrations", mig(T, { thua: 1 }), A.tokenTS, "/admin/identity-migrations", mig(G, { thua: 1 }), A.tokenGO);
+  await both("POST /admin/dids/{addr}/status — khoá DID ví cũ (mất khoá)", "POST",
+    `/admin/dids/${T.h1.address}/status`, didStatus("suspended", "Mat khoa"), A.tokenTS,
+    `/admin/dids/${G.h1.address}/status`, didStatus("suspended", "Mat khoa"), A.tokenGO);
+  await both("POST /admin/identity-migrations — hợp lệ → 201", "POST",
+    "/admin/identity-migrations", mig(T), A.tokenTS, "/admin/identity-migrations", mig(G), A.tokenGO);
+  await both("POST /admin/identity-migrations — ghi lần hai → 409", "POST",
+    "/admin/identity-migrations", mig(T), A.tokenTS, "/admin/identity-migrations", mig(G), A.tokenGO);
+  await both("GET /admin/identity-migrations/{addr}", "GET",
+    `/admin/identity-migrations/${T.h1.address}`, null, A.tokenTS, `/admin/identity-migrations/${G.h1.address}`, null, A.tokenGO);
+  await both("GET /issuer/holders/{addr}/migration — issuer đã cấp", "GET",
+    `/issuer/holders/${T.h1.address}/migration`, null, T.iss.tokenTS, `/issuer/holders/${G.h1.address}/migration`, null, G.iss.tokenGO);
+  await both("GET /issuer/holders/{addr}/migration — issuer chưa từng cấp → 403", "GET",
+    `/issuer/holders/${T.h1.address}/migration`, null, G.iss.tokenTS, `/issuer/holders/${G.h1.address}/migration`, null, T.iss.tokenGO);
+  await both("POST /issuer/credentials/{vcId}/reissue — sang ví mới sau khi khoá DID cũ → 201", "POST",
+    `/issuer/credentials/${enc(T.vcs[1].vcId)}/reissue`, await re(T, T.h2), T.iss.tokenTS,
+    `/issuer/credentials/${enc(G.vcs[1].vcId)}/reissue`, await re(G, G.h2), G.iss.tokenGO);
+
+  // --- C3: admin nối liên kết (issuer gốc mất quyền: issuer khác cấp mới) ---
+  const newT = await vcBody(T.h2, 1, {}, [TS, G.iss, "tokenTS"]), newG = await vcBody(G.h2, 1, {}, [GO, T.iss, "tokenGO"]);
+  await call(TS, "POST", "/issuer/credentials", newT, G.iss.tokenTS);
+  await call(GO, "POST", "/issuer/credentials", newG, T.iss.tokenGO);
+  const link = (n, extra = {}) => ({ newVcId: n.vcId, txHash: fakeTx, ...extra });
+  await both("POST /admin/credentials/{vcId}/replacement — tự nối chính nó → 400", "POST",
+    `/admin/credentials/${enc(T.vcs[2].vcId)}/replacement`, link(T.vcs[2]), A.tokenTS,
+    `/admin/credentials/${enc(G.vcs[2].vcId)}/replacement`, link(G.vcs[2]), A.tokenGO);
+  await both("POST /admin/credentials/{vcId}/replacement — kèm trường lạ → 400", "POST",
+    `/admin/credentials/${enc(T.vcs[2].vcId)}/replacement`, link(newT, { thua: 1 }), A.tokenTS,
+    `/admin/credentials/${enc(G.vcs[2].vcId)}/replacement`, link(newG, { thua: 1 }), A.tokenGO);
+  await both("POST /admin/credentials/{vcId}/replacement — VC đã thu hồi → nối được", "POST",
+    `/admin/credentials/${enc(T.vcs[2].vcId)}/replacement`, link(newT), A.tokenTS,
+    `/admin/credentials/${enc(G.vcs[2].vcId)}/replacement`, link(newG), A.tokenGO);
+  const keptT = (await call(TS, "GET", `/admin/credentials/${enc(T.vcs[2].vcId)}`, null, A.tokenTS)).data?.data?.status_reason;
+  const keptG = (await call(GO, "GET", `/admin/credentials/${enc(G.vcs[2].vcId)}`, null, A.tokenGO)).data?.data?.status_reason;
+  valueCheck("Nối liên kết giữ lý do thu hồi cũ ở cả hai", keptT === "Xem xet sau thu hoi" && keptG === "Xem xet sau thu hoi",
+    `TS=${keptT} GO=${keptG}`);
+  await both("POST /admin/credentials/{vcId}/replacement — nối lần hai → 409", "POST",
+    `/admin/credentials/${enc(T.vcs[2].vcId)}/replacement`, link(newT), A.tokenTS,
+    `/admin/credentials/${enc(G.vcs[2].vcId)}/replacement`, link(newG), A.tokenGO);
+
+  // --- P4.1: tự khoá DID ---
+  const self = (status, extra = {}) => ({ status, txHash: fakeTx, ...extra });
+  await both("POST /did/self-status — trạng thái lạ → 400", "POST",
+    "/did/self-status", self("revoked"), T.h2.tokenTS, "/did/self-status", self("revoked"), G.h2.tokenGO);
+  await both("POST /did/self-status — mở khi chưa khoá → 409", "POST",
+    "/did/self-status", self("active"), T.h2.tokenTS, "/did/self-status", self("active"), G.h2.tokenGO);
+  await both("POST /did/self-status — tự khoá → 200", "POST",
+    "/did/self-status", self("suspended"), T.h2.tokenTS, "/did/self-status", self("suspended"), G.h2.tokenGO);
+  await both("POST /did/self-status — khoá lần hai → 409", "POST",
+    "/did/self-status", self("suspended"), T.h2.tokenTS, "/did/self-status", self("suspended"), G.h2.tokenGO);
+  await both("POST /did/self-status — tự mở → 200", "POST",
+    "/did/self-status", self("active"), T.h2.tokenTS, "/did/self-status", self("active"), G.h2.tokenGO);
+  await both("POST /did/self-status — chưa có DID → 404", "POST",
+    "/did/self-status", self("suspended"), holder.tokenTS, "/did/self-status", self("suspended"), holder.tokenGO);
+} else {
+  console.log("  (bỏ qua: mục L ghi thật nên chỉ chạy ở chế độ VERIFY_ONCHAIN=false)");
+}
 
 const failed = rows.filter((r) => !r.ok);
 console.log(`\n${rows.length - failed.length}/${rows.length} KHỚP` +

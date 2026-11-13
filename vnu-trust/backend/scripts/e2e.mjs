@@ -124,7 +124,7 @@ check("JWT bị sửa → 401", tampered.status === 401);
 const notIssuer = await call("POST", "/issuer/credentials", {
   vcId: "urn:uuid:" + randomUUID(), onChainVcId: 0, holderDid: holder.did, holderAddress: holder.address,
   vcType: 1, ipfsCid: cid, vcIdHash: sha3("x"), contentHash: sha3("y"), proofValue: "0".repeat(64),
-  vcJson: {}, issuedAt: new Date().toISOString(), expiresAt: null, txHash: fakeTx(),
+  issuedAt: new Date().toISOString(), expiresAt: null, txHash: fakeTx(),
 }, issuer.token);
 check(
   STRICT

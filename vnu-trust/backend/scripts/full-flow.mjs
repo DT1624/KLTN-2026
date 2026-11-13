@@ -5,6 +5,7 @@
 import { ed25519 } from "@noble/curves/ed25519";
 import { sha3_256 } from "@noble/hashes/sha3";
 import { randomUUID, createHash } from "node:crypto";
+import { fakeEnvelope, fakeShareBlob } from "./lib-envelope.mjs";
 
 const API = process.env.API_BASE ?? "http://localhost:4000/api";
 const results = [];
@@ -77,13 +78,34 @@ const vc = {
     "vnu:degreeName": "Cử nhân Công nghệ thông tin", "vnu:faculty": "Trường ĐH Công nghệ",
     "vnu:gpa": "3.42", "vnu:graduationYear": "2026" },
 };
-const pin2 = await call("POST", "/ipfs/pin", { json: vc, name: "vc" }, issuer.token);
+// P3: IPFS chỉ nhận PHONG BÌ mã hoá — nội dung văn bằng không rời trình duyệt dạng rõ.
+const pin2 = await call("POST", "/ipfs/pin", { json: fakeEnvelope(sha3(vcId), holder.address, issuer.address), name: "vc" }, issuer.token);
 const issue = await call("POST", "/issuer/credentials", {
   vcId, onChainVcId, holderDid: holder.did, holderAddress: holder.address,
   vcType: 1, ipfsCid: pin2.data.data.cid, vcIdHash: sha3(vcId), contentHash: sha3(vc),
-  proofValue: issuer.sign(canon(vc)), vcJson: vc, issuedAt, expiresAt: null, txHash: fakeTx(),
+  proofValue: issuer.sign(canon(vc)), issuedAt, expiresAt: null, txHash: fakeTx(),
 }, issuer.token);
 check("Issuer cấp VC", issue.status === 201, `HTTP ${issue.status} ${issue.status !== 201 ? JSON.stringify(issue.data).slice(0,120) : ""}`);
+const onIpfs = await call("GET", `/ipfs/${pin2.data.data.cid}`);
+check("P3: nội dung trên IPFS là bản mã — không lộ mã SV, tên văn bằng, điểm",
+  onIpfs.status === 200 && !/21020123|Công nghệ|3\.42/.test(JSON.stringify(onIpfs.data)), `HTTP ${onIpfs.status}`);
+check("P3: máy chủ không lưu và không trả nội dung văn bằng dạng rõ",
+  issue.data?.data && !("vc_json" in issue.data.data) && !JSON.stringify(issue.data.data).includes("21020123"));
+const plainBody = await call("POST", "/issuer/credentials", {
+  vcId: `urn:uuid:${randomUUID()}`, onChainVcId: onChainVcId + 1, holderDid: holder.did, holderAddress: holder.address,
+  vcType: 1, ipfsCid: pin2.data.data.cid, vcIdHash: sha3("x"), contentHash: sha3(vc),
+  proofValue: issuer.sign(canon(vc)), vcJson: vc, issuedAt, expiresAt: null, txHash: fakeTx(),
+}, issuer.token);
+check("P3: gửi kèm vcJson dạng rõ → 400 (trường lạ)", plainBody.status === 400, `HTTP ${plainBody.status}`);
+const pinPlain = await call("POST", "/ipfs/pin", { json: vc, name: "vc-ro" }, issuer.token);
+const vcId2 = `urn:uuid:${randomUUID()}`;
+const plainCid = await call("POST", "/issuer/credentials", {
+  vcId: vcId2, onChainVcId: onChainVcId + 2, holderDid: holder.did, holderAddress: holder.address,
+  vcType: 1, ipfsCid: pinPlain.data.data.cid, vcIdHash: sha3(vcId2), contentHash: sha3(vc),
+  proofValue: issuer.sign(canon(vc)), issuedAt, expiresAt: null, txHash: fakeTx(),
+}, issuer.token);
+check("P3: CID trỏ tới văn bằng DẠNG RÕ (không phải phong bì) → 400",
+  plainCid.status === 400 && String(plainCid.data?.error).includes("Phong bì"), `HTTP ${plainCid.status} ${plainCid.data?.error}`);
 
 const stats1 = await call("GET", "/issuer/stats", null, issuer.token);
 check("Thống kê issuer đúng", stats1.data?.data?.active === 1, JSON.stringify(stats1.data?.data));
@@ -94,7 +116,9 @@ check("Holder thấy VC trong ví", wallet.data?.data?.length === 1);
 console.log("\n=== 4. Holder tạo bản trình bày và chia sẻ ===");
 const vp = { "@context": ["https://www.w3.org/2018/credentials/v1"], type: ["VerifiablePresentation"],
   holder: holder.did, verifiableCredential: [vc], created: new Date().toISOString() };
-const pin3 = await call("POST", "/ipfs/pin", { json: vp, name: "vp" }, holder.token);
+// P3: IPFS chỉ giữ bản trình bày ĐÃ MÃ HOÁ; khoá nằm trong fragment liên kết, trình
+// duyệt người xác minh giải mã rồi gửi bản rõ `vp` lên tuyến xác minh.
+const pin3 = await call("POST", "/ipfs/pin", { json: fakeShareBlob(), name: "vp" }, holder.token);
 const vpId = `urn:uuid:${randomUUID()}`;
 const vpRes = await call("POST", "/holder/presentations", {
   vpId, verifierDid: null, vcIds: [vcId], ipfsCid: pin3.data.data.cid,
@@ -114,7 +138,9 @@ const preview = await call("GET", `/verify/share/${token}`);
 check("Bên xác minh mở được liên kết (công khai)", preview.status === 200 && preview.data.data.vcIds.length === 1);
 
 console.log("\n=== 5. Xác minh đầy đủ 7 bước ===");
-const report = await call("POST", `/verify/share/${token}`);
+const noVp = await call("POST", `/verify/share/${token}`);
+check("P3: xác minh không kèm bản trình bày đã giải mã → 400", noVp.status === 400, `HTTP ${noVp.status}`);
+const report = await call("POST", `/verify/share/${token}`, { vp });
 check("Chạy được quy trình xác minh", report.status === 200);
 if (report.data?.data?.checks) {
   for (const c of report.data.data.checks) {
@@ -126,7 +152,23 @@ check("Chữ ký của holder được xác minh đúng",
 check("Toàn vẹn nội dung VP khớp",
   report.data?.data?.checks?.find(c => c.name.includes("Toàn vẹn"))?.passed === true);
 
-const record = await call("POST", `/verify/share/${token}/record`, null, verifier.token);
+// C2 (quyết định 13/11/2026): thu hồi đơn vị cấp KHÔNG làm văn bằng họ đã cấp mất hiệu
+// lực — bước 6 chỉ còn là CẢNH BÁO. Trước đây bước này làm cả kết quả "không hợp lệ".
+console.log("\n=== 5b. Thu hồi đơn vị cấp không làm văn bằng mất hiệu lực (C2) ===");
+const revIss = await call("POST", `/admin/authority/issuers/${issuer.address}/status`,
+  { status: "revoked", reason: "Kiem thu C2", txHash: fakeTx() }, admin.token);
+check("Admin thu hồi quyền của đơn vị cấp", revIss.status === 200, `${revIss.status} ${JSON.stringify(revIss.data?.error ?? "")}`);
+const c2 = await call("POST", `/verify/share/${token}`, { vp });
+const step6 = c2.data?.data?.checks?.find((c) => c.name.includes("Đơn vị cấp"));
+check("Bước 6 báo đơn vị không còn được tin cậy, dưới dạng CẢNH BÁO",
+  step6?.passed === false && step6?.advisory === true, JSON.stringify(step6));
+check("Văn bằng của đơn vị bị thu hồi VẪN hợp lệ cho tới khi được xem xét",
+  c2.data?.data?.overallValid === true, `overallValid=${c2.data?.data?.overallValid}`);
+const reIss = await call("POST", "/admin/authority/issuers",
+  { address: issuer.address, vcTypeMask: 1, expiresAt: 0, txHash: fakeTx() }, admin.token);
+check("Cấp lại đơn vị để các bước sau chạy tiếp", reIss.status === 201, `${reIss.status} ${JSON.stringify(reIss.data?.error ?? "")}`);
+
+const record = await call("POST", `/verify/share/${token}/record`, { vp }, verifier.token);
 check("Verifier lưu kết quả vào lịch sử", record.status === 200);
 const hist = await call("GET", "/verify/history", null, verifier.token);
 check("Verifier xem được lịch sử", hist.status === 200 && hist.data.data.length >= 1);
@@ -138,7 +180,7 @@ check("Issuer thu hồi VC", revoke.status === 200);
 const stats2 = await call("GET", "/issuer/stats", null, issuer.token);
 check("Thống kê cập nhật sau thu hồi", stats2.data?.data?.revoked === 1, JSON.stringify(stats2.data?.data));
 
-const reVerify = await call("POST", `/verify/share/${token}`);
+const reVerify = await call("POST", `/verify/share/${token}`, { vp });
 check("VP chứa VC đã thu hồi -> xác minh THẤT BẠI",
   reVerify.data?.data?.overallValid === false,
   reVerify.data?.data?.credentials?.[0]?.status);

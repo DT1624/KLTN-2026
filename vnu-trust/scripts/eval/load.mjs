@@ -11,7 +11,7 @@
  */
 import { ed25519 } from "@noble/curves/ed25519";
 import { sha3_256 } from "@noble/hashes/sha3";
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID, createHash, randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 
@@ -60,6 +60,13 @@ async function actor(role, label) {
   return { priv, pub, address, did, token: await login(TS), sign: (m) => hex(ed25519.sign(new TextEncoder().encode(m), priv)) };
 }
 
+// P3 (13/11/2026): IPFS chỉ giữ phong bì / bản trình bày ĐÃ MÃ HOÁ; backend chỉ kiểm cấu
+// trúc nên dùng byte ngẫu nhiên đúng kích thước. Người xác minh gửi bản rõ vp khi xác minh.
+const rb = (n) => randomBytes(n).toString("base64");
+const envelope = (vcIdHash, holder, issuer) => ({ v: 1, alg: "A256GCM", aad: `vnu-vc:${vcIdHash}`, iv: rb(12), ct: rb(96),
+  recipients: [{ kid: holder, role: "holder", epk: rb(32), iv: rb(12), wk: rb(48) }, { kid: issuer, role: "issuer", epk: rb(32), iv: rb(12), wk: rb(48) }] });
+const shareBlob = () => ({ v: 1, alg: "A256GCM", iv: rb(12), ct: rb(96) });
+
 // ============================================================ setup
 async function setup() {
   const issuer = await actor("issuer", "Truong thanh vien (danh gia)");
@@ -79,30 +86,32 @@ async function setup() {
       id: vcId, type: ["VerifiableCredential", "VNUDegreeCredential"], issuer: issuer.did, issuanceDate: issuedAt,
       credentialSubject: { id: holder.did, "vnu:studentId": "22028334", "vnu:degreeName": `Chứng chỉ ${i + 1}`,
         "vnu:faculty": "Trường Đại học Công nghệ", "vnu:gpa": "3.42", "vnu:graduationYear": "2026" } };
-    const p = await call(TS, "POST", "/ipfs/pin", { json: vc, name: "vc" }, issuer.token);
+    const p = await call(TS, "POST", "/ipfs/pin", { json: envelope(sha3(vcId), holder.address, issuer.address), name: "vc" }, issuer.token);
     const r = await call(TS, "POST", "/issuer/credentials", { vcId, onChainVcId: 900000 + i, holderDid: holder.did, holderAddress: holder.address,
       vcType: 1, ipfsCid: p.data.data.cid, vcIdHash: sha3(vcId), contentHash: sha3(vc), proofValue: issuer.sign(canon(vc)),
-      vcJson: vc, issuedAt, expiresAt: null, txHash: fakeTx() }, issuer.token);
+      issuedAt, expiresAt: null, txHash: fakeTx() }, issuer.token);
     if (r.status !== 201) throw new Error("issue " + JSON.stringify(r.data));
     vcs.push({ vcId, vc });
   }
   const shares = {};
+  const vps = {};
   for (const k of [1, 2, 4, 8]) {
     const vp = { "@context": ["https://www.w3.org/2018/credentials/v1"], type: ["VerifiablePresentation"], holder: holder.did,
       verifiableCredential: vcs.slice(0, k).map((x) => x.vc), created: new Date().toISOString() };
-    const p = await call(TS, "POST", "/ipfs/pin", { json: vp, name: "vp" }, holder.token);
+    const p = await call(TS, "POST", "/ipfs/pin", { json: shareBlob(), name: "vp" }, holder.token);
     const r = await call(TS, "POST", "/holder/presentations", { vpId: `urn:uuid:${randomUUID()}`, verifierDid: null,
       vcIds: vcs.slice(0, k).map((x) => x.vcId), ipfsCid: p.data.data.cid, vpHash: sha3(vp), proofValue: holder.sign(canon(vp)),
       challenge: null, ttlSeconds: 86400 }, holder.token);
     if (r.status !== 201) throw new Error("vp " + JSON.stringify(r.data));
     shares[k] = r.data.data.share.token;
+    vps[k] = vp;
   }
   // Kiểm tra trước khi đo: một phép đo trên tuyến trả lỗi thì chỉ đo tốc độ trả lỗi.
   for (const base of [TS, GO]) {
-    const rep = await call(base, "POST", `/verify/share/${shares[8]}`);
+    const rep = await call(base, "POST", `/verify/share/${shares[8]}`, { vp: vps[8] });
     if (rep.status !== 200 || !rep.data.data.overallValid) throw new Error(`xác minh k=8 ở ${base} không hợp lệ: ${JSON.stringify(rep.data).slice(0, 300)}`);
   }
-  writeFileSync(`${OUT}/state.json`, JSON.stringify({ holderDid: holder.did, holderPriv: hex(holder.priv), holderAddress: holder.address, token: holder.token, shares }, null, 2));
+  writeFileSync(`${OUT}/state.json`, JSON.stringify({ holderDid: holder.did, holderPriv: hex(holder.priv), holderAddress: holder.address, token: holder.token, shares, vps }, null, 2));
   console.log("   ✓ đã dựng: 1 issuer, 1 holder, 8 VC, 4 VP — xác minh k=8 hợp lệ ở cả hai backend");
 }
 
@@ -111,10 +120,10 @@ const routes = (s) => ({
   "/did/resolve": { m: "GET", p: `/did/resolve?did=${encodeURIComponent(s.holderDid)}` },
   "/auth/me": { m: "GET", p: "/auth/me", auth: true },
   "/holder/credentials": { m: "GET", p: "/holder/credentials", auth: true },
-  "verify k=1": { m: "POST", p: `/verify/share/${s.shares[1]}` },
-  "verify k=2": { m: "POST", p: `/verify/share/${s.shares[2]}` },
-  "verify k=4": { m: "POST", p: `/verify/share/${s.shares[4]}` },
-  "verify k=8": { m: "POST", p: `/verify/share/${s.shares[8]}` },
+  "verify k=1": { m: "POST", p: `/verify/share/${s.shares[1]}`, body: { vp: s.vps[1] } },
+  "verify k=2": { m: "POST", p: `/verify/share/${s.shares[2]}`, body: { vp: s.vps[2] } },
+  "verify k=4": { m: "POST", p: `/verify/share/${s.shares[4]}`, body: { vp: s.vps[4] } },
+  "verify k=8": { m: "POST", p: `/verify/share/${s.shares[8]}`, body: { vp: s.vps[8] } },
 });
 
 async function run(base, r, token, n, conc) {
@@ -125,7 +134,11 @@ async function run(base, r, token, n, conc) {
       next++;
       const s = performance.now();
       try {
-        const res = await fetch(base + r.p, { method: r.m, headers: r.auth ? { authorization: "Bearer " + token } : {} });
+        const res = await fetch(base + r.p, {
+          method: r.m,
+          headers: { ...(r.auth ? { authorization: "Bearer " + token } : {}), ...(r.body ? { "content-type": "application/json" } : {}) },
+          body: r.body ? JSON.stringify(r.body) : undefined,
+        });
         await res.text();
         if (res.status >= 400) bad++;
       } catch { bad++; }
@@ -171,7 +184,8 @@ async function isolation(label) {
 // ============================================================ D: quy mô dữ liệu
 function fill(from, to) {
   // Mỗi "bản ghi" = 1 thực thể holder + 1 DID Document + 1 văn bằng, rải cho 12 đơn vị cấp
-  // (9 trường thành viên + 3 trường trực thuộc). vc_json mang đúng khuôn của giao diện.
+  // (9 trường thành viên + 3 trường trực thuộc). P3: không còn cột vc_json — nội dung
+  // văn bằng chỉ nằm trong phong bì mã hoá trên IPFS.
   psql(`
 INSERT INTO entities (address, public_key_hex, did, role, label)
 SELECT '0x' || 'e' || lpad(to_hex(i), 63, '0'), '0x' || md5(i::text) || md5((i+1)::text), 'did:vnu:holder:0x' || 'e' || lpad(to_hex(i), 63, '0'), 'holder', 'Nguoi hoc ' || i
@@ -181,18 +195,12 @@ SELECT e.id, e.did, 'bafkrei' || substr(md5(e.did) || md5(e.address), 1, 52), '0
        jsonb_build_object('@context', jsonb_build_array('https://www.w3.org/ns/did/v1'), 'id', e.did), '0x' || md5(e.address) || md5(e.did)
 FROM entities e WHERE e.label ~ '^Nguoi hoc [0-9]+$' AND substring(e.label from 11)::int BETWEEN ${from} AND ${to - 1};
 INSERT INTO credentials (vc_id, on_chain_vc_id, issuer_did, issuer_address, holder_did, holder_address, vc_type, ipfs_cid,
-                         vc_id_hash, content_hash, proof_value, vc_json, status, issued_at, tx_hash)
+                         vc_id_hash, content_hash, proof_value, status, issued_at, tx_hash)
 SELECT 'urn:uuid:' || gen_random_uuid(), 1000000 + i,
        'did:vnu:issuer:0x' || 'a' || lpad(to_hex(i % 12), 63, '0'), '0x' || 'a' || lpad(to_hex(i % 12), 63, '0'),
        'did:vnu:holder:0x' || 'e' || lpad(to_hex(i), 63, '0'), '0x' || 'e' || lpad(to_hex(i), 63, '0'), 1 + (i % 6),
        'bafkrei' || substr(md5(i::text) || md5((i*7)::text), 1, 52), '0x' || md5(i::text) || md5((i*3)::text),
        '0x' || md5((i*5)::text) || md5((i*11)::text), '0x' || md5((i*13)::text) || md5((i*17)::text) || md5((i*19)::text) || md5((i*23)::text),
-       jsonb_build_object('@context', jsonb_build_array('https://www.w3.org/2018/credentials/v1', jsonb_build_object('vnu','https://vnu.edu.vn/credentials/v1#')),
-         'id', 'urn:uuid:' || md5(i::text), 'type', jsonb_build_array('VerifiableCredential','VNUDegreeCredential'),
-         'issuer', 'did:vnu:issuer:0x' || 'a' || lpad(to_hex(i % 12), 63, '0'), 'issuanceDate', to_char(now() - (i || ' minutes')::interval, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-         'credentialSubject', jsonb_build_object('id', 'did:vnu:holder:0x' || 'e' || lpad(to_hex(i), 63, '0'), 'vnu:studentId', lpad((i % 100000000)::text, 8, '0'),
-           'vnu:degreeName', 'Chuong trinh dao tao so ' || (i % 483), 'vnu:faculty', 'Truong thanh vien ' || (i % 12),
-           'vnu:gpa', to_char(2 + (i % 200) / 100.0, 'FM0.00'), 'vnu:graduationYear', (2000 + i % 27)::text)),
        (ARRAY['active','active','active','active','active','active','active','active','revoked','suspended'])[1 + i % 10]::vc_status,
        now() - (i || ' minutes')::interval, '0x' || md5((i*29)::text) || md5((i*31)::text)
 FROM generate_series(${from}, ${to - 1}) AS i;

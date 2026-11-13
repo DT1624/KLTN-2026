@@ -118,6 +118,11 @@ const feEntryOnly = [...feNames].filter((n) => contract.entry.has(n) && !tsNames
 if (feEntryOnly.length) console.log(`       chỉ giao diện có: ${feEntryOnly.join(", ")}`);
 check("Mọi hàm entry giao diện gửi đều có trong bảng của backend", feEntryOnly.length === 0,
   feEntryOnly.length ? feEntryOnly.join(", ") : `${feNames.size} hàm đều có bên backend`);
+// Bảng của Go cũng phải có: đổi backend ở thanh trên là giao dịch đi qua bên Go.
+const feNotGo = [...feNames].filter((n) => contract.entry.has(n) && !goNames.has(n));
+if (feNotGo.length) console.log(`       giao diện có mà Go thiếu: ${feNotGo.join(", ")}`);
+check("Mọi hàm entry giao diện gửi đều có trong bảng của backend Go", feNotGo.length === 0,
+  feNotGo.length ? feNotGo.join(", ") : "đủ");
 
 // ---------- 6. Hàm entry đã sửa trong đợt rà soát phải còn/đã mất đúng ----------
 console.log("\n=== Hệ quả của đợt sửa contract ===");
@@ -129,7 +134,12 @@ check("Không backend nào còn gọi transfer_root",
 for (const fn of ["authority::propose_root", "authority::accept_root",
                   "authority::cancel_root_transfer", "authority::can_delegate",
                   "authority::get_pending_root", "did_registry::reactivate_own_did",
-                  "did_registry::suspend_own_did", "vc_registry::get_live_counts"]) {
+                  "did_registry::suspend_own_did", "vc_registry::get_live_counts",
+                  // Nâng cấp 13/11/2026: C2 (theo lô), C3 (cấp lại) — xem contracts/README.md
+                  "vc_registry::admin_suspend_vcs", "vc_registry::admin_revoke_vcs",
+                  "vc_registry::delegator_suspend_vcs", "vc_registry::delegator_revoke_vcs",
+                  "vc_registry::reissue_vc", "vc_registry::admin_link_replacement",
+                  "vc_registry::init_replacement_registry", "vc_registry::get_replacement"]) {
   check(`contract có ${fn}`, allContract.has(fn));
 }
 

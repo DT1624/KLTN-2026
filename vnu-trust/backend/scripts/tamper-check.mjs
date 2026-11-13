@@ -2,28 +2,22 @@
 // việc sửa nội dung — chứ không phải một bước luôn luôn xanh.
 //
 // Vì sao cần: một bước kiểm tra luôn PASS thì vô dụng hơn là không có, vì nó
-// tạo cảm giác an toàn giả. Kịch bản này cấp một văn bằng thật, chạy xác minh
-// (phải đạt), rồi SỬA THẲNG nội dung trong CSDL sau lưng ứng dụng, chạy lại
-// xác minh (phải hỏng ĐÚNG ở bước toàn vẹn), cuối cùng trả lại như cũ.
+// tạo cảm giác an toàn giả. Kịch bản này cấp một văn bằng, xác minh bản trình bày
+// nguyên vẹn (phải đạt), rồi xác minh bản trình bày có nội dung bị sửa (phải hỏng
+// ĐÚNG ở bước toàn vẹn).
+//
+// P3 (13/11/2026): máy chủ không còn giữ nội dung văn bằng, nên không còn "sửa thẳng
+// trong CSDL". Mối đe doạ thực tế là nội dung bị sửa trong BẢN TRÌNH BÀY: holder tự
+// sửa rồi ký (chỉ bước 7 bắt được), hoặc bị sửa trên đường tới người xác minh.
 //
 //   cd backend && node scripts/tamper-check.mjs
 //   API_BASE=http://localhost:4001/api node scripts/tamper-check.mjs   # lên Go
 import { ed25519 } from "@noble/curves/ed25519";
 import { sha3_256 } from "@noble/hashes/sha3";
 import { randomUUID, createHash } from "node:crypto";
-import pg from "pg";
-import { readFileSync } from "node:fs";
+import { fakeEnvelope, fakeShareBlob } from "./lib-envelope.mjs";
 
 const API = process.env.API_BASE ?? "http://localhost:4000/api";
-// Biến môi trường thắng .env, để dev.sh trỏ được sang CSDL kiểm thử riêng.
-const env = {
-  ...Object.fromEntries(
-    readFileSync(new URL("../.env", import.meta.url), "utf8")
-      .split("\n").filter((l) => l.includes("=") && !l.trim().startsWith("#"))
-      .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
-  ),
-  ...process.env,
-};
 
 const hex = (b) => "0x" + Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
 const canon = (v) => v === null || typeof v !== "object" ? JSON.stringify(v)
@@ -82,68 +76,71 @@ const vc = {
   issuanceDate: new Date().toISOString(),
   credentialSubject: { id: holder.did, "vnu:degreeName": "Cu nhan CNTT", "vnu:gpa": "2.50" },
 };
-const vcPin = await call("POST", "/ipfs/pin", { json: vc, name: "vc" }, issuer.token);
+// P3: IPFS chỉ nhận phong bì mã hoá; nội dung văn bằng không rời thiết bị dạng rõ.
+const vcPin = await call("POST", "/ipfs/pin", { json: fakeEnvelope(sha3(vcId), holder.address, issuer.address), name: "vc" }, issuer.token);
 const issued = await call("POST", "/issuer/credentials", {
   vcId, onChainVcId: Math.floor(Math.random() * 1e9),
   holderDid: holder.did, holderAddress: holder.address, vcType: 1,
   ipfsCid: vcPin.data.data.cid, vcIdHash: sha3(vcId), contentHash: sha3(vc),
   proofValue: hex(ed25519.sign(new TextEncoder().encode(canon(vc)), issuer.priv)),
-  vcJson: vc, issuedAt: vc.issuanceDate, expiresAt: null, txHash: fakeTx(),
+  issuedAt: vc.issuanceDate, expiresAt: null, txHash: fakeTx(),
 }, issuer.token);
-check("Cấp được văn bằng để thử nghiệm", issued.status === 201, `HTTP ${issued.status}`);
+check("Cấp được văn bằng để thử nghiệm", issued.status === 201, `HTTP ${issued.status} ${issued.data?.error ?? ""}`);
 
-const vp = { "@context": ["https://www.w3.org/2018/credentials/v1"], type: ["VerifiablePresentation"], holder: holder.did };
-const vpPin = await call("POST", "/ipfs/pin", { json: vp, name: "vp" }, holder.token);
-const pres = await call("POST", "/holder/presentations", {
-  vpId: `urn:uuid:${randomUUID()}`, vcIds: [vcId], ipfsCid: vpPin.data.data.cid,
-  vpHash: sha3(vp), proofValue: hex(ed25519.sign(new TextEncoder().encode(canon(vp)), holder.priv)),
-}, holder.token);
-const shareToken = pres.data?.data?.shareToken ?? pres.data?.data?.share_token
-  ?? pres.data?.data?.token ?? pres.data?.data?.share?.token;
-check("Tạo được liên kết chia sẻ", !!shareToken,
-  shareToken ? "có token" : `HTTP ${pres.status} ${JSON.stringify(pres.data).slice(0, 200)}`);
-if (!shareToken) { console.log("\n  Không tạo được liên kết, dừng sớm."); process.exit(1); }
+// Holder tạo bản trình bày (bản rõ chỉ nằm ở trình duyệt; IPFS giữ bản mã) và ký nó.
+async function share(credential) {
+  const vp = { "@context": ["https://www.w3.org/2018/credentials/v1"], type: ["VerifiablePresentation"],
+    holder: holder.did, verifiableCredential: [credential] };
+  const vpPin = await call("POST", "/ipfs/pin", { json: fakeShareBlob(), name: "vp" }, holder.token);
+  const pres = await call("POST", "/holder/presentations", {
+    vpId: `urn:uuid:${randomUUID()}`, vcIds: [vcId], ipfsCid: vpPin.data.data.cid,
+    vpHash: sha3(vp), proofValue: hex(ed25519.sign(new TextEncoder().encode(canon(vp)), holder.priv)),
+  }, holder.token);
+  return { vp, token: pres.data?.data?.share?.token, pres };
+}
+const honest = await share(vc);
+check("Tạo được liên kết chia sẻ", !!honest.token,
+  honest.token ? "có token" : `HTTP ${honest.pres.status} ${JSON.stringify(honest.pres.data).slice(0, 200)}`);
+if (!honest.token) { console.log("\n  Không tạo được liên kết, dừng sớm."); process.exit(1); }
 
-const integrityCheck = (report) =>
-  report?.checks?.find((c) => c.name === "Nội dung văn bằng khớp bản neo trên chuỗi");
+const step = (report, name) => report?.checks?.find((c) => c.name === name);
+const INTEGRITY = "Nội dung văn bằng khớp bản neo trên chuỗi";
+const verify = async (token, vp) => (await call("POST", `/verify/share/${token}`, { vp })).data?.data;
 
-const before = await call("POST", `/verify/share/${shareToken}`);
-const beforeIntegrity = integrityCheck(before.data?.data);
-check("Trước khi sửa: bước toàn vẹn ĐẠT", beforeIntegrity?.passed === true,
-  beforeIntegrity ? beforeIntegrity.detail : "không thấy bước toàn vẹn trong báo cáo");
+const before = await verify(honest.token, honest.vp);
+check("Văn bằng nguyên vẹn: bước toàn vẹn ĐẠT và kết quả hợp lệ",
+  step(before, INTEGRITY)?.passed === true && before?.overallValid === true,
+  step(before, INTEGRITY)?.detail ?? "không thấy bước toàn vẹn");
 
-// --- Sửa lén nội dung trong CSDL, đúng kiểu kẻ có quyền ghi vào chỉ mục ---
-const client = new pg.Client({
-  host: env.DB_HOST, port: Number(env.DB_PORT), database: env.DB_NAME,
-  user: env.DB_USER, password: env.DB_PASSWORD,
-});
-await client.connect();
-const original = (await client.query("SELECT vc_json FROM credentials WHERE vc_id = $1", [vcId])).rows[0].vc_json;
+// --- Kịch bản 1: holder sửa điểm rồi tự ký bản trình bày ---
+// Chữ ký và hash bản trình bày đều khớp (chính holder ký), văn bằng vẫn "còn hiệu
+// lực" — chỉ bước toàn vẹn (hash nội dung ↔ bản neo trên chuỗi) bắt được.
+const forgedVc = JSON.parse(JSON.stringify(vc));
+forgedVc.credentialSubject["vnu:gpa"] = "4.00";
+const forged = await share(forgedVc);
+const after = await verify(forged.token, forged.vp);
+check("Holder sửa điểm rồi tự ký: bước toàn vẹn HỎNG", step(after, INTEGRITY)?.passed === false,
+  step(after, INTEGRITY)?.detail ?? "không thấy bước toàn vẹn");
+check("…trong khi chữ ký và hash bản trình bày vẫn đạt (nên chỉ bước 7 bắt được)",
+  step(after, "Chữ ký của người trình bày")?.passed === true && step(after, "Toàn vẹn nội dung VP")?.passed === true);
+check("Toàn bộ kết quả xác minh chuyển thành KHÔNG hợp lệ", after?.overallValid === false,
+  `overallValid=${after?.overallValid}`);
+// Bước "còn hiệu lực" VẪN đạt — đó chính là lý do phải có bước toàn vẹn riêng.
+check("Bước 'còn hiệu lực' vẫn đạt — nên một mình nó KHÔNG đủ",
+  step(after, "Tất cả chứng chỉ còn hiệu lực")?.passed === true,
+  step(after, "Tất cả chứng chỉ còn hiệu lực")?.detail ?? "không thấy");
 
-const tampered = JSON.parse(JSON.stringify(original));
-tampered.credentialSubject["vnu:gpa"] = "4.00";   // sửa điểm
-await client.query("UPDATE credentials SET vc_json = $2 WHERE vc_id = $1", [vcId, tampered]);
+// --- Kịch bản 2: sửa bản trình bày trên đường tới người xác minh ---
+const mitm = JSON.parse(JSON.stringify(honest.vp));
+mitm.verifiableCredential[0].credentialSubject["vnu:gpa"] = "4.00";
+const relayed = await verify(honest.token, mitm);
+check("Sửa bản trình bày sau khi chia sẻ: bước hash bản trình bày VÀ bước toàn vẹn cùng HỎNG",
+  step(relayed, "Toàn vẹn nội dung VP")?.passed === false && step(relayed, INTEGRITY)?.passed === false
+  && relayed?.overallValid === false);
 
-const after = await call("POST", `/verify/share/${shareToken}`);
-const afterReport = after.data?.data;
-const afterIntegrity = integrityCheck(afterReport);
-check("Sau khi sửa điểm: bước toàn vẹn HỎNG", afterIntegrity?.passed === false,
-  afterIntegrity ? afterIntegrity.detail : "không thấy bước toàn vẹn");
-check("Toàn bộ kết quả xác minh chuyển thành KHÔNG hợp lệ", afterReport?.overallValid === false,
-  `overallValid=${afterReport?.overallValid}`);
-
-// Bước "còn hiệu lực" VẪN đạt — đó chính là lý do phải có bước toàn vẹn riêng:
-// sửa nội dung không hề làm văn bằng bị thu hồi.
-const stillActive = afterReport?.checks?.find((c) => c.name === "Tất cả chứng chỉ còn hiệu lực");
-check("Bước 'còn hiệu lực' vẫn đạt — nên một mình nó KHÔNG đủ", stillActive?.passed === true,
-  stillActive ? stillActive.detail : "không thấy");
-
-// --- Trả lại như cũ ---
-await client.query("UPDATE credentials SET vc_json = $2 WHERE vc_id = $1", [vcId, original]);
-const restored = await call("POST", `/verify/share/${shareToken}`);
-check("Khôi phục nội dung thì xác minh đạt trở lại",
-  integrityCheck(restored.data?.data)?.passed === true);
-await client.end();
+// Xác minh không lưu trạng thái: gửi lại đúng bản gốc thì đạt trở lại.
+const restored = await verify(honest.token, honest.vp);
+check("Gửi lại bản trình bày gốc thì xác minh đạt trở lại", step(restored, INTEGRITY)?.passed === true && restored?.overallValid === true);
 
 const failed = rows.filter((r) => !r.ok);
 console.log(`\n${rows.length - failed.length}/${rows.length} PASS` +

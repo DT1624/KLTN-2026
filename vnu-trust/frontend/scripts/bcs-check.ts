@@ -33,7 +33,8 @@ for (const f of readdirSync(srcDir).filter((x) => x.endsWith(".move"))) {
     const params = m[2].split(",").map((p) => p.trim()).filter(Boolean).map((p) => p.split(":")[1].trim());
     fromMove[`${mod}::${m[1]}`] = params
       .filter((t) => t !== "&signer")
-      .map((t) => (t === "address" ? "address" : t === "u64" ? "u64" : t === "vector<u8>" ? "bytes" : `?${t}`));
+      .map((t) => (t === "address" ? "address" : t === "u64" ? "u64" : t === "vector<u8>" ? "bytes"
+        : t === "vector<u64>" ? "u64s" : `?${t}`));
   }
 }
 for (const [fn, kinds] of Object.entries(ENTRY_PARAMS)) {
@@ -52,6 +53,11 @@ if (process.argv.includes("--live")) {
     ["authority::approve_issuer", ["0x00000000000000000000000000000000000000000000000000000000000abc", "63", "0x", "0x", "0"]],
     ["vc_registry::revoke_vc", ["18446744073709551615", "0x" + Buffer.from("Lý do có dấu").toString("hex")]],
     ["authority::accept_root", []],
+    // Nâng cấp 13/11: vector<u64> (C2) và reissue_vc / admin_link_replacement (C3).
+    ["vc_registry::admin_revoke_vcs", [["0", "7", "18446744073709551615"], "0x" + Buffer.from("xem xét").toString("hex")]],
+    ["vc_registry::delegator_suspend_vcs", [["3"], "0x"]],
+    ["vc_registry::reissue_vc", ["12", "0x1", "1", h32, cid, h32, "0"]],
+    ["vc_registry::admin_link_replacement", ["1", "2"]],
   ];
   for (const [fn, args] of cases) {
     const tx: EntryTx = {

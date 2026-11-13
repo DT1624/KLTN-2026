@@ -4,6 +4,7 @@
 // phép "B8-…" là rào chắn trước đây không bộ kiểm thử nào bắt được khi bị phá.
 import { Account } from "@aptos-labs/ts-sdk";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { fakeEnvelope, fakeShareBlob } from "./lib-envelope.mjs";
 
 const API = process.env.API_BASE ?? "http://localhost:4000/api";
 const results = [];
@@ -84,19 +85,35 @@ const admin = await actor("admin");
   check("B8-T12 DID không bám theo địa chỉ ví → 400", r2.status === 400, `${r2.status}`);
 }
 
-async function issue(by, to, extraSubject = {}, overrides = {}) {
+// P3: nội dung văn bằng chỉ nằm trong phong bì mã hoá trên IPFS; `envelope` cho phép
+// thử phong bì sai để kiểm rào cấu trúc của máy chủ.
+// Mỗi văn bằng một số hiệu on-chain riêng: offline tra trạng thái THEO số hiệu, dùng chung
+// số 0 thì văn bằng mới đọc nhầm trạng thái "suspended" của văn bằng ở phép B8-T5.
+let nextChainId = 7_000_000 + Math.floor(Math.random() * 1e6) * 10;
+async function issue(by, to, extraSubject = {}, overrides = {}, envelope = null) {
   const vcId = "urn:uuid:" + randomUUID();
   const vcJson = { id: vcId, issuer: by.did, credentialSubject: { id: to.did, ...extraSubject } };
+  const env = envelope ? envelope(sha3(vcId)) : fakeEnvelope(sha3(vcId), to.address, by.address);
+  const pin = await call("POST", "/ipfs/pin", { json: env, name: "vc" }, by.token);
   const body = {
-    vcId, onChainVcId: 0, holderDid: to.did, holderAddress: to.address, vcType: 1, ipfsCid: fakeCid(),
-    vcIdHash: sha3(vcId), contentHash: sha3(vcJson), proofValue: "z".repeat(32), vcJson,
+    vcId, onChainVcId: nextChainId++, holderDid: to.did, holderAddress: to.address, vcType: 1, ipfsCid: pin.data?.data?.cid ?? fakeCid(),
+    vcIdHash: sha3(vcId), contentHash: sha3(vcJson), proofValue: "z".repeat(32),
     issuedAt: new Date().toISOString(), expiresAt: null, txHash: fakeTx(), ...overrides,
   };
-  return { vcId, r: await call("POST", "/issuer/credentials", body, by.token) };
+  return { vcId, vcJson, r: await call("POST", "/issuer/credentials", body, by.token) };
 }
 if (OFFLINE) {
-  const { r: bad } = await issue(issuer, holder, {}, { contentHash: sha3({ khac: 1 }) });
-  check("B8-T10 hash nội dung VC sai → 400", bad.status === 400, `${bad.status}`);
+  // ĐỔI ĐẶC TẢ (P3, 13/11/2026): phép cũ "B8-T10 hash nội dung VC sai → 400" khẳng định
+  // máy chủ tính lại hash từ vcJson. Máy chủ không còn thấy bản rõ nên phép đó đã bỏ có
+  // chủ ý; rào thay thế phía máy chủ là cấu trúc phong bì (hai phép dưới), phía ví là
+  // checkCredential (frontend/scripts/vc-crypto-check.ts), phía xác minh là bước 7.
+  const { r: noIssuer } = await issue(issuer, holder, {}, {}, (h) => fakeEnvelope(h, holder.address, other.address));
+  check("B8-T10 (P3) phong bì không có issuer là người nhận → 400",
+    noIssuer.status === 400 && errOf(noIssuer).includes("issuer không nằm"), `${noIssuer.status} ${errOf(noIssuer)}`);
+  const { r: stuffed } = await issue(issuer, holder, {}, {}, (h) => fakeEnvelope(h, holder.address, issuer.address,
+    { credentialSubject: { "vnu:studentId": "SV-NHET-KEM" } }));
+  check("B8-T10b (P3) phong bì nhét kèm bản rõ (trường lạ) → 400",
+    stuffed.status === 400 && errOf(stuffed).includes("chỉ được có các trường"), `${stuffed.status} ${errOf(stuffed)}`);
   const { vcId, r } = await issue(issuer, holder);
   check("(chuẩn bị) cấp VC cho holder", r.status === 201, `${r.status} ${errOf(r)}`);
   const v = encodeURIComponent(vcId);
@@ -108,11 +125,25 @@ if (OFFLINE) {
   const t5 = await call("POST", `/admin/credentials/${v}/reinstate`, { reason: "tự bật", txHash: fakeTx() }, issuer.token);
   check("B8-T5 issuer tự kích hoạt lại VC → 403", s.status === 200 && t5.status === 403, `${s.status}/${t5.status}`);
 
-  console.log("\n=== S-05. Tuần tự hoá tất định giống JavaScript ở cả hai bản ===");
+  // ĐỔI CÁCH KIỂM (P3): trước đây S-05 dựa vào việc máy chủ tính lại hash vcJson lúc
+  // cấp — bước đó đã bỏ, nên S-05 sẽ lặng lẽ không kiểm gì. Nay máy chủ băm bản rõ ở
+  // BƯỚC XÁC MINH: hash bản trình bày (bước 2) và hash văn bằng (bước 7) do máy chủ tính
+  // phải khớp hash JavaScript tính — đúng bất biến #5.
+  console.log("\n=== S-05. Tuần tự hoá tất định giống JavaScript ở cả hai bản (qua bước xác minh) ===");
   for (const [label, extra] of [["dấu &", { faculty: "Kinh tế & QTKD" }], ["dấu < >", { note: "a<b>c" }],
     ["số thực", { gpa: 3.75, big: 1234567.5, tiny: 1e-7 }], ["khoá ngoài BMP", { "😀": 1, "！": 2 }]]) {
-    const { r: x } = await issue(issuer, holder, extra);
-    check(`S-05 cấp VC chứa ${label}`, x.status === 201, `${x.status} ${errOf(x)}`);
+    const { vcId: id, vcJson, r: x } = await issue(issuer, holder, extra);
+    const vp = { type: ["VerifiablePresentation"], holder: holder.did, verifiableCredential: [vcJson] };
+    const blob = await call("POST", "/ipfs/pin", { json: fakeShareBlob(), name: "vp" }, holder.token);
+    const pres = await call("POST", "/holder/presentations", {
+      vpId: "urn:uuid:" + randomUUID(), vcIds: [id], ipfsCid: blob.data?.data?.cid,
+      vpHash: sha3(vp), proofValue: holder.acct.sign(new TextEncoder().encode(canonical(vp))).toString(),
+    }, holder.token);
+    const rep = (await call("POST", `/verify/share/${pres.data?.data?.share?.token}`, { vp })).data?.data;
+    const ok = (n) => rep?.checks?.find((c) => c.name === n)?.passed === true;
+    check(`S-05 ${label}: máy chủ băm bản trình bày và văn bằng khớp JavaScript`,
+      x.status === 201 && ok("Toàn vẹn nội dung VP") && ok("Nội dung văn bằng khớp bản neo trên chuỗi"),
+      `${x.status} ${errOf(x)} ${pres.status} ${errOf(pres)}`);
   }
 } else {
   console.log("  (bỏ qua nhóm cấp VC — chế độ nghiêm ngặt cần giao dịch thật)");
@@ -123,6 +154,8 @@ console.log("\n=== S-03 / P-05. Dữ liệu cá nhân trên tuyến công khai =
   const pinned = await call("POST", "/ipfs/pin", { json: { credentialSubject: { "vnu:studentId": "SV-REVIEW-01" } }, name: "vc" }, holder.token);
   const lk = await call("GET", `/lookup?q=${pinned.data?.data?.cid}`);
   check("S-03 tra CID của văn bằng không lộ nội dung", lk.status === 200 && !JSON.stringify(lk.data).includes("SV-REVIEW-01"), `${lk.status}`);
+  const gw = await call("GET", `/ipfs/${pinned.data?.data?.cid}`);
+  check("S-03b (P3) gateway công khai không phát lại JSON dạng rõ đã ghim", gw.status === 404 && !JSON.stringify(gw.data).includes("SV-REVIEW-01"), `${gw.status}`);
   const pub = await call("GET", `/entities/by-address/${holder.address}`);
   check("P-05 hồ sơ công khai không lộ label", pub.status === 200 && pub.data?.data?.label === null && pub.data?.data?.did === holder.did, `${pub.status} label=${JSON.stringify(pub.data?.data?.label)}`);
 }
