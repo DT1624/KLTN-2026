@@ -47,6 +47,8 @@ module vnu::errors {
     const E_DID_NOT_BOUND_TO_OWNER:     u64 = 2011;
     /// DID do chinh chu tu khoa thi chi chu moi mo lai.
     const E_OWNER_LOCKED:               u64 = 2012;
+    /// C1: DID da thu hoi la vinh vien - dia chi do khong dang ky lai duoc.
+    const E_DID_PERMANENTLY_REVOKED:    u64 = 2013;
 
     // ========== Credential ==========
 
@@ -61,6 +63,18 @@ module vnu::errors {
     const E_VC_ALREADY_EXISTS:          u64 = 3009;
     /// Issuer khong duoc tu cap van bang cho chinh minh.
     const E_SELF_ISSUE:                 u64 = 3010;
+    /// C2: lo rong, qua 100 muc, hoac co id trung.
+    const E_INVALID_BATCH:              u64 = 3011;
+    /// C3: VC cu da co ban thay the.
+    const E_VC_ALREADY_REPLACED:        u64 = 3012;
+    /// C3: doi holder khi DID cua holder cu van ACTIVE.
+    const E_HOLDER_STILL_ACTIVE:        u64 = 3013;
+    /// C3: nguoi goi khong phai issuer goc / issuer cha cua VC cu.
+    const E_NOT_REISSUER:               u64 = 3014;
+    /// C3: VC moi khong hop le de noi (trung id, khac loai, khong ACTIVE, da noi).
+    const E_INVALID_REPLACEMENT:        u64 = 3015;
+    /// C2: VC khong do sub-issuer cua nguoi goi cap.
+    const E_NOT_PARENT_ISSUER:          u64 = 3016;
 
 
     // ========== Utils ==========
@@ -71,6 +85,8 @@ module vnu::errors {
     const E_RESULT_TOO_LARGE:           u64 = 4005;
     /// Resource bo sung khi nang cap da duoc khoi tao.
     const E_ALREADY_INITIALIZED:        u64 = 4006;
+    /// Resource them khi nang cap chua duoc khoi tao bang entry init_*.
+    const E_NOT_INITIALIZED:            u64 = 4007;
 
     // ========== Public accessors ==========
 
@@ -110,6 +126,7 @@ module vnu::errors {
     public fun not_self_suspended(): u64        { E_NOT_SELF_SUSPENDED }
     public fun did_not_bound_to_owner(): u64    { E_DID_NOT_BOUND_TO_OWNER }
     public fun owner_locked(): u64              { E_OWNER_LOCKED }
+    public fun did_permanently_revoked(): u64   { E_DID_PERMANENTLY_REVOKED }
 
 
     // === Credential ===
@@ -123,6 +140,12 @@ module vnu::errors {
     public fun not_vc_holder(): u64             { E_NOT_VC_HOLDER }
     public fun vc_already_exists(): u64         { E_VC_ALREADY_EXISTS }
     public fun self_issue(): u64                { E_SELF_ISSUE }
+    public fun invalid_batch(): u64             { E_INVALID_BATCH }
+    public fun vc_already_replaced(): u64       { E_VC_ALREADY_REPLACED }
+    public fun holder_still_active(): u64       { E_HOLDER_STILL_ACTIVE }
+    public fun not_reissuer(): u64              { E_NOT_REISSUER }
+    public fun invalid_replacement(): u64       { E_INVALID_REPLACEMENT }
+    public fun not_parent_issuer(): u64         { E_NOT_PARENT_ISSUER }
 
     // === Utils ===
 
@@ -132,4 +155,5 @@ module vnu::errors {
     public fun invalid_page(): u64              { E_INVALID_PAGE }
     public fun result_too_large(): u64          { E_RESULT_TOO_LARGE }
     public fun already_initialized(): u64       { E_ALREADY_INITIALIZED }
+    public fun not_initialized(): u64           { E_NOT_INITIALIZED }
 }

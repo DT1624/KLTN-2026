@@ -172,26 +172,29 @@ module vnu::did_registry_test {
         did_registry::register_did(&s, t::did_with(b"did:vnu:v2:", a), t::cid(), t::hash(1));
     }
 
+    // DOI DAC TA 13/11/2026 (C1): truoc day DID bi thu hoi thi chu dang ky
+    // DID moi duoc (F-05, test cu "..._creates_new_version_and_keeps_old_record").
+    // Nay thu hoi la vinh vien; nguoi dung di quy trinh cap lai bang vi moi.
     #[test]
-    fun register_did_after_revocation_creates_new_version_and_keeps_old_record() {
+    #[expected_failure(abort_code = errors::E_DID_PERMANENTLY_REVOKED, location = did_registry)]
+    fun register_did_after_revocation_is_rejected_and_old_record_kept() {
         let root = t::setup();
         let a = t::holder1_addr();
         let s = t::user(a);
         authority::admin_revoke_did(&root, a, b"fraud");
 
-        let new_did = t::did_with(b"did:vnu:v2:", a);
-        did_registry::register_did(&s, new_did, t::cid_v2(), t::hash(2));
-
-        assert!(did_registry::did_id_of(a) == 1 && did_registry::version_of(a) == 2, 0);
-        assert!(did_registry::status_of(a) == t::did_active(), 1);
+        assert!(did_registry::did_id_of(a) == 0 && did_registry::version_of(a) == 1, 0);
         let (_, _, _, old_status, old_version) = did_registry::resolve_did(t::did_for(a));
-        assert!(old_status == t::did_revoked() && old_version == 1, 2);
-        let (cur, _, _, _, _) = did_registry::resolve_did_by_owner(a);
-        assert!(cur == new_did, 3);
+        assert!(old_status == t::did_revoked() && old_version == 1, 1);
+
+        did_registry::register_did(&s, t::did_with(b"did:vnu:v2:", a), t::cid_v2(), t::hash(2));
     }
 
+    // DOI DAC TA (C1): cung chuoi DID cu nay bi chan som hon, o rao chu so huu.
+    // Chuoi DID gan voi dia chi chu, nen E_DID_ALREADY_REGISTERED khong con
+    // duong nao cham toi - giu trong ma lam lop phong thu thu hai.
     #[test]
-    #[expected_failure(abort_code = errors::E_DID_ALREADY_REGISTERED, location = did_registry)]
+    #[expected_failure(abort_code = errors::E_DID_PERMANENTLY_REVOKED, location = did_registry)]
     fun register_did_rejects_reuse_of_revoked_did_string() {
         let root = t::setup();
         let a = t::holder1_addr();
@@ -500,14 +503,15 @@ module vnu::did_registry_test {
     fun list_views_include_every_did_string_and_owner() {
         let root = t::setup();
         let a = t::holder1_addr();
-        let s = t::user(a);
+        t::user(a);
         t::user(t::holder2_addr());
+        // DOI DAC TA (C1): khong dang ky lai duoc nua; DID da thu hoi van nam
+        // trong danh sach (truoc day test dang ky lai roi dem 3 chuoi DID).
         authority::admin_revoke_did(&root, a, b"x");
-        did_registry::register_did(&s, t::did_with(b"did:vnu:v2:", a), t::cid(), t::hash(1));
 
         let dids = did_registry::get_dids();
-        assert!(vector::length(&dids) == 3, 0);
-        assert!(vector::contains(&dids, &t::did_for(a)) && vector::contains(&dids, &t::did_with(b"did:vnu:v2:", a)), 1);
+        assert!(vector::length(&dids) == 2, 0);
+        assert!(vector::contains(&dids, &t::did_for(a)) && vector::contains(&dids, &t::did_for(t::holder2_addr())), 1);
         let owners = did_registry::get_owners();
         assert!(vector::length(&owners) == 2, 2);
     }

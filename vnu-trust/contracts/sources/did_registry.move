@@ -121,9 +121,11 @@ module vnu::did_registry {
 
     /// Dang ky DID cho chinh nguoi ky.
     /// - `did_string`: "did:vnu:...<dia chi nguoi ky>", toi da 128 byte, chua tung dung.
-    /// - Moi dia chi chi co MOT DID hien hanh; chi dang ky lai duoc khi DID cu
-    ///   da bi thu hoi. Thu hoi DID cung thu hoi moi vai tro (xem authority),
-    ///   nen dang ky lai chi cho mot danh tinh tran, nhu mot dia chi moi.
+    /// - Moi dia chi chi co MOT DID, suot doi. DID da thu hoi la VINH VIEN:
+    ///   dia chi do khong dang ky lai duoc (C1, 13/11/2026 - thay F-05). Nguoi
+    ///   bi thu hoi DID (lo khoa, gian lan) lap vi moi va di quy trinh cap lai
+    ///   (vc_registry::reissue_vc) - de khong ai tu tai lap danh tinh tren cung
+    ///   dia chi ma khong qua thu tuc. Thu hoi DID van thu hoi moi vai tro (M-01).
     public entry fun register_did(
         owner: &signer,
         did_string: vector<u8>,
@@ -136,12 +138,14 @@ module vnu::did_registry {
         assert!(vector::length(&document_hash) == 32, errors::hash_wrong_length());
 
         let reg = borrow_global_mut<DIDRegistry>(@vnu);
-        let version = 1;
         if (smart_table::contains(&reg.owner_to_id, owner_addr)) {
             let prev = record_of(reg, owner_addr);
-            assert!(prev.status == DID_STATUS_REVOKED, errors::owner_has_did());
-            version = prev.version + 1;
+            assert!(prev.status != DID_STATUS_REVOKED, errors::did_permanently_revoked());
+            abort errors::owner_has_did()
         };
+        let version = 1;
+        // Tu C1, chuoi DID gan voi dia chi chu va moi dia chi chi dang ky mot lan,
+        // nen rao nay khong con duong cham toi; giu lam lop phong thu thu hai.
         assert!(
             !smart_table::contains(&reg.did_string_to_id, did_string),
             errors::did_already_registered()

@@ -8,6 +8,13 @@
 ///
 /// EXPIRED chi chuyen tiep duoc sang REVOKED: thu hoi la loi tuyen bo vinh vien
 /// ve gian lan, khong duoc het han truoc khi kip tuyen bo.
+///
+/// Them khi nang cap 13/11/2026 (bo sung, khong doi ham cu):
+///   C2 - xu ly theo lo: admin_*_vcs (moi VC), delegator_*_vcs (VC do sub-issuer
+///        cua nguoi goi cap). Muc khong chuyen duoc thi BO QUA, khong abort ca lo.
+///   C3 - cap lai: reissue_vc (issuer goc / issuer cha) va admin_link_replacement;
+///        VC cu bi thu hoi voi ly do "replaced" va lien ket cu <-> moi nam trong
+///        ReplacementRegistry (khoi tao mot lan bang init_replacement_registry).
 module vnu::vc_registry {
 
     use std::signer;
@@ -30,6 +37,14 @@ module vnu::vc_registry {
 
     const MAX_VIEW_ITEMS:       u64 = 500;
     const MAX_PAGE_LIMIT:       u64 = 200;
+    /// Tran so muc moi lo (C2).
+    const MAX_BATCH:            u64 = 100;
+    /// Ly do ghi vao VC cu khi bi thay the (C3).
+    const REASON_REPLACED:      vector<u8> = b"replaced";
+
+    /// Ai dang xu ly lo (C2).
+    const BY_ADMIN:             u8 = 1;
+    const BY_PARENT:            u8 = 2;
 
     // ========== Structs ==========
 
@@ -68,6 +83,13 @@ module vnu::vc_registry {
         holder_live_vc_count: SmartTable<address, u64>,
     }
 
+    /// C3: lien ket VC cu <-> VC thay the. Moi VC bi thay toi da mot lan, va
+    /// moi VC chi thay cho toi da mot VC.
+    struct ReplacementRegistry has key {
+        replaced_by: SmartTable<u64, u64>,
+        replaces: SmartTable<u64, u64>,
+    }
+
     // ========== Events ==========
 
     #[event]
@@ -94,6 +116,26 @@ module vnu::vc_registry {
         at: u64,
     }
 
+    #[event]
+    /// Tong ket mot lo (C2). Moi muc doi trang thai con co VCStatusChangedEvent rieng.
+    struct VCBatchProcessedEvent has drop, store {
+        new_status: u8,
+        changed: vector<u64>,
+        skipped: vector<u64>,
+        by: address,
+        at: u64,
+    }
+
+    #[event]
+    struct VCReplacedEvent has drop, store {
+        old_id: u64,
+        new_id: u64,
+        old_holder: address,
+        new_holder: address,
+        by: address,
+        at: u64,
+    }
+
     // ========== Init ==========
 
     fun init_module(publisher: &signer) {
@@ -106,6 +148,14 @@ module vnu::vc_registry {
             issuer_live_vc_count: smart_table::new(),
             holder_live_vc_count: smart_table::new(),
         })
+    }
+
+    /// Chay MOT lan ngay sau ban nang cap them C3 (init_module khong chay lai).
+    /// Truoc khi goi, reissue_vc / admin_link_replacement abort E_NOT_INITIALIZED.
+    public entry fun init_replacement_registry(publisher: &signer) {
+        assert!(signer::address_of(publisher) == @vnu, errors::not_authorized());
+        assert!(!exists<ReplacementRegistry>(@vnu), errors::already_initialized());
+        move_to(publisher, ReplacementRegistry { replaced_by: smart_table::new(), replaces: smart_table::new() });
     }
 
     // ========== Entry functions ==========
@@ -126,7 +176,19 @@ module vnu::vc_registry {
         content_hash: vector<u8>,
         expires_at: u64,
     ) acquires VCRegistry {
-        let issuer_addr = signer::address_of(issuer);
+        issue_internal(signer::address_of(issuer), holder_addr, vc_type, vc_id_hash, content_cid, content_hash, expires_at);
+    }
+
+    /// Than cua issue_vc, dung chung voi reissue_vc. Tra ve id VC moi.
+    fun issue_internal(
+        issuer_addr: address,
+        holder_addr: address,
+        vc_type: u64,
+        vc_id_hash: vector<u8>,
+        content_cid: vector<u8>,
+        content_hash: vector<u8>,
+        expires_at: u64,
+    ): u64 acquires VCRegistry {
         let now = timestamp::now_seconds();
         assert_issue_input(issuer_addr, holder_addr, vc_type, &vc_id_hash, &content_cid, &content_hash, expires_at, now);
 
@@ -170,6 +232,7 @@ module vnu::vc_registry {
             issued_at: now,
             expires_at,
         });
+        id
     }
 
     /// Issuer tam ngung VC cua chinh minh. Khong tu kich hoat lai duoc.
@@ -193,6 +256,78 @@ module vnu::vc_registry {
 
     public entry fun admin_revoke_vc(admin: &signer, vc_id: u64, reason: vector<u8>) acquires VCRegistry {
         set_status(signer::address_of(admin), true, vc_id, VC_STATUS_REVOKED, reason);
+    }
+
+    // ---------- C2: xu ly theo lo ----------
+    // `vc_ids`: 1..100 id TANG DAN NGHIEM NGAT (chan trung lap ma khong ton O(n^2)).
+    // Kiem het (ton tai, quyen) roi moi ghi: loi phan quyen abort ca lo. Muc da o
+    // trang thai dich, da thu hoi, hoac het han (khi tam ngung) thi BO QUA va ghi
+    // vao `skipped` - giua luc xem danh sach va luc ky, issuer co the da tu xu ly.
+
+    public entry fun admin_suspend_vcs(admin: &signer, vc_ids: vector<u64>, reason: vector<u8>) acquires VCRegistry {
+        batch_set_status(signer::address_of(admin), BY_ADMIN, vc_ids, VC_STATUS_SUSPENDED, reason);
+    }
+
+    public entry fun admin_revoke_vcs(admin: &signer, vc_ids: vector<u64>, reason: vector<u8>) acquires VCRegistry {
+        batch_set_status(signer::address_of(admin), BY_ADMIN, vc_ids, VC_STATUS_REVOKED, reason);
+    }
+
+    /// Issuer cha tam ngung VC do sub-issuer CUA MINH cap. Kich hoat lai van chi admin.
+    public entry fun delegator_suspend_vcs(parent: &signer, vc_ids: vector<u64>, reason: vector<u8>) acquires VCRegistry {
+        batch_set_status(signer::address_of(parent), BY_PARENT, vc_ids, VC_STATUS_SUSPENDED, reason);
+    }
+
+    public entry fun delegator_revoke_vcs(parent: &signer, vc_ids: vector<u64>, reason: vector<u8>) acquires VCRegistry {
+        batch_set_status(signer::address_of(parent), BY_PARENT, vc_ids, VC_STATUS_REVOKED, reason);
+    }
+
+    // ---------- C3: cap lai co lien ket ----------
+
+    /// Cap VC moi thay cho `old_vc_id` trong MOT giao dich: cap moi (moi rao cua
+    /// issue_vc), thu hoi VC cu voi ly do "replaced", ghi lien ket.
+    /// - nguoi goi la issuer goc cua VC cu, hoac issuer cha cua issuer goc;
+    /// - VC cu dang GHI la ACTIVE (ke ca da het han). VC dang tam ngung / da thu
+    ///   hoi thi khong tu cap lai duoc - neu khong, issuer "lam mem" duoc quyet
+    ///   dinh cua admin; truong hop do di duong admin_link_replacement;
+    /// - VC cu chua tung bi thay, cung `vc_type`;
+    /// - doi holder (vi moi) chi khi DID cua holder cu khong con ACTIVE.
+    public entry fun reissue_vc(
+        issuer: &signer,
+        old_vc_id: u64,
+        holder_addr: address,
+        vc_type: u64,
+        vc_id_hash: vector<u8>,
+        content_cid: vector<u8>,
+        content_hash: vector<u8>,
+        expires_at: u64,
+    ) acquires VCRegistry, ReplacementRegistry {
+        let caller = signer::address_of(issuer);
+        assert!(exists<ReplacementRegistry>(@vnu), errors::not_initialized());
+        let old = stored(old_vc_id);
+        assert!(caller == old.issuer_addr || authority::is_current_parent(caller, old.issuer_addr), errors::not_reissuer());
+        assert!(old.status != VC_STATUS_REVOKED, errors::vc_already_revoked());
+        assert!(old.status == VC_STATUS_ACTIVE, errors::vc_not_active());
+        assert_can_replace(&old, holder_addr, vc_type);
+
+        let new_id = issue_internal(caller, holder_addr, vc_type, vc_id_hash, content_cid, content_hash, expires_at);
+        replace(caller, old, new_id, holder_addr);
+    }
+
+    /// Admin noi lien ket khi issuer goc da mat quyen: mot issuer khac cap VC moi
+    /// bang issue_vc, roi admin noi. VC cu bi thu hoi (ly do "replaced") neu chua.
+    /// VC moi phai dang ACTIVE, cung loai, co id lon hon, chua thay cho VC nao.
+    public entry fun admin_link_replacement(admin: &signer, old_vc_id: u64, new_vc_id: u64)
+    acquires VCRegistry, ReplacementRegistry {
+        let caller = signer::address_of(admin);
+        authority::assert_is_active_admin(caller);
+        assert!(exists<ReplacementRegistry>(@vnu), errors::not_initialized());
+        let old = stored(old_vc_id);
+        let new = stored(new_vc_id);
+        assert!(new_vc_id > old_vc_id, errors::invalid_replacement());
+        assert!(effective_status(&new, timestamp::now_seconds()) == VC_STATUS_ACTIVE, errors::invalid_replacement());
+        assert!(!smart_table::contains(&borrow_global<ReplacementRegistry>(@vnu).replaces, new_vc_id), errors::invalid_replacement());
+        assert_can_replace(&old, new.holder_addr, new.vc_type);
+        replace(caller, old, new_vc_id, new.holder_addr);
     }
 
     // ========== Views ==========
@@ -227,6 +362,20 @@ module vnu::vc_registry {
         let record = smart_table::borrow(&reg.vcs, vc_id);
         effective_status(record, timestamp::now_seconds()) == VC_STATUS_ACTIVE
             && record.content_hash == claimed_hash
+    }
+
+    #[view]
+    /// (co ban thay the, id VC thay the) cho VC cu. Khong abort khi chua khoi tao.
+    public fun get_replacement(old_vc_id: u64): (bool, u64) acquires ReplacementRegistry {
+        if (!exists<ReplacementRegistry>(@vnu)) return (false, 0);
+        lookup(&borrow_global<ReplacementRegistry>(@vnu).replaced_by, old_vc_id)
+    }
+
+    #[view]
+    /// (la ban thay the, id VC cu ma no thay) cho VC moi.
+    public fun get_replaced(new_vc_id: u64): (bool, u64) acquires ReplacementRegistry {
+        if (!exists<ReplacementRegistry>(@vnu)) return (false, 0);
+        lookup(&borrow_global<ReplacementRegistry>(@vnu).replaces, new_vc_id)
     }
 
     #[view]
@@ -323,13 +472,19 @@ module vnu::vc_registry {
         let reg = borrow_global_mut<VCRegistry>(@vnu);
         assert!(smart_table::contains(&reg.vcs, vc_id), errors::vc_not_found());
         let now = timestamp::now_seconds();
-        let record = smart_table::borrow_mut(&mut reg.vcs, vc_id);
+        let record = smart_table::borrow(&reg.vcs, vc_id);
         if (!as_admin) {
             assert!(record.issuer_addr == caller, errors::not_vc_issuer());
             authority::assert_can_manage_own_vcs(caller);
         };
         assert_vc_transition(record, new_status, now);
+        write_status(reg, caller, vc_id, new_status, reason, now);
+    }
 
+    /// Ghi trang thai da duoc kiem (bo dem + su kien). Dung chung cho don le, lo
+    /// va cap lai.
+    fun write_status(reg: &mut VCRegistry, caller: address, vc_id: u64, new_status: u8, reason: vector<u8>, now: u64) {
+        let record = smart_table::borrow_mut(&mut reg.vcs, vc_id);
         let was_live = record.status == VC_STATUS_ACTIVE;
         let (issuer_addr, holder_addr) = (record.issuer_addr, record.holder_addr);
         record.status = new_status;
@@ -362,6 +517,85 @@ module vnu::vc_registry {
         } else if (new_status == VC_STATUS_ACTIVE) {
             assert!(record.status == VC_STATUS_SUSPENDED, errors::vc_not_suspended());
         };
+    }
+
+    /// Than chung cua bon entry xu ly lo (C2).
+    fun batch_set_status(caller: address, mode: u8, vc_ids: vector<u64>, new_status: u8, reason: vector<u8>) acquires VCRegistry {
+        let n = vector::length(&vc_ids);
+        assert!(n > 0 && n <= MAX_BATCH, errors::invalid_batch());
+        if (mode == BY_ADMIN) authority::assert_is_active_admin(caller);
+        let reg = borrow_global_mut<VCRegistry>(@vnu);
+
+        // Luot 1: kiem het, chua ghi gi.
+        let i = 0;
+        while (i < n) {
+            let id = *vector::borrow(&vc_ids, i);
+            assert!(i == 0 || id > *vector::borrow(&vc_ids, i - 1), errors::invalid_batch());
+            assert!(smart_table::contains(&reg.vcs, id), errors::vc_not_found());
+            if (mode == BY_PARENT) {
+                let issuer = smart_table::borrow(&reg.vcs, id).issuer_addr;
+                assert!(authority::is_current_parent(caller, issuer), errors::not_parent_issuer());
+            };
+            i = i + 1;
+        };
+        // Toi day nguoi goi chac chan la issuer cha (co ban ghi issuer), nen
+        // kiem trang thai cua chinh no an toan: DID ACTIVE, vai tro ACTIVE.
+        if (mode == BY_PARENT) authority::assert_can_manage_own_vcs(caller);
+
+        // Luot 2: ghi.
+        let now = timestamp::now_seconds();
+        let changed = vector::empty<u64>();
+        let skipped = vector::empty<u64>();
+        i = 0;
+        while (i < n) {
+            let id = *vector::borrow(&vc_ids, i);
+            if (batch_can_apply(smart_table::borrow(&reg.vcs, id), new_status, now)) {
+                write_status(reg, caller, id, new_status, reason, now);
+                vector::push_back(&mut changed, id);
+            } else {
+                vector::push_back(&mut skipped, id);
+            };
+            i = i + 1;
+        };
+        event::emit(VCBatchProcessedEvent { new_status, changed, skipped, by: caller, at: now });
+    }
+
+    /// Dung tap con cua assert_vc_transition: muc nao ma ham do se abort thi lo bo qua.
+    fun batch_can_apply(record: &VCRecord, new_status: u8, now: u64): bool {
+        if (record.status == VC_STATUS_REVOKED) return false;
+        if (new_status == VC_STATUS_REVOKED) return true;
+        record.status == VC_STATUS_ACTIVE && effective_status(record, now) != VC_STATUS_EXPIRED
+    }
+
+    /// Ban ghi DA GHI cua mot VC (abort E_VC_NOT_FOUND).
+    fun stored(vc_id: u64): VCRecord acquires VCRegistry {
+        let reg = borrow_global<VCRegistry>(@vnu);
+        assert!(smart_table::contains(&reg.vcs, vc_id), errors::vc_not_found());
+        *smart_table::borrow(&reg.vcs, vc_id)
+    }
+
+    /// Rao chung cua hai duong thay the (C3). Thu tu va ma loi:
+    /// E_VC_ALREADY_REPLACED, E_INVALID_REPLACEMENT (khac loai), E_HOLDER_STILL_ACTIVE.
+    fun assert_can_replace(old: &VCRecord, new_holder: address, new_type: u64) acquires ReplacementRegistry {
+        assert!(!smart_table::contains(&borrow_global<ReplacementRegistry>(@vnu).replaced_by, old.id), errors::vc_already_replaced());
+        assert!(new_type == old.vc_type, errors::invalid_replacement());
+        assert!(new_holder == old.holder_addr || !did_registry::has_active_did(old.holder_addr), errors::holder_still_active());
+    }
+
+    /// Thu hoi VC cu (neu chua) voi ly do "replaced", ghi lien ket, phat su kien.
+    fun replace(caller: address, old: VCRecord, new_id: u64, new_holder: address) acquires VCRegistry, ReplacementRegistry {
+        let now = timestamp::now_seconds();
+        if (old.status != VC_STATUS_REVOKED) {
+            write_status(borrow_global_mut<VCRegistry>(@vnu), caller, old.id, VC_STATUS_REVOKED, REASON_REPLACED, now);
+        };
+        let links = borrow_global_mut<ReplacementRegistry>(@vnu);
+        smart_table::add(&mut links.replaced_by, old.id, new_id);
+        smart_table::add(&mut links.replaces, new_id, old.id);
+        event::emit(VCReplacedEvent { old_id: old.id, new_id, old_holder: old.holder_addr, new_holder, by: caller, at: now });
+    }
+
+    fun lookup(table: &SmartTable<u64, u64>, key: u64): (bool, u64) {
+        if (smart_table::contains(table, key)) (true, *smart_table::borrow(table, key)) else (false, 0)
     }
 
     /// Them mot VC "song" vao bo dem cua ca issuer va holder. Khong abort.
@@ -417,6 +651,21 @@ module vnu::vc_registry {
         vc_id_hash: vector<u8>, content_cid: vector<u8>, vc_type: u64, issued_at: u64, expires_at: u64,
     ): VCIssuedEvent {
         VCIssuedEvent { id, issuer_addr, issuer_did, holder_addr, holder_did, vc_id_hash, content_cid, vc_type, issued_at, expires_at }
+    }
+
+    #[test_only]
+    public fun vc_batch_processed_event(new_status: u8, changed: vector<u64>, skipped: vector<u64>, by: address, at: u64): VCBatchProcessedEvent {
+        VCBatchProcessedEvent { new_status, changed, skipped, by, at }
+    }
+
+    #[test_only]
+    public fun vc_replaced_event(old_id: u64, new_id: u64, old_holder: address, new_holder: address, by: address, at: u64): VCReplacedEvent {
+        VCReplacedEvent { old_id, new_id, old_holder, new_holder, by, at }
+    }
+
+    #[test_only]
+    public fun init_replacement_for_test(publisher: &signer) {
+        init_replacement_registry(publisher);
     }
 
     #[test_only]

@@ -14,42 +14,50 @@ module vnu::audit_findings_test {
     use vnu::test_utils as t;
 
     // ---------------------------------------------------------------
-    // M-01 / R-01 (Cao): DID bi thu hoi, chu dang ky DID moi -> vai tro
-    // KHONG duoc song lai.
+    // M-01 / R-01 (Cao): DID bi thu hoi -> vai tro KHONG duoc song lai.
+    // DOI DAC TA 13/11/2026 (C1): truoc day chu DID bi thu hoi dang ky lai
+    // duoc (F-05) va test kiem "dang ky lai nhung khong co vai tro". Nay DID
+    // thu hoi la vinh vien nen ke gian lan khong co duong tai lap danh tinh tren
+    // cung dia chi; lan dang ky lai abort E_DID_PERMANENTLY_REVOKED. Phan M-01
+    // (vai tro bi thu hoi cung DID) van duoc kiem truoc khi thu dang ky lai.
     // ---------------------------------------------------------------
 
     #[test]
-    fun m01_fraudulent_issuer_reregistering_did_gets_no_role_back() {
+    #[expected_failure(abort_code = errors::E_DID_PERMANENTLY_REVOKED, location = did_registry)]
+    fun m01_c1_fraudulent_issuer_loses_role_and_cannot_reregister_did() {
         let root = t::setup();
         let i = t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
         t::user(t::holder1_addr());
         authority::admin_revoke_did(&root, t::issuer1_addr(), b"fraud");
-
-        did_registry::register_did(&i, t::did_with(b"did:vnu:v2:", t::issuer1_addr()), t::cid(), t::hash(2));
-        assert!(did_registry::has_active_did(t::issuer1_addr()), 0);
+        assert!(!did_registry::has_active_did(t::issuer1_addr()), 0);
         assert!(!authority::is_active_issuer(t::issuer1_addr()), 1);
         assert!(authority::role_status(&authority::issuer_record(t::issuer1_addr())) == t::role_revoked(), 2);
+
+        did_registry::register_did(&i, t::did_with(b"did:vnu:v2:", t::issuer1_addr()), t::cid(), t::hash(2));
     }
 
+    // DOI DAC TA (C1): truoc day test dang ky lai DID roi moi cap, nen cham rao
+    // VAI TRO (E_ISSUER_NOT_ACTIVE). Nay DID khong song lai duoc nen rao DID chan
+    // truoc; viec vai tro da bi thu hoi (M-01) kiem o test m01_c1_ ngay tren.
     #[test]
-    #[expected_failure(abort_code = errors::E_ISSUER_NOT_ACTIVE, location = authority)]
-    fun m01_fraudulent_issuer_cannot_issue_after_reregistering() {
+    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = authority)]
+    fun m01_fraudulent_issuer_cannot_issue_after_did_revoked() {
         let root = t::setup();
         let i = t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
         t::user(t::holder1_addr());
         authority::admin_revoke_did(&root, t::issuer1_addr(), b"fraud");
-        did_registry::register_did(&i, t::did_with(b"did:vnu:v2:", t::issuer1_addr()), t::cid(), t::hash(2));
         t::issue(&i, t::holder1_addr(), t::bachelor(), 1, 0);
     }
 
     #[test]
-    fun m01_admin_reregistering_did_gets_no_role_back() {
+    #[expected_failure(abort_code = errors::E_DID_PERMANENTLY_REVOKED, location = did_registry)]
+    fun m01_c1_revoked_admin_loses_role_and_cannot_reregister_did() {
         let root = t::setup();
         let a = t::admin(&root, t::admin1_addr());
         authority::admin_revoke_did(&root, t::admin1_addr(), b"compromised");
-        did_registry::register_did(&a, t::did_with(b"did:vnu:v2:", t::admin1_addr()), t::cid(), t::hash(2));
         assert!(!authority::is_active_admin(t::admin1_addr()), 0);
         assert!(!authority::can_delegate(t::admin1_addr()), 1);
+        did_registry::register_did(&a, t::did_with(b"did:vnu:v2:", t::admin1_addr()), t::cid(), t::hash(2));
     }
 
     // ---------------------------------------------------------------

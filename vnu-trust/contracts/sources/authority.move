@@ -370,6 +370,19 @@ module vnu::authority {
         assert!(current(&a.issuers, &a.roles, issuer).status == ROLE_ACTIVE, errors::issuer_not_active());
     }
 
+    /// `parent` la issuer cha HIEN HANH cua `sub` (C2/C3): lien ket tro dung ban
+    /// ghi hien hanh cua `parent`. Parent bi thu hoi roi duoc cap lai (ban ghi
+    /// moi, co the khong con bit uy quyen) thi mat quyen xem xet - cung phep so
+    /// ma parent_error dung de chan sub-issuer cap VC.
+    public(friend) fun is_current_parent(parent: address, sub: address): bool acquires Authority, DelegationRegistry {
+        let link = parent_role_of(sub);
+        if (option::is_none(&link)) return false;
+        let id = *option::borrow(&link);
+        let a = borrow_global<Authority>(@vnu);
+        let owner = smart_table::borrow(&a.roles, id).owner;
+        owner == parent && *smart_table::borrow(&a.issuers, owner) == id
+    }
+
     // ========== Views ==========
 
     #[view]
