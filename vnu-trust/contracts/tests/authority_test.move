@@ -1,611 +1,1037 @@
+// Dac ta cay quyen: root -> admin -> issuer -> sub-issuer.
 #[test_only]
 module vnu::authority_test {
-
-    use aptos_framework::account;
-    use aptos_framework::timestamp;
-    use vnu::authority::is_active_admin;
-    use vnu::errors;
-    use vnu::did_registry;
+    use std::vector;
+    use aptos_framework::event;
     use vnu::authority;
-    use vnu::test_utils;
+    use vnu::did_registry;
+    use vnu::errors;
+    use vnu::test_utils as t;
 
-    // ========== SETUP TEST ==========
+    const FAR: u64 = 1000000;
 
-    // Setup: initialize module state and verify root/admin/issuer counts
+    // ================= Khoi tao / nang cap =================
+
     #[test]
-    fun setup_test_success() {
-        setup_test();
-        assert!(authority::get_root_admin() == test_utils::root_addr(), 1);
-        let (admin_count, issuer_count) = authority::stats();
-        assert!(admin_count == 0, 2);
-        assert!(issuer_count == 0, 3);
+    fun init_with_zero_root_makes_publisher_root() {
+        let deployer = t::account(@vnu);
+        authority::initialize_with_root_for_test(&deployer, @0x0);
+        assert!(authority::get_root_admin() == @vnu, 0);
+        assert!(authority::get_pending_root() == @0x0, 1);
+        assert!(authority::delegation_registry_exists(), 2);
+        let (admins, issuers) = authority::stats();
+        assert!(admins == 0 && issuers == 0 && authority::total_roles() == 0, 3);
     }
 
-    // ========== CHUYEN QUYEN ROOT (HAI BUOC) ==========
-    // F-00: chuyen mot buoc la bay mot chieu. Nay phai co chu ky cua nguoi nhan.
-
-    // Success: de cu roi nguoi nhan tu ky chap nhan -> quyen root moi doi
     #[test]
-    fun test_transfer_root_two_step_success() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let new_root_addr = test_utils::random1_addr();
-        let new_root = &account::create_account_for_test(new_root_addr);
-        let now = timestamp::now_seconds();
+    fun init_with_configured_root_uses_it() {
+        t::setup();
+        assert!(authority::get_root_admin() == t::root_addr(), 0);
+    }
 
-        authority::propose_root(root, new_root_addr);
-        authority::assert_root_transfer_proposed_event_emitted(test_utils::root_addr(), new_root_addr, now);
-        // Buoc de cu CHUA doi quyen - day chinh la cho bao ve
-        assert!(authority::get_root_admin() == test_utils::root_addr(), 1);
-        assert!(authority::get_pending_root() == new_root_addr, 2);
+    #[test]
+    fun init_delegation_registry_creates_missing_registry_once() {
+        let deployer = t::account(@vnu);
+        authority::initialize_legacy_for_test(&deployer, t::root_addr());
+        assert!(!authority::delegation_registry_exists(), 0);
+        authority::init_delegation_registry(&deployer);
+        assert!(authority::delegation_registry_exists(), 1);
+    }
 
-        authority::accept_root(new_root);
-        authority::assert_root_transferred_event_emitted(test_utils::root_addr(), new_root_addr, now);
-        assert!(authority::get_root_admin() == new_root_addr, 3);
+    #[test]
+    #[expected_failure(abort_code = errors::E_ALREADY_INITIALIZED, location = authority)]
+    fun init_delegation_registry_cannot_run_twice() {
+        t::setup();
+        authority::init_delegation_registry(&t::signer_of(@vnu));
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_NOT_AUTHORIZED, location = authority)]
+    fun init_delegation_registry_only_by_publisher() {
+        let root = t::setup();
+        authority::init_delegation_registry(&root);
+    }
+
+    #[test]
+    fun legacy_state_still_supports_non_delegated_flows() {
+        // Goi truoc nang cap: chua co DelegationRegistry. Moi luong khong dung
+        // uy quyen van phai chay truoc khi init_delegation_registry duoc goi.
+        let fx = t::account(@aptos_framework);
+        aptos_framework::timestamp::set_time_has_started_for_testing(&fx);
+        let deployer = t::account(@vnu);
+        did_registry::initialize_for_test(&deployer);
+        authority::initialize_legacy_for_test(&deployer, t::root_addr());
+        let root = t::account(t::root_addr());
+        let i = t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        assert!(authority::is_active_issuer(t::issuer1_addr()), 0);
+        assert!(authority::get_delegator(t::issuer1_addr()) == @0x0, 1);
+        authority::revoke_issuer(&root, t::issuer1_addr(), b"x");
+        authority::approve_issuer(&root, t::issuer1_addr(), t::bachelor(), b"", b"", 0);
+        let _ = i;
+    }
+
+    // ================= Chuyen root =================
+
+    #[test]
+    fun root_transfer_two_steps() {
+        let root = t::setup();
+        let new_root = t::account(t::random1_addr());
+        authority::propose_root(&root, t::random1_addr());
+        assert!(authority::get_pending_root() == t::random1_addr(), 0);
+        assert!(authority::get_root_admin() == t::root_addr(), 1);
+        assert!(event::was_event_emitted(&authority::root_transfer_proposed_event(t::root_addr(), t::random1_addr(), t::t0())), 2);
+
+        authority::accept_root(&new_root);
+        assert!(authority::get_root_admin() == t::random1_addr(), 3);
         assert!(authority::get_pending_root() == @0x0, 4);
+        assert!(event::was_event_emitted(&authority::root_transferred_event(t::root_addr(), t::random1_addr(), t::t0())), 5);
+        // Root moi khong can DID van hanh dong duoc.
+        t::user(t::admin1_addr());
+        authority::grant_admin(&new_root, t::admin1_addr());
+        assert!(authority::is_active_admin(t::admin1_addr()), 6);
     }
 
-    // Fail: chi root moi duoc de cu
     #[test]
     #[expected_failure(abort_code = errors::E_NOT_ROOT_ADMIN, location = authority)]
-    fun test_propose_root_fails_if_caller_not_root() {
-        setup_test();
-        let stranger = &account::create_account_for_test(test_utils::random2_addr());
-        authority::propose_root(stranger, test_utils::random1_addr());
+    fun old_root_loses_power_after_transfer() {
+        let root = t::setup();
+        authority::propose_root(&root, t::random1_addr());
+        authority::accept_root(&t::account(t::random1_addr()));
+        t::user(t::admin1_addr());
+        authority::grant_admin(&root, t::admin1_addr());
     }
 
-    // Fail: nguoi KHAC nguoi duoc de cu khong the nhan quyen
+    #[test]
+    #[expected_failure(abort_code = errors::E_NOT_ROOT_ADMIN, location = authority)]
+    fun propose_root_only_by_root() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        authority::propose_root(&admin, t::random1_addr());
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_ROOT_CANDIDATE, location = authority)]
+    fun propose_root_rejects_zero_address() {
+        let root = t::setup();
+        authority::propose_root(&root, @0x0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_ROOT_CANDIDATE, location = authority)]
+    fun propose_root_rejects_current_root() {
+        let root = t::setup();
+        authority::propose_root(&root, t::root_addr());
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ROLE_CONFLICT, location = authority)]
+    fun propose_root_rejects_active_admin() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        authority::propose_root(&root, t::admin1_addr());
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ROLE_CONFLICT, location = authority)]
+    fun propose_root_rejects_suspended_issuer() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
+        authority::propose_root(&root, t::issuer1_addr());
+    }
+
+    #[test]
+    fun propose_root_accepts_former_admin() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        authority::revoke_admin(&root, t::admin1_addr(), b"x");
+        authority::propose_root(&root, t::admin1_addr());
+        authority::accept_root(&admin);
+        assert!(authority::get_root_admin() == t::admin1_addr(), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ROLE_CONFLICT, location = authority)]
+    fun accept_root_rejects_candidate_that_gained_a_role() {
+        let root = t::setup();
+        authority::propose_root(&root, t::issuer1_addr());
+        let i = t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::accept_root(&i);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_NO_PENDING_ROOT, location = authority)]
+    fun accept_root_without_proposal_fails() {
+        t::setup();
+        authority::accept_root(&t::account(t::random1_addr()));
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_NOT_PENDING_ROOT, location = authority)]
-    fun test_accept_root_fails_if_not_the_proposed_address() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        authority::propose_root(root, test_utils::random1_addr());
-
-        let impostor = &account::create_account_for_test(test_utils::random2_addr());
-        authority::accept_root(impostor);
+    fun accept_root_by_other_address_fails() {
+        let root = t::setup();
+        authority::propose_root(&root, t::random1_addr());
+        authority::accept_root(&t::account(t::holder1_addr()));
     }
 
-    // Fail: khong co de cu nao thi khong nhan duoc
+    #[test]
+    #[expected_failure(abort_code = errors::E_NOT_PENDING_ROOT, location = authority)]
+    fun new_proposal_replaces_previous_candidate() {
+        let root = t::setup();
+        authority::propose_root(&root, t::random1_addr());
+        authority::propose_root(&root, t::holder1_addr());
+        assert!(authority::get_pending_root() == t::holder1_addr(), 0);
+        authority::accept_root(&t::account(t::random1_addr()));
+    }
+
+    #[test]
+    fun cancel_root_transfer_clears_pending_and_emits_event() {
+        let root = t::setup();
+        authority::propose_root(&root, t::random1_addr());
+        authority::cancel_root_transfer(&root);
+        assert!(authority::get_pending_root() == @0x0, 0);
+        assert!(event::was_event_emitted(&authority::root_transfer_cancelled_event(t::root_addr(), t::random1_addr(), t::t0())), 1);
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_NO_PENDING_ROOT, location = authority)]
-    fun test_accept_root_fails_if_no_pending_proposal() {
-        setup_test();
-        let anyone = &account::create_account_for_test(test_utils::random1_addr());
-        authority::accept_root(anyone);
+    fun accept_root_after_cancel_fails() {
+        let root = t::setup();
+        authority::propose_root(&root, t::random1_addr());
+        authority::cancel_root_transfer(&root);
+        authority::accept_root(&t::account(t::random1_addr()));
     }
 
-    // Success: root huy de cu -> nguoi duoc de cu khong the nhan nua
     #[test]
     #[expected_failure(abort_code = errors::E_NO_PENDING_ROOT, location = authority)]
-    fun test_cancel_root_transfer_blocks_acceptance() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let new_root_addr = test_utils::random1_addr();
-        let new_root = &account::create_account_for_test(new_root_addr);
-
-        authority::propose_root(root, new_root_addr);
-        authority::cancel_root_transfer(root);
-        assert!(authority::get_pending_root() == @0x0, 1);
-
-        authority::accept_root(new_root);
+    fun cancel_root_transfer_without_proposal_fails() {
+        let root = t::setup();
+        authority::cancel_root_transfer(&root);
     }
 
-    // ========== GRANT ADMIN ==========
-
-    // Fail: `grant_admin` should abort when caller is not the root admin
     #[test]
     #[expected_failure(abort_code = errors::E_NOT_ROOT_ADMIN, location = authority)]
-    fun test_grant_admin_fails_if_caller_not_root_admin() {
-        setup_test();
-        let caller = &account::create_account_for_test(test_utils::random1_addr());
-        let admin = test_utils::admin1_addr();
-        authority::grant_admin(caller, admin);
+    fun cancel_root_transfer_only_by_root() {
+        let root = t::setup();
+        authority::propose_root(&root, t::random1_addr());
+        authority::cancel_root_transfer(&t::account(t::random1_addr()));
     }
 
-    // Fail: `grant_admin` should abort when admin DID does not exist
+    // ================= grant_admin / revoke_admin =================
+
+    #[test]
+    fun grant_admin_creates_active_record() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        let r = authority::admin_record(t::admin1_addr());
+        let (owner, version, by, at, mask, cid, hash, exp, status, reason, _) = authority::record_fields(&r);
+        assert!(owner == t::admin1_addr() && version == 1 && by == t::root_addr() && at == t::t0(), 0);
+        assert!(mask == 0 && cid == b"" && hash == b"" && exp == 0, 1);
+        assert!(status == t::role_active() && reason == b"", 2);
+        assert!(authority::is_active_admin(t::admin1_addr()), 3);
+        let (admins, issuers) = authority::stats();
+        assert!(admins == 1 && issuers == 0 && authority::total_roles() == 1, 4);
+        assert!(event::was_event_emitted(&authority::admin_granted_event(t::admin1_addr(), t::root_addr(), t::t0())), 5);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_NOT_ROOT_ADMIN, location = authority)]
+    fun grant_admin_only_by_root() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        t::user(t::admin2_addr());
+        authority::grant_admin(&admin, t::admin2_addr());
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
-    fun test_grant_admin_fails_if_admin_not_exists() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin = test_utils::admin1_addr();
-        authority::grant_admin(root, admin);
+    fun grant_admin_requires_target_did() {
+        let root = t::setup();
+        authority::grant_admin(&root, t::admin1_addr());
     }
 
-    // Fail: `grant_admin` should abort when admin DID is not active
     #[test]
     #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = did_registry)]
-    fun test_grant_admin_fails_if_admin_not_active() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin = test_utils::admin1_addr();
-        let admin_signer = &register_did_for(admin);
-
-        did_registry::deactivate_did(admin_signer);
-        authority::grant_admin(root, admin);
+    fun grant_admin_requires_active_target_did() {
+        let root = t::setup();
+        let s = t::user(t::admin1_addr());
+        did_registry::suspend_own_did(&s);
+        authority::grant_admin(&root, t::admin1_addr());
     }
 
-    // Success: root can grant admin and admin state/event updated accordingly
     #[test]
-    fun test_grant_admin_success() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin = test_utils::admin1_addr();
-        register_did_for(admin);
-        let now = timestamp::now_seconds();
-
-        assert!(!authority::is_active_admin(admin), 1);
-        let (count_admin_befort, _) = authority::stats();
-        assert!(count_admin_befort == 0, 2);
-
-        authority::grant_admin(root, admin);
-        authority::assert_admin_granted_event_emitted(admin, test_utils::root_addr(), now);
-
-        assert!(authority::is_active_admin(admin), 3);
-        let (count_admin_after, _) = authority::stats();
-        assert!(count_admin_after == 1, 4);
-        let (owner, approved_by, approved_at, version, vc_type_mask, delegation_cid, delegation_hash, expires_at, status, status_reason, status_updated_at) = authority::get_admin_details(admin);
-        assert!(owner == admin, 5);
-        assert!(approved_by == test_utils::root_addr(), 6);
-        assert!(approved_at == now, 7);
-        assert!(version == 1, 8);
-        assert!(vc_type_mask == test_utils::vc_type_delegation(), 9);
-        assert!(delegation_cid == b"", 10);
-        assert!(delegation_hash == b"", 11);
-        assert!(expires_at == 0, 12);
-        assert!(status == test_utils::admin_status_active(), 13);
-        assert!(status_reason == b"", 14);
-        assert!(status_updated_at == now, 15);
+    #[expected_failure(abort_code = errors::E_ROLE_CONFLICT, location = authority)]
+    fun grant_admin_rejects_root() {
+        let root = t::setup();
+        t::register(&root);
+        authority::grant_admin(&root, t::root_addr());
     }
 
-    // Fail: `grant_admin` should abort when admin already exists
+    #[test]
+    #[expected_failure(abort_code = errors::E_ROLE_CONFLICT, location = authority)]
+    fun grant_admin_rejects_active_issuer() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::grant_admin(&root, t::issuer1_addr());
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ROLE_CONFLICT, location = authority)]
+    fun grant_admin_rejects_suspended_issuer() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
+        authority::grant_admin(&root, t::issuer1_addr());
+    }
+
+    #[test]
+    fun grant_admin_accepts_revoked_issuer() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::revoke_issuer(&root, t::issuer1_addr(), b"x");
+        authority::grant_admin(&root, t::issuer1_addr());
+        assert!(authority::is_active_admin(t::issuer1_addr()), 0);
+        assert!(!authority::is_active_issuer(t::issuer1_addr()), 1);
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_ADMIN_ALREADY_EXISTS, location = authority)]
-    fun test_grant_admin_fails_if_admin_already_exists() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin = test_utils::admin1_addr();
-        register_did_for(admin);
-
-        authority::grant_admin(root, admin);
-        authority::grant_admin(root, admin);
+    fun grant_admin_twice_fails() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        authority::grant_admin(&root, t::admin1_addr());
     }
 
-    // Fail: `grant_admin` should abort when caller is an admin (not root)
+    #[test]
+    fun grant_admin_again_after_revoke_creates_new_version() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        authority::revoke_admin(&root, t::admin1_addr(), b"x");
+        t::advance(10);
+        authority::grant_admin(&root, t::admin1_addr());
+
+        assert!(authority::role_version(&authority::admin_record(t::admin1_addr())) == 2, 0);
+        assert!(authority::is_active_admin(t::admin1_addr()), 1);
+        let (admins, _) = authority::stats();
+        assert!(admins == 1 && authority::total_roles() == 2, 2);
+        // Ban ghi cu con nguyen lam vet kiem toan.
+        let all = authority::get_roles_paginated(0, 10);
+        assert!(authority::role_status(vector::borrow(&all, 0)) == t::role_revoked(), 3);
+        assert!(authority::role_status(vector::borrow(&all, 1)) == t::role_active(), 4);
+    }
+
+    #[test]
+    fun revoke_admin_marks_record_and_emits_event() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        t::advance(5);
+        authority::revoke_admin(&root, t::admin1_addr(), b"left");
+        let (_, _, _, _, _, _, _, _, status, reason, updated) = authority::record_fields(&authority::admin_record(t::admin1_addr()));
+        assert!(status == t::role_revoked() && reason == b"left" && updated == t::t0() + 5, 0);
+        assert!(!authority::is_active_admin(t::admin1_addr()), 1);
+        assert!(event::was_event_emitted(&authority::admin_revoked_event(t::admin1_addr(), t::root_addr(), b"left", t::t0() + 5)), 2);
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_NOT_ROOT_ADMIN, location = authority)]
-    fun test_grant_admin_fails_if_caller_is_admin() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin1 = test_utils::admin1_addr();
-        let admin2 = test_utils::admin2_addr();
-        register_did_for(admin1);
-        register_did_for(admin2);
-
-        authority::grant_admin(root, admin1);
-        assert!(is_active_admin(admin1), 1);
-        let admin1_signer = &account::create_account_for_test(admin1);
-        authority::grant_admin(admin1_signer, admin2);
+    fun revoke_admin_only_by_root() {
+        let root = t::setup();
+        let a1 = t::admin(&root, t::admin1_addr());
+        t::admin(&root, t::admin2_addr());
+        authority::revoke_admin(&a1, t::admin2_addr(), b"x");
     }
 
-    // ========== REVOKE ADMIN ==========
-
-    // Fail: `revoke_admin` should abort when caller is not root admin
-    #[test]
-    #[expected_failure(abort_code = errors::E_NOT_ROOT_ADMIN, location = authority)]
-    fun test_revoke_admin_fails_if_caller_not_root_admin() {
-        setup_test();
-        let caller = &account::create_account_for_test(test_utils::random1_addr());
-        let admin = test_utils::admin1_addr();
-        authority::revoke_admin(caller, admin, b"");
-    }
-
-    // Fail: `revoke_admin` should abort when caller is admin (not root)
-    #[test]
-    #[expected_failure(abort_code = errors::E_NOT_ROOT_ADMIN, location = authority)]
-    fun test_revoke_admin_fails_if_caller_is_admin() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin1 = test_utils::admin1_addr();
-        let admin2 = test_utils::admin2_addr();
-        register_did_for(admin1);
-        register_did_for(admin2);
-
-        authority::grant_admin(root, admin1);
-        authority::grant_admin(root, admin2);
-        let admin1_signer = &account::create_account_for_test(admin1);
-        authority::revoke_admin(admin1_signer, admin2, b"");
-    }
-
-    // Fail: `revoke_admin` should abort when the target is not an admin
     #[test]
     #[expected_failure(abort_code = errors::E_NOT_ADMIN, location = authority)]
-    fun test_revoke_admin_fails_if_not_admin() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin1 = test_utils::admin1_addr();
-        authority::revoke_admin(root, admin1, b"");
+    fun revoke_admin_unknown_fails() {
+        let root = t::setup();
+        authority::revoke_admin(&root, t::admin1_addr(), b"x");
     }
 
-    // Success: root can revoke admin and admin state/event updated accordingly
-    #[test]
-    fun test_revoke_admin_success() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin1 = test_utils::admin1_addr();
-        register_did_for(admin1);
-
-        authority::grant_admin(root, admin1);
-        assert!(is_active_admin(admin1), 1);
-        let now = timestamp::now_seconds();
-        authority::revoke_admin(root, admin1, b"");
-        authority::assert_admin_revoked_event_emitted(admin1, test_utils::root_addr(), b"", now);
-        assert!(!is_active_admin(admin1), 2);
-        let (owner, approved_by, approved_at, version, vc_type_mask, delegation_cid, delegation_hash, expires_at, status, status_reason, status_updated_at) = authority::get_admin_details(admin1);
-        assert!(owner == admin1, 3);
-        assert!(approved_by == test_utils::root_addr(), 4);
-        assert!(approved_at < now + 1, 5);
-        assert!(version == 1, 6);
-        assert!(vc_type_mask == test_utils::vc_type_delegation(), 7);
-        assert!(delegation_cid == b"", 8);
-        assert!(delegation_hash == b"", 9);
-        assert!(expires_at == 0, 10);
-        assert!(status == test_utils::admin_status_revoked(), 11);
-        assert!(status_reason == b"", 12);
-        assert!(status_updated_at == now, 13);
-    }
-
-    // Fail: `revoke_admin` should abort when admin already revoked
     #[test]
     #[expected_failure(abort_code = errors::E_ADMIN_ALREADY_REVOKED, location = authority)]
-    fun test_revoke_admin_fails_if_admin_already_revoked() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin1 = test_utils::admin1_addr();
-        register_did_for(admin1);
-
-        authority::grant_admin(root, admin1);
-        assert!(is_active_admin(admin1), 1);
-        authority::revoke_admin(root, admin1, b"");
-        assert!(!is_active_admin(admin1), 1);
-        authority::revoke_admin(root, admin1, b"");
+    fun revoke_admin_twice_fails() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        authority::revoke_admin(&root, t::admin1_addr(), b"x");
+        authority::revoke_admin(&root, t::admin1_addr(), b"x");
     }
 
-    // ========== ISSUER ========== 
-
-    // Fail: `approve_issuer` should abort when caller has no DID
-    #[test]
-    #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
-    fun test_approve_issuer_fails_if_caller_has_no_did() {
-        setup_test();
-        let caller = &account::create_account_for_test(test_utils::random2_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(caller, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-    }
-
-    // Fail: `approve_issuer` should abort when caller's DID is not active
-    #[test]
-    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = did_registry)]
-    fun test_approve_issuer_fails_if_caller_did_not_active() {
-        setup_test();
-        let caller = &register_did_for(test_utils::admin1_addr());
-        did_registry::deactivate_did(caller);
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(caller, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-    }
-
-    // Fail: `approve_issuer` should abort when caller is active DID but not an admin
     #[test]
     #[expected_failure(abort_code = errors::E_ADMIN_NOT_ACTIVE, location = authority)]
-    fun test_approve_issuer_fails_if_caller_is_active_did_but_not_admin() {
-        setup_test();
-        let caller = &register_did_for(test_utils::random1_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(caller, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
+    fun revoked_admin_loses_admin_powers() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::revoke_admin(&root, t::admin1_addr(), b"x");
+        authority::suspend_issuer(&admin, t::issuer1_addr(), b"x");
     }
 
-    // Fail: `approve_issuer` should abort when issuer DID is missing
     #[test]
-    #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
-    fun test_approve_issuer_fails_if_issuer_did_missing() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        authority::approve_issuer(root, test_utils::issuer1_addr(), test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
+    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = authority)]
+    fun admin_with_suspended_did_loses_admin_powers() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        did_registry::suspend_own_did(&admin);
+        assert!(!authority::is_active_admin(t::admin1_addr()), 0);
+        authority::suspend_issuer(&admin, t::issuer1_addr(), b"x");
     }
 
-    // Fail: `approve_issuer` should abort when issuer DID is not active
+    // ================= approve_issuer: root / admin =================
+
     #[test]
-    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = did_registry)]
-    fun test_approve_issuer_fails_if_issuer_did_not_active() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer_signer = &register_did_for(test_utils::issuer1_addr());
-        did_registry::deactivate_did(issuer_signer);
-        authority::approve_issuer(root, test_utils::issuer1_addr(), test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
+    fun root_approves_issuer() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), t::bachelor() | t::master(), b"", b"", t::t0() + FAR);
+        let (owner, version, by, at, mask, cid, hash, exp, status, _, _) = authority::record_fields(&authority::issuer_record(t::issuer1_addr()));
+        assert!(owner == t::issuer1_addr() && version == 1 && by == t::root_addr() && at == t::t0(), 0);
+        assert!(mask == 3 && cid == b"" && hash == b"" && exp == t::t0() + FAR, 1);
+        assert!(status == t::role_active() && authority::is_active_issuer(t::issuer1_addr()), 2);
+        assert!(authority::get_delegator(t::issuer1_addr()) == @0x0, 3);
+        let (_, issuers) = authority::stats();
+        assert!(issuers == 1, 4);
+        assert!(event::was_event_emitted(&authority::issuer_approved_event(t::issuer1_addr(), t::root_addr(), 3, b"", t::t0(), t::t0() + FAR)), 5);
     }
 
-    // Fail: `approve_issuer` should abort when issuer already exists
     #[test]
-    #[expected_failure(abort_code = errors::E_ISSUER_ALREADY_EXISTS, location = authority)]
-    fun test_approve_issuer_fails_if_issuer_already_exists() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_master(), test_utils::mock_vc_cid_v2(), test_utils::mock_hash_v2(), 0);
+    fun admin_approves_plain_issuer() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&admin, t::issuer1_addr(), t::phd(), b"", b"", 0);
+        assert!(authority::is_active_issuer(t::issuer1_addr()), 0);
     }
 
-    // Fail: `approve_issuer` should abort when non-root tries to use delegation mask
+    #[test]
+    fun root_can_grant_every_defined_bit() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), 63, t::cid(), t::hash(9), 0);
+        assert!(authority::can_delegate(t::issuer1_addr()), 0);
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_NOT_ROOT_ADMIN, location = authority)]
-    fun test_approve_issuer_fails_if_delegation_mask_used_by_non_root() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin = test_utils::admin1_addr();
-        register_did_for(admin);
-        authority::grant_admin(root, admin);
-
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        let admin_signer = &account::create_account_for_test(admin);
-        authority::approve_issuer(admin_signer, issuer, test_utils::vc_type_delegation(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
+    fun admin_cannot_grant_delegation_bit() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&admin, t::issuer1_addr(), t::bachelor() | t::delegation(), t::cid(), t::hash(9), 0);
     }
 
-    // Fail: `approve_issuer` should abort when delegation hash length invalid
+    #[test]
+    #[expected_failure(abort_code = errors::E_NOT_AUTHORIZED, location = authority)]
+    fun stranger_cannot_approve_issuer() {
+        t::setup();
+        let s = t::user(t::random1_addr());
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&s, t::issuer1_addr(), t::bachelor(), b"", b"", 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_CANNOT_DELEGATE, location = authority)]
+    fun plain_issuer_cannot_approve_issuer() {
+        let root = t::setup();
+        let i = t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::user(t::issuer2_addr());
+        authority::approve_issuer(&i, t::issuer2_addr(), t::bachelor(), t::cid(), t::hash(8), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_VC_TYPE, location = authority)]
+    fun approve_issuer_rejects_empty_mask() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), 0, b"", b"", 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_VC_TYPE, location = authority)]
+    fun approve_issuer_rejects_undefined_bits() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), 64 | t::bachelor(), b"", b"", 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ISSUER_CAP_EXPIRED, location = authority)]
+    fun approve_issuer_rejects_expiry_now() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), t::bachelor(), b"", b"", t::t0());
+    }
+
+    #[test]
+    fun approve_issuer_accepts_expiry_one_second_ahead() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), t::t0() + 1);
+        assert!(authority::is_active_issuer(t::issuer1_addr()), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_CID, location = did_registry)]
+    fun delegation_bit_requires_proof_cid() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), t::bachelor() | t::delegation(), b"", t::hash(9), 0);
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_HASH_WRONG_LENGTH, location = authority)]
-    fun test_approve_issuer_fails_if_hash_short() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), b"short", 0);
-    }
-
-    // Success: root approves issuer with delegation mask and event/state set
-    #[test]
-    fun test_approve_issuer_success_by_root_with_delegation() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        let now = timestamp::now_seconds();
-        let vc_type_mask = test_utils::vc_type_bachelor() | test_utils::vc_type_delegation();
-        let delegation_cid = test_utils::mock_vc_cid();
-        let delegation_hash = test_utils::mock_hash();
-
-        authority::approve_issuer(root, issuer, vc_type_mask, delegation_cid, delegation_hash, 0);
-        authority::assert_issuer_approved_event_emitted(issuer, test_utils::root_addr(), vc_type_mask, delegation_cid, now, 0);
-
-        assert!(authority::is_active_issuer(issuer), 1);
-        let (approved_by, returned_mask, returned_cid, returned_hash, expires_at, status) = authority::get_info(issuer);
-        assert!(approved_by == test_utils::root_addr(), 2);
-        assert!(returned_mask == vc_type_mask, 3);
-        assert!(returned_cid == delegation_cid, 4);
-        assert!(returned_hash == delegation_hash, 5);
-        assert!(expires_at == 0, 6);
-        assert!(status == test_utils::issuer_status_active(), 7);
-
-        let (owner, owner_approved_by, approved_at, version, owner_mask, owner_cid, owner_hash, owner_expires_at, owner_status, owner_reason, owner_status_updated_at) = authority::get_issuer_details(issuer);
-        assert!(owner == issuer, 8);
-        assert!(owner_approved_by == test_utils::root_addr(), 9);
-        assert!(approved_at == now, 10);
-        assert!(version == 1, 11);
-        assert!(owner_mask == vc_type_mask, 12);
-        assert!(owner_cid == delegation_cid, 13);
-        assert!(owner_hash == delegation_hash, 14);
-        assert!(owner_expires_at == 0, 15);
-        assert!(owner_status == test_utils::issuer_status_active(), 16);
-        assert!(owner_reason == b"", 17);
-        assert!(owner_status_updated_at == now, 18);
+    fun delegation_bit_requires_proof_hash() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), t::bachelor() | t::delegation(), t::cid(), b"", 0);
     }
 
     #[test]
-    fun test_approve_issuer_success_by_admin_without_delegation() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let admin = test_utils::admin1_addr();
-        register_did_for(admin);
-        authority::grant_admin(root, admin);
-
-        let issuer = test_utils::issuer2_addr();
-        register_did_for(issuer);
-        let admin_signer = &account::create_account_for_test(admin);
-        let now = timestamp::now_seconds();
-        let vc_type_mask = test_utils::vc_type_bachelor() | test_utils::vc_type_transcript();
-        let delegation_cid = b"";
-        let delegation_hash = test_utils::mock_hash_v2();
-
-        authority::approve_issuer(admin_signer, issuer, vc_type_mask, delegation_cid, delegation_hash, 0);
-        authority::assert_issuer_approved_event_emitted(issuer, admin, vc_type_mask, delegation_cid, now, 0);
-
-        assert!(authority::is_active_issuer(issuer), 1);
-        let (approved_by, returned_mask, returned_cid, returned_hash, expires_at, status) = authority::get_info(issuer);
-        assert!(approved_by == admin, 2);
-        assert!(returned_mask == vc_type_mask, 3);
-        assert!(returned_cid == delegation_cid, 4);
-        assert!(returned_hash == delegation_hash, 5);
-        assert!(expires_at == 0, 6);
-        assert!(status == test_utils::issuer_status_active(), 7);
+    fun plain_issuer_proof_is_optional_but_stored_when_given() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), t::bachelor(), t::cid(), t::hash(9), 0);
+        let (_, _, _, _, _, cid, hash, _, _, _, _) = authority::record_fields(&authority::issuer_record(t::issuer1_addr()));
+        assert!(cid == t::cid() && hash == t::hash(9), 0);
     }
 
     #[test]
-    #[expected_failure(abort_code = errors::E_ISSUER_NOT_FOUND, location = authority)]
-    fun test_suspend_issuer_fails_if_issuer_not_found() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        authority::suspend_issuer(root, test_utils::issuer1_addr(), test_utils::reason_policy());
+    #[expected_failure(abort_code = errors::E_HASH_WRONG_LENGTH, location = authority)]
+    fun plain_issuer_optional_hash_must_be_32_bytes() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), t::bachelor(), b"", t::bytes(5, 0), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_CID, location = did_registry)]
+    fun plain_issuer_optional_cid_must_be_valid() {
+        let root = t::setup();
+        t::user(t::issuer1_addr());
+        authority::approve_issuer(&root, t::issuer1_addr(), t::bachelor(), b"abc", b"", 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
+    fun approve_issuer_requires_target_did() {
+        let root = t::setup();
+        authority::approve_issuer(&root, t::issuer1_addr(), t::bachelor(), b"", b"", 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ROLE_CONFLICT, location = authority)]
+    fun approve_issuer_rejects_root() {
+        let root = t::setup();
+        t::register(&root);
+        authority::approve_issuer(&root, t::root_addr(), t::bachelor(), b"", b"", 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ROLE_CONFLICT, location = authority)]
+    fun approve_issuer_rejects_active_admin() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        authority::approve_issuer(&root, t::admin1_addr(), t::bachelor(), b"", b"", 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ISSUER_ALREADY_EXISTS, location = authority)]
+    fun approve_issuer_rejects_active_issuer() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::approve_issuer(&root, t::issuer1_addr(), t::master(), b"", b"", 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ISSUER_ALREADY_EXISTS, location = authority)]
+    fun approve_issuer_rejects_suspended_issuer() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
+        authority::approve_issuer(&root, t::issuer1_addr(), t::master(), b"", b"", 0);
+    }
+
+    #[test]
+    fun revoked_issuer_can_be_reapproved_with_new_record() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::revoke_issuer(&root, t::issuer1_addr(), b"x");
+        authority::approve_issuer(&admin, t::issuer1_addr(), t::master(), b"", b"", 0);
+        let (_, version, by, _, mask, _, _, _, status, _, _) = authority::record_fields(&authority::issuer_record(t::issuer1_addr()));
+        assert!(version == 2 && by == t::admin1_addr() && mask == t::master() && status == t::role_active(), 0);
+        let (_, issuers) = authority::stats();
+        assert!(issuers == 1 && authority::total_roles() == 3, 1);
+    }
+
+    // ================= approve_issuer: uy quyen =================
+
+    #[test]
+    fun delegator_approves_sub_issuer() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor() | t::master(), 0);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), t::t0() + FAR);
+        let (_, _, by, _, mask, cid, hash, exp, _, _, _) = authority::record_fields(&authority::issuer_record(t::issuer2_addr()));
+        assert!(by == t::issuer1_addr() && mask == t::bachelor() && exp == t::t0() + FAR, 0);
+        assert!(cid == t::cid() && hash == t::hash(8), 1);
+        assert!(authority::get_delegator(t::issuer2_addr()) == t::issuer1_addr(), 2);
+        assert!(authority::is_active_issuer(t::issuer2_addr()), 3);
+        assert!(!authority::can_delegate(t::issuer2_addr()), 4);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_UNAUTHORIZED_VC_TYPE, location = authority)]
+    fun sub_issuer_mask_must_be_subset_of_parent() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor() | t::phd(), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_NOT_ROOT_ADMIN, location = authority)]
+    fun sub_issuer_cannot_receive_delegation_bit() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor() | t::delegation(), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_CID, location = did_registry)]
+    fun sub_issuer_requires_delegation_proof() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::user(t::issuer2_addr());
+        authority::approve_issuer(&d, t::issuer2_addr(), t::bachelor(), b"", b"", 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ISSUER_CAP_EXPIRED, location = authority)]
+    fun sub_issuer_of_expiring_parent_cannot_be_permanent() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), t::t0() + 100);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ISSUER_CAP_EXPIRED, location = authority)]
+    fun sub_issuer_cannot_outlive_parent() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), t::t0() + 100);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), t::t0() + 101);
+    }
+
+    #[test]
+    fun sub_issuer_may_expire_with_parent() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), t::t0() + 100);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), t::t0() + 100);
+        assert!(authority::is_active_issuer(t::issuer2_addr()), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_NOT_AUTHORIZED, location = authority)]
+    fun delegator_cannot_reapprove_revoked_issuer() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::issuer(&root, t::issuer2_addr(), t::bachelor(), 0);
+        authority::revoke_issuer(&root, t::issuer2_addr(), b"fraud");
+        authority::approve_issuer(&d, t::issuer2_addr(), t::bachelor(), t::cid(), t::hash(8), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ISSUER_CAP_EXPIRED, location = authority)]
+    fun expired_delegator_cannot_approve() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), t::t0() + 10);
+        t::advance(10);
+        // Han 0 de qua phep kiem "han o tuong lai" va cham dung nhanh delegator het han.
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), 0);
     }
 
     #[test]
     #[expected_failure(abort_code = errors::E_ISSUER_NOT_ACTIVE, location = authority)]
-    fun test_suspend_issuer_fails_if_issuer_already_suspended() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-        authority::suspend_issuer(root, issuer, test_utils::reason_policy());
-        authority::suspend_issuer(root, issuer, test_utils::reason_policy());
+    fun suspended_delegator_cannot_approve() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = authority)]
+    fun delegator_with_suspended_did_cannot_approve() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::user(t::issuer2_addr());
+        did_registry::suspend_own_did(&d);
+        authority::approve_issuer(&d, t::issuer2_addr(), t::bachelor(), t::cid(), t::hash(8), 0);
+    }
+
+    #[test]
+    fun former_admin_can_use_delegation_role() {
+        let root = t::setup();
+        let s = t::admin(&root, t::admin1_addr());
+        authority::revoke_admin(&root, t::admin1_addr(), b"x");
+        authority::approve_issuer(&root, t::admin1_addr(), t::bachelor() | t::delegation(), t::cid(), t::hash(9), 0);
+        assert!(authority::can_delegate(t::admin1_addr()), 0);
+        t::sub_issuer(&s, t::issuer2_addr(), t::bachelor(), 0);
+        assert!(authority::get_delegator(t::issuer2_addr()) == t::admin1_addr(), 1);
+    }
+
+    #[test]
+    fun reapproval_by_root_detaches_sub_issuer_from_parent() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), 0);
+        authority::revoke_issuer(&root, t::issuer2_addr(), b"x");
+        authority::approve_issuer(&root, t::issuer2_addr(), t::bachelor(), b"", b"", 0);
+        assert!(authority::get_delegator(t::issuer2_addr()) == @0x0, 0);
+        authority::revoke_issuer(&root, t::issuer1_addr(), b"x");
+        assert!(authority::is_active_issuer(t::issuer2_addr()), 1);
+    }
+
+    // ================= Trang thai issuer =================
+
+    #[test]
+    fun admin_suspends_reactivates_and_revokes_issuer() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        let a = t::issuer1_addr();
+        t::issuer(&root, a, t::bachelor(), 0);
+
+        authority::suspend_issuer(&admin, a, b"audit");
+        assert!(authority::role_status(&authority::issuer_record(a)) == t::role_suspended(), 0);
+        assert!(!authority::is_active_issuer(a), 1);
+        assert!(event::was_event_emitted(&authority::issuer_status_changed_event(a, t::admin1_addr(), t::role_suspended(), b"audit", t::t0())), 2);
+
+        authority::reactivate_issuer(&admin, a, b"ok");
+        assert!(authority::is_active_issuer(a), 3);
+
+        authority::revoke_issuer(&admin, a, b"fraud");
+        let (_, _, _, _, _, _, _, _, status, reason, _) = authority::record_fields(&authority::issuer_record(a));
+        assert!(status == t::role_revoked() && reason == b"fraud", 4);
+    }
+
+    #[test]
+    fun suspended_issuer_can_be_revoked() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
+        authority::revoke_issuer(&root, t::issuer1_addr(), b"x");
+        assert!(authority::role_status(&authority::issuer_record(t::issuer1_addr())) == t::role_revoked(), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ISSUER_NOT_ACTIVE, location = authority)]
+    fun suspend_issuer_twice_fails() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
     }
 
     #[test]
     #[expected_failure(abort_code = errors::E_ISSUER_NOT_SUSPENDED, location = authority)]
-    fun test_reactivate_issuer_fails_if_issuer_not_suspended() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-        authority::reactivate_issuer(root, issuer, test_utils::reason_technical());
-    }
-
-    #[test]
-    #[expected_failure(abort_code = errors::E_ISSUER_NOT_FOUND, location = authority)]
-    fun test_reactivate_issuer_fails_if_issuer_not_found() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        authority::reactivate_issuer(root, test_utils::issuer1_addr(), test_utils::reason_technical());
-    }
-
-    #[test]
-    #[expected_failure(abort_code = errors::E_ADMIN_NOT_ACTIVE, location = authority)]
-    fun test_reactivate_issuer_fails_if_caller_active_did_but_not_admin() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let caller = &register_did_for(test_utils::random1_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-        authority::reactivate_issuer(caller, issuer, test_utils::reason_technical());
+    fun reactivate_active_issuer_fails() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::reactivate_issuer(&root, t::issuer1_addr(), b"x");
     }
 
     #[test]
     #[expected_failure(abort_code = errors::E_ISSUER_ALREADY_REVOKED, location = authority)]
-    fun test_revoke_issuer_fails_if_already_revoked() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-        authority::revoke_issuer(root, issuer, test_utils::reason_fraud());
-        authority::revoke_issuer(root, issuer, test_utils::reason_error());
+    fun revoked_issuer_cannot_be_reactivated_in_place() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::revoke_issuer(&root, t::issuer1_addr(), b"x");
+        authority::reactivate_issuer(&root, t::issuer1_addr(), b"x");
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ISSUER_ALREADY_REVOKED, location = authority)]
+    fun revoke_issuer_twice_fails() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::revoke_issuer(&root, t::issuer1_addr(), b"x");
+        authority::revoke_issuer(&root, t::issuer1_addr(), b"x");
     }
 
     #[test]
     #[expected_failure(abort_code = errors::E_ISSUER_NOT_FOUND, location = authority)]
-    fun test_revoke_issuer_fails_if_issuer_not_found() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        authority::revoke_issuer(root, test_utils::issuer1_addr(), test_utils::reason_fraud());
+    fun issuer_status_change_requires_existing_issuer() {
+        let root = t::setup();
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
     }
 
     #[test]
     #[expected_failure(abort_code = errors::E_ADMIN_NOT_ACTIVE, location = authority)]
-    fun test_revoke_issuer_fails_if_caller_active_did_but_not_admin() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let caller = &register_did_for(test_utils::random1_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-        authority::revoke_issuer(caller, issuer, test_utils::reason_fraud());
+    fun stranger_cannot_change_issuer_status() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&t::user(t::random1_addr()), t::issuer1_addr(), b"x");
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = authority)]
+    fun caller_without_did_cannot_change_issuer_status() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&t::account(t::random1_addr()), t::issuer1_addr(), b"x");
+    }
+
+    #[test]
+    fun delegator_can_suspend_and_revoke_own_sub_issuer() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&d, t::issuer2_addr(), b"check");
+        assert!(authority::role_status(&authority::issuer_record(t::issuer2_addr())) == t::role_suspended(), 0);
+        authority::revoke_issuer(&d, t::issuer2_addr(), b"done");
+        assert!(authority::role_status(&authority::issuer_record(t::issuer2_addr())) == t::role_revoked(), 1);
     }
 
     #[test]
     #[expected_failure(abort_code = errors::E_ADMIN_NOT_ACTIVE, location = authority)]
-    fun test_suspend_issuer_fails_if_caller_active_did_but_not_admin() {
-        setup_test();
-        let caller = &register_did_for(test_utils::random1_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::suspend_issuer(caller, issuer, test_utils::reason_policy());
+    fun delegator_cannot_reactivate_sub_issuer() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&d, t::issuer2_addr(), b"x");
+        authority::reactivate_issuer(&d, t::issuer2_addr(), b"x");
     }
 
     #[test]
-    fun test_suspend_issuer_success() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-
-        let reason = test_utils::reason_policy();
-        let now = timestamp::now_seconds();
-        authority::suspend_issuer(root, issuer, reason);
-        authority::assert_issuer_status_changed_event_emitted(issuer, test_utils::root_addr(), test_utils::issuer_status_suspended(), reason, now);
-
-        let (_, _, _, _, _, _, _, _, status, status_reason, status_updated_at) = authority::get_issuer_details(issuer);
-        assert!(status == test_utils::issuer_status_suspended(), 1);
-        assert!(status_reason == reason, 2);
-        assert!(status_updated_at == now, 3);
+    #[expected_failure(abort_code = errors::E_ADMIN_NOT_ACTIVE, location = authority)]
+    fun delegator_cannot_touch_another_delegators_sub_issuer() {
+        let root = t::setup();
+        let d1 = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        let d2 = t::delegator(&root, t::issuer3_addr(), t::bachelor(), 0);
+        t::sub_issuer(&d1, t::issuer2_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&d2, t::issuer2_addr(), b"x");
     }
 
     #[test]
-    fun test_reactivate_issuer_success() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-        authority::suspend_issuer(root, issuer, test_utils::reason_policy());
+    #[expected_failure(abort_code = errors::E_ADMIN_NOT_ACTIVE, location = authority)]
+    fun suspended_delegator_cannot_manage_sub_issuer() {
+        let root = t::setup();
+        let d = t::delegator(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::sub_issuer(&d, t::issuer2_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
+        authority::revoke_issuer(&d, t::issuer2_addr(), b"x");
+    }
 
-        let reason = test_utils::reason_technical();
-        let now = timestamp::now_seconds();
-        authority::reactivate_issuer(root, issuer, reason);
-        authority::assert_issuer_status_changed_event_emitted(issuer, test_utils::root_addr(), test_utils::issuer_status_active(), reason, now);
+    // ================= Kiem duyet DID: bao ve dich + thu hoi vai tro =================
 
-        let (_, _, _, _, _, _, _, _, status, status_reason, status_updated_at) = authority::get_issuer_details(issuer);
-        assert!(status == test_utils::issuer_status_active(), 1);
-        assert!(status_reason == reason, 2);
-        assert!(status_updated_at == now, 3);
+    #[test]
+    #[expected_failure(abort_code = errors::E_PROTECTED_TARGET, location = authority)]
+    fun admin_cannot_moderate_root_did() {
+        let root = t::setup();
+        t::register(&root);
+        let admin = t::admin(&root, t::admin1_addr());
+        authority::admin_suspend_did(&admin, t::root_addr(), b"x");
     }
 
     #[test]
-    fun test_revoke_issuer_success() {
-        setup_test();
-        let root = &account::create_account_for_test(test_utils::root_addr());
-        let issuer = test_utils::issuer1_addr();
-        register_did_for(issuer);
-        authority::approve_issuer(root, issuer, test_utils::vc_type_bachelor(), test_utils::mock_vc_cid(), test_utils::mock_hash(), 0);
-
-        let reason = test_utils::reason_fraud();
-        let now = timestamp::now_seconds();
-        authority::revoke_issuer(root, issuer, reason);
-        authority::assert_issuer_status_changed_event_emitted(issuer, test_utils::root_addr(), test_utils::issuer_status_revoked(), reason, now);
-
-        let (_, _, _, _, _, _, _, _, status, status_reason, status_updated_at) = authority::get_issuer_details(issuer);
-        assert!(status == test_utils::issuer_status_revoked(), 1);
-        assert!(status_reason == reason, 2);
-        assert!(status_updated_at == now, 3);
+    #[expected_failure(abort_code = errors::E_PROTECTED_TARGET, location = authority)]
+    fun root_cannot_moderate_own_did() {
+        let root = t::setup();
+        t::register(&root);
+        authority::admin_revoke_did(&root, t::root_addr(), b"x");
     }
 
-    // ========== HELPERS ==========
-
-    fun setup_test() {
-        let aptos_framework = &account::create_account_for_test(@aptos_framework);
-        timestamp::set_time_has_started_for_testing(aptos_framework);
-        test_utils::fast_forward_by(test_utils::initial_time_seconds());
-
-        let deployer = &account::create_account_for_test(test_utils::deployer_addr());
-        did_registry::initialize_for_test(deployer);
-        authority::initialize_for_test(deployer);
-        register_did_for(test_utils::root_addr());
+    #[test]
+    #[expected_failure(abort_code = errors::E_PROTECTED_TARGET, location = authority)]
+    fun admin_cannot_moderate_another_admin_did() {
+        let root = t::setup();
+        let a1 = t::admin(&root, t::admin1_addr());
+        t::admin(&root, t::admin2_addr());
+        authority::admin_revoke_did(&a1, t::admin2_addr(), b"x");
     }
 
-    fun register_did_for(addr: address): signer {
-        let sig = account::create_account_for_test(addr);
-        let did = test_utils::did_for(addr);
-        let cid = test_utils::mock_cid();
-        let hash = test_utils::mock_hash();
-        did_registry::register_did(&sig, did, cid, hash);
-        assert!(did_registry::has_active_did(addr), 1);
-        sig
+    #[test]
+    fun admin_can_moderate_former_admin_did() {
+        let root = t::setup();
+        let a1 = t::admin(&root, t::admin1_addr());
+        t::admin(&root, t::admin2_addr());
+        authority::revoke_admin(&root, t::admin2_addr(), b"x");
+        authority::admin_suspend_did(&a1, t::admin2_addr(), b"x");
+        assert!(did_registry::status_of(t::admin2_addr()) == t::did_suspended(), 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_ADMIN_NOT_ACTIVE, location = authority)]
+    fun non_admin_cannot_moderate_did() {
+        t::setup();
+        t::user(t::holder1_addr());
+        authority::admin_suspend_did(&t::user(t::random1_addr()), t::holder1_addr(), b"x");
+    }
+
+    #[test]
+    fun revoking_admin_did_also_revokes_admin_role() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        authority::admin_revoke_did(&root, t::admin1_addr(), b"compromised");
+        let (_, _, _, _, _, _, _, _, status, reason, _) = authority::record_fields(&authority::admin_record(t::admin1_addr()));
+        assert!(status == t::role_revoked() && reason == b"compromised", 0);
+        assert!(event::was_event_emitted(&authority::admin_revoked_event(t::admin1_addr(), t::root_addr(), b"compromised", t::t0())), 1);
+    }
+
+    #[test]
+    fun revoking_issuer_did_also_revokes_issuer_role() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::suspend_issuer(&root, t::issuer1_addr(), b"x");
+        authority::admin_revoke_did(&admin, t::issuer1_addr(), b"fraud");
+        assert!(authority::role_status(&authority::issuer_record(t::issuer1_addr())) == t::role_revoked(), 0);
+        assert!(event::was_event_emitted(&authority::issuer_status_changed_event(t::issuer1_addr(), t::admin1_addr(), t::role_revoked(), b"fraud", t::t0())), 1);
+    }
+
+    #[test]
+    fun suspending_did_keeps_role_record_but_blocks_it() {
+        let root = t::setup();
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::admin_suspend_did(&root, t::issuer1_addr(), b"x");
+        assert!(authority::role_status(&authority::issuer_record(t::issuer1_addr())) == t::role_active(), 0);
+        assert!(!authority::is_active_issuer(t::issuer1_addr()), 1);
+        authority::admin_reactivate_did(&root, t::issuer1_addr(), b"x");
+        assert!(authority::is_active_issuer(t::issuer1_addr()), 2);
+    }
+
+    // ================= Views =================
+
+    #[test]
+    fun is_active_issuer_reflects_every_condition() {
+        let root = t::setup();
+        assert!(!authority::is_active_issuer(t::issuer1_addr()), 0);
+        t::user(t::issuer3_addr());
+        assert!(!authority::is_active_issuer(t::issuer3_addr()), 1);
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), t::t0() + 10);
+        assert!(authority::is_active_issuer(t::issuer1_addr()), 2);
+        t::advance(9);
+        assert!(authority::is_active_issuer(t::issuer1_addr()), 3);
+        t::advance(1);
+        assert!(!authority::is_active_issuer(t::issuer1_addr()), 4);
+    }
+
+    #[test]
+    fun is_active_admin_reflects_every_condition() {
+        let root = t::setup();
+        assert!(authority::is_active_admin(t::root_addr()), 0);
+        assert!(!authority::is_active_admin(t::admin1_addr()), 1);
+        t::user(t::random1_addr());
+        assert!(!authority::is_active_admin(t::random1_addr()), 2);
+        t::admin(&root, t::admin1_addr());
+        assert!(authority::is_active_admin(t::admin1_addr()), 3);
+    }
+
+    #[test]
+    fun can_delegate_matches_approve_issuer_rules() {
+        let root = t::setup();
+        assert!(authority::can_delegate(t::root_addr()), 0);
+        t::admin(&root, t::admin1_addr());
+        assert!(authority::can_delegate(t::admin1_addr()), 1);
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        assert!(!authority::can_delegate(t::issuer1_addr()), 2);
+        t::delegator(&root, t::issuer2_addr(), t::bachelor(), t::t0() + 5);
+        assert!(authority::can_delegate(t::issuer2_addr()), 3);
+        t::user(t::random1_addr());
+        assert!(!authority::can_delegate(t::random1_addr()), 4);
+        t::advance(5);
+        assert!(!authority::can_delegate(t::issuer2_addr()), 5);
+        authority::revoke_admin(&root, t::admin1_addr(), b"x");
+        assert!(!authority::can_delegate(t::admin1_addr()), 6);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = authority)]
+    fun get_role_unknown_fails() {
+        t::setup();
+        authority::get_role(t::random1_addr());
+    }
+
+    #[test]
+    fun get_role_of_plain_admin_and_plain_issuer() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        t::issuer(&root, t::issuer1_addr(), t::master(), 0);
+        let (by, mask, _, _, _, status) = authority::get_info(t::admin1_addr());
+        assert!(by == t::root_addr() && mask == 0 && status == t::role_active(), 0);
+        let (_, mask2, _, _, _, _) = authority::get_info(t::issuer1_addr());
+        assert!(mask2 == t::master(), 1);
+    }
+
+    #[test]
+    fun get_role_prefers_the_live_role() {
+        let root = t::setup();
+        // issuer -> thu hoi -> admin: tra ve admin
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        authority::revoke_issuer(&root, t::issuer1_addr(), b"x");
+        authority::grant_admin(&root, t::issuer1_addr());
+        let (_, _, _, _, _, status) = authority::get_info(t::issuer1_addr());
+        assert!(status == t::role_active() && authority::role_owner(&authority::get_role(t::issuer1_addr())) == t::issuer1_addr(), 0);
+        let (_, mask, _, _, _, _) = authority::get_info(t::issuer1_addr());
+        assert!(mask == 0, 1);
+        // admin -> thu hoi -> issuer: tra ve issuer
+        t::admin(&root, t::admin1_addr());
+        authority::revoke_admin(&root, t::admin1_addr(), b"x");
+        authority::approve_issuer(&root, t::admin1_addr(), t::phd(), b"", b"", 0);
+        let (_, mask2, _, _, _, status2) = authority::get_info(t::admin1_addr());
+        assert!(mask2 == t::phd() && status2 == t::role_active(), 2);
+        // ca hai da chet: tra ve ban issuer
+        authority::revoke_issuer(&root, t::admin1_addr(), b"x");
+        let (_, mask3, _, _, _, status3) = authority::get_info(t::admin1_addr());
+        assert!(mask3 == t::phd() && status3 == t::role_revoked(), 3);
+    }
+
+    #[test]
+    fun list_views_and_pagination() {
+        let root = t::setup();
+        t::admin(&root, t::admin1_addr());
+        t::issuer(&root, t::issuer1_addr(), t::bachelor(), 0);
+        t::issuer(&root, t::issuer2_addr(), t::bachelor(), 0);
+        assert!(authority::get_admins() == vector[t::admin1_addr()], 0);
+        let issuers = authority::get_issuers();
+        assert!(vector::length(&issuers) == 2 && vector::contains(&issuers, &t::issuer2_addr()), 1);
+
+        let page = authority::get_roles_paginated(1, 1);
+        assert!(vector::length(&page) == 1 && authority::role_owner(vector::borrow(&page, 0)) == t::issuer1_addr(), 2);
+        assert!(vector::length(&authority::get_roles_paginated(0, 200)) == 3, 3);
+        assert!(vector::is_empty(&authority::get_roles_paginated(18446744073709551615, 200)), 4);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_RESULT_TOO_LARGE, location = authority)]
+    fun get_admins_refuses_more_than_500_entries() {
+        let root = t::setup();
+        t::many_users(501);
+        let n = 0;
+        while (n < 501) { authority::grant_admin(&root, t::nth_addr(n)); n = n + 1; };
+        assert!(vector::length(&authority::get_roles_paginated(300, 200)) == 200, 0);
+        authority::get_admins();
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_RESULT_TOO_LARGE, location = authority)]
+    fun get_issuers_refuses_more_than_500_entries() {
+        let root = t::setup();
+        t::many_users(501);
+        let n = 0;
+        while (n < 501) { authority::approve_issuer(&root, t::nth_addr(n), t::bachelor(), b"", b"", 0); n = n + 1; };
+        authority::get_issuers();
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_PAGE, location = authority)]
+    fun get_roles_paginated_rejects_zero_limit() {
+        t::setup();
+        authority::get_roles_paginated(0, 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_PAGE, location = authority)]
+    fun get_roles_paginated_rejects_limit_above_200() {
+        t::setup();
+        authority::get_roles_paginated(0, 201);
     }
 }

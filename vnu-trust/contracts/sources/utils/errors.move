@@ -1,3 +1,7 @@
+/// Toan bo ma abort cua goi. Giao dien dich ma theo SO (frontend/src/lib/chain.ts),
+/// vi vm_status chi kem ma hex, khong kem ten hang so.
+/// Mot so ham truy cap khong con duoc dung trong goi nhung la `public` nen phai
+/// giu lai de nang cap `compatible` khong bi tu choi.
 module vnu::errors {
     // ========== Authority ==========
 
@@ -20,6 +24,12 @@ module vnu::errors {
     const E_CANNOT_DELEGATE:            u64 = 1017;
     /// Admin thuong khong duoc tac dong len DID cua root hoac admin dang hoat dong.
     const E_PROTECTED_TARGET:           u64 = 1018;
+    /// Sub-issuer duoc cap qua uy quyen ma issuer cha khong con hop le.
+    const E_DELEGATOR_NOT_ACTIVE:       u64 = 1019;
+    /// vc_type_mask phai khac 0 va chi gom cac bit da dinh nghia; vc_type phai dung MOT bit.
+    const E_INVALID_VC_TYPE:            u64 = 1020;
+    /// De cu root khong hop le: dia chi 0x0 hoac chinh root hien tai.
+    const E_INVALID_ROOT_CANDIDATE:     u64 = 1021;
 
     // ========== Identity ==========
 
@@ -59,14 +69,16 @@ module vnu::errors {
     const E_INVALID_ID:                 u64 = 4003;
     const E_INVALID_PAGE:               u64 = 4004;
     const E_RESULT_TOO_LARGE:           u64 = 4005;
+    /// Resource bo sung khi nang cap da duoc khoi tao.
+    const E_ALREADY_INITIALIZED:        u64 = 4006;
 
     // ========== Public accessors ==========
 
     // === Authority ===
     public fun not_root_admin(): u64            { E_NOT_ROOT_ADMIN }
-    public fun not_admin(): u64                 { E_NOT_ADMIN }//
+    public fun not_admin(): u64                 { E_NOT_ADMIN }
     public fun admin_already_exists(): u64      { E_ADMIN_ALREADY_EXISTS }
-    public fun issuer_already_exists(): u64     { E_ISSUER_ALREADY_EXISTS}
+    public fun issuer_already_exists(): u64     { E_ISSUER_ALREADY_EXISTS }
     public fun issuer_not_found(): u64          { E_ISSUER_NOT_FOUND }
     public fun issuer_not_active(): u64         { E_ISSUER_NOT_ACTIVE }
     public fun issuer_not_suspended(): u64      { E_ISSUER_NOT_SUSPENDED }
@@ -81,6 +93,9 @@ module vnu::errors {
     public fun role_conflict(): u64             { E_ROLE_CONFLICT }
     public fun cannot_delegate(): u64           { E_CANNOT_DELEGATE }
     public fun protected_target(): u64          { E_PROTECTED_TARGET }
+    public fun delegator_not_active(): u64      { E_DELEGATOR_NOT_ACTIVE }
+    public fun invalid_vc_type(): u64           { E_INVALID_VC_TYPE }
+    public fun invalid_root_candidate(): u64    { E_INVALID_ROOT_CANDIDATE }
 
     // === Identity ===
     public fun did_already_registered(): u64    { E_DID_ALREADY_REGISTERED }
@@ -116,4 +131,5 @@ module vnu::errors {
     public fun invalid_id(): u64                { E_INVALID_ID }
     public fun invalid_page(): u64              { E_INVALID_PAGE }
     public fun result_too_large(): u64          { E_RESULT_TOO_LARGE }
+    public fun already_initialized(): u64       { E_ALREADY_INITIALIZED }
 }

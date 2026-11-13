@@ -1,367 +1,568 @@
+// Dac ta vong doi DID. Moi test la mot luat; ten test = <ham>_<dieu kien>.
 #[test_only]
 module vnu::did_registry_test {
-
-    use aptos_framework::account;
-    use aptos_framework::timestamp;
-    use vnu::errors;
+    use std::vector;
+    use aptos_framework::event;
+    use vnu::authority;
     use vnu::did_registry;
-    use vnu::test_utils;
+    use vnu::errors;
+    use vnu::test_utils as t;
 
-    // ========== SETUP TEST = ==========
+    // ================= register_did =================
 
-    // Setup: initialize DID module test environment
     #[test]
-    fun setup_test_success() {
-        setup_test();
+    fun register_did_creates_active_record_and_emits_event() {
+        t::setup();
+        let a = t::holder1_addr();
+        let s = t::account(a);
+        did_registry::register_did(&s, t::did_for(a), t::cid(), t::hash(1));
+
+        let r = did_registry::get_did_by_owner(a);
+        let (id, owner, did, cid, hash, status, created, updated, version, suspended_by) = did_registry::record_fields(&r);
+        assert!(id == 0 && owner == a && did == t::did_for(a), 0);
+        assert!(cid == t::cid() && hash == t::hash(1), 1);
+        assert!(status == t::did_active() && version == 1 && suspended_by == @0x0, 2);
+        assert!(created == t::t0() && updated == t::t0(), 3);
+        assert!(did_registry::total_dids() == 1 && did_registry::has_active_did(a), 4);
+        assert!(event::was_event_emitted(&did_registry::did_registered_event(0, a, t::did_for(a), t::cid(), t::t0())), 5);
+
+        let (d1, c1, h1, s1, v1) = did_registry::resolve_did(t::did_for(a));
+        let (d2, c2, h2, s2, v2) = did_registry::resolve_did_by_owner(a);
+        assert!(d1 == d2 && c1 == c2 && h1 == h2 && s1 == s2 && v1 == v2, 6);
+        assert!(d1 == t::did_for(a) && s1 == t::did_active() && v1 == 1, 7);
+        assert!(did_registry::get_did(t::did_for(a)) == r, 8);
     }
 
-    // ========== REGISTER DID ==========
+    #[test]
+    fun register_did_assigns_increasing_ids() {
+        t::setup();
+        t::user(t::holder1_addr());
+        t::user(t::holder2_addr());
+        assert!(did_registry::did_id_of(t::holder1_addr()) == 0, 0);
+        assert!(did_registry::did_id_of(t::holder2_addr()) == 1, 1);
+        assert!(did_registry::total_dids() == 2, 2);
+    }
 
-    // Fail: `register_did` aborts when document hash has wrong length
     #[test]
     #[expected_failure(abort_code = errors::E_HASH_WRONG_LENGTH, location = did_registry)]
-    fun test_register_did_fails_if_hash_short() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let short_document_hash = b"short";
-        did_registry::register_did(h1, test_utils::did_for(owner), test_utils::mock_cid(), short_document_hash);
+    fun register_did_rejects_hash_shorter_than_32_bytes() {
+        t::setup();
+        let a = t::holder1_addr();
+        did_registry::register_did(&t::account(a), t::did_for(a), t::cid(), t::bytes(31, 0));
     }
 
-    // Fail: `register_did` aborts when owner already has a DID
     #[test]
-    #[expected_failure(abort_code = errors::E_OWNER_HAS_DID, location = did_registry)]
-    fun test_register_did_fails_if_duplicate_owner() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        did_registry::register_did(h1, test_utils::did_for(owner), test_utils::mock_cid(), test_utils::mock_hash());
-        did_registry::register_did(h1, test_utils::did_with_prefix(b"did:vnu:other:", owner), test_utils::mock_cid_v2(), test_utils::mock_hash_v2());
+    #[expected_failure(abort_code = errors::E_HASH_WRONG_LENGTH, location = did_registry)]
+    fun register_did_rejects_hash_longer_than_32_bytes() {
+        t::setup();
+        let a = t::holder1_addr();
+        did_registry::register_did(&t::account(a), t::did_for(a), t::cid(), t::bytes(33, 0));
     }
 
-    // Fail: dung DID cua nguoi khac bi chan ngay o buoc rang buoc dia chi (F-12)
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_CID, location = did_registry)]
+    fun register_did_rejects_cid_shorter_than_10() {
+        t::setup();
+        let a = t::holder1_addr();
+        did_registry::register_did(&t::account(a), t::did_for(a), t::bytes(9, 97), t::hash(1));
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_CID, location = did_registry)]
+    fun register_did_rejects_cid_longer_than_128() {
+        t::setup();
+        let a = t::holder1_addr();
+        did_registry::register_did(&t::account(a), t::did_for(a), t::bytes(129, 97), t::hash(1));
+    }
+
+    #[test]
+    fun register_did_accepts_cid_length_bounds() {
+        t::setup();
+        let a = t::holder1_addr();
+        let b = t::holder2_addr();
+        did_registry::register_did(&t::account(a), t::did_for(a), t::bytes(10, 97), t::hash(1));
+        did_registry::register_did(&t::account(b), t::did_for(b), t::bytes(128, 97), t::hash(1));
+        assert!(did_registry::has_active_did(a) && did_registry::has_active_did(b), 0);
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_DID_NOT_BOUND_TO_OWNER, location = did_registry)]
-    fun test_register_did_fails_if_duplicate_did() {
-        setup_test();
-        let owner1 = test_utils::holder1_addr();
-        let owner2 = test_utils::holder2_addr();
-        let h1 = &account::create_account_for_test(owner1);
-        let h2 = &account::create_account_for_test(owner2);
-        let same_did = test_utils::did_for(owner1);
-        did_registry::register_did(h1, same_did, test_utils::mock_cid(), test_utils::mock_hash());
-        did_registry::register_did(h2, same_did, test_utils::mock_cid_v2(), test_utils::mock_hash_v2());
+    fun register_did_rejects_other_did_method() {
+        t::setup();
+        let a = t::holder1_addr();
+        // Cung do dai voi "did:vnu:" de cham dung phep so tien to, khong bi
+        // phep kiem do dai chan truoc.
+        did_registry::register_did(&t::account(a), t::did_with(b"did:abc:", a), t::cid(), t::hash(1));
     }
 
-    // Success: `register_did` stores DID and document and emits event
     #[test]
-    fun test_register_did_success() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let did = test_utils::did_for(owner);
-        let cid = test_utils::mock_cid();
-        let hash = test_utils::mock_hash();
-        let now = timestamp::now_seconds();
-
-        // Pre-state
-        assert!(!did_registry::has_active_did(owner), 1);
-        assert!(did_registry::total_dids() == 0, 2);
-
-        did_registry::register_did(h1, did, cid, hash);
-        did_registry::assert_did_registered_event_emitted(0, owner, did, cid, now);
-
-        // Post-state
-        assert!(did_registry::has_active_did(owner), 3);
-        assert!(did_registry::total_dids() == 1, 4);
-
-        let (did_str, doc_cid, doc_hash, status, version) = did_registry::resolve_did_by_owner(owner);
-        assert!(did_str == did, 5);
-        assert!(doc_cid == cid, 6);
-        assert!(doc_hash == hash, 7);
-        assert!(status == test_utils::did_status_active(), 8);
-        assert!(version == 1, 9);
-
-        let (record_id, record_owner, record_did, record_cid, record_hash, record_status, created_at, updated_at, record_version) = did_registry::get_did_details_by_owner(owner);
-        assert!(record_id == 0, 10);
-        assert!(record_owner == owner, 11);
-        assert!(record_did == did, 12);
-        assert!(record_cid == cid, 13);
-        assert!(record_hash == hash, 14);
-        assert!(record_status == test_utils::did_status_active(), 15);
-        assert!(created_at == now, 16);
-        assert!(updated_at == now, 17);
-        assert!(record_version == 1, 18);
+    #[expected_failure(abort_code = errors::E_DID_NOT_BOUND_TO_OWNER, location = did_registry)]
+    fun register_did_rejects_string_too_short_to_hold_prefix_and_address() {
+        t::setup();
+        let a = t::holder1_addr();
+        did_registry::register_did(&t::account(a), t::did_with(b"did:x:", a), t::cid(), t::hash(1));
     }
 
-    // ========== Update DID Document ==========
-
-    // Fail: `update_did_document` aborts when owner does not exist
     #[test]
-    #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
-    fun test_update_did_fails_if_owner_not_exists() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let new_cid = test_utils::mock_cid();
-        let new_hash = test_utils::mock_hash();
-        did_registry::update_did_document(h1, new_cid, new_hash, 1);
+    #[expected_failure(abort_code = errors::E_DID_NOT_BOUND_TO_OWNER, location = did_registry)]
+    fun register_did_rejects_did_of_another_address() {
+        t::setup();
+        let s = t::account(t::holder1_addr());
+        did_registry::register_did(&s, t::did_for(t::holder2_addr()), t::cid(), t::hash(1));
     }
 
-    // Fail: `update_did_document` aborts when DID is not active
     #[test]
-    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = did_registry)]
-    fun test_update_did_fails_if_did_not_active() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let did = test_utils::did_for(owner);
-        let new_cid = test_utils::mock_cid();
-        let new_hash = test_utils::mock_hash();
-
-        did_registry::register_did(h1, did, new_cid, new_hash);
-        did_registry::deactivate_did(h1);
-        did_registry::update_did_document(h1, new_cid, new_hash, 1);
+    #[expected_failure(abort_code = errors::E_DID_NOT_BOUND_TO_OWNER, location = did_registry)]
+    fun register_did_rejects_uppercase_address_suffix() {
+        t::setup();
+        let a = @0xABCD;
+        let did = b"did:vnu:0x000000000000000000000000000000000000000000000000000000000000ABCD";
+        did_registry::register_did(&t::account(a), did, t::cid(), t::hash(1));
     }
 
-    // Fail: `update_did_document` aborts on version mismatch (stable version)
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_NOT_BOUND_TO_OWNER, location = did_registry)]
+    fun register_did_rejects_empty_string() {
+        t::setup();
+        did_registry::register_did(&t::account(t::holder1_addr()), b"", t::cid(), t::hash(1));
+    }
+
+    #[test]
+    fun register_did_accepts_minimal_and_128_byte_strings() {
+        t::setup();
+        let a = t::holder1_addr();
+        let b = t::holder2_addr();
+        // "did:vnu:" + dia chi = 8 + 66 = 74 byte
+        did_registry::register_did(&t::account(a), t::did_with(b"did:vnu:", a), t::cid(), t::hash(1));
+        // phan giua 54 byte -> tong 128
+        let prefix = b"did:vnu:";
+        vector::append(&mut prefix, t::bytes(54, 97));
+        let long = t::did_with(prefix, b);
+        assert!(vector::length(&long) == 128, 0);
+        did_registry::register_did(&t::account(b), long, t::cid(), t::hash(1));
+        assert!(did_registry::has_active_did(a) && did_registry::has_active_did(b), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_NOT_BOUND_TO_OWNER, location = did_registry)]
+    fun register_did_rejects_string_longer_than_128() {
+        t::setup();
+        let a = t::holder1_addr();
+        let prefix = b"did:vnu:";
+        vector::append(&mut prefix, t::bytes(55, 97));
+        did_registry::register_did(&t::account(a), t::did_with(prefix, a), t::cid(), t::hash(1));
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_OWNER_HAS_DID, location = did_registry)]
+    fun register_did_rejects_second_did_while_active() {
+        t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        did_registry::register_did(&s, t::did_with(b"did:vnu:v2:", a), t::cid(), t::hash(1));
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_OWNER_HAS_DID, location = did_registry)]
+    fun register_did_rejects_new_did_while_suspended() {
+        t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        did_registry::suspend_own_did(&s);
+        did_registry::register_did(&s, t::did_with(b"did:vnu:v2:", a), t::cid(), t::hash(1));
+    }
+
+    #[test]
+    fun register_did_after_revocation_creates_new_version_and_keeps_old_record() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        authority::admin_revoke_did(&root, a, b"fraud");
+
+        let new_did = t::did_with(b"did:vnu:v2:", a);
+        did_registry::register_did(&s, new_did, t::cid_v2(), t::hash(2));
+
+        assert!(did_registry::did_id_of(a) == 1 && did_registry::version_of(a) == 2, 0);
+        assert!(did_registry::status_of(a) == t::did_active(), 1);
+        let (_, _, _, old_status, old_version) = did_registry::resolve_did(t::did_for(a));
+        assert!(old_status == t::did_revoked() && old_version == 1, 2);
+        let (cur, _, _, _, _) = did_registry::resolve_did_by_owner(a);
+        assert!(cur == new_did, 3);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_ALREADY_REGISTERED, location = did_registry)]
+    fun register_did_rejects_reuse_of_revoked_did_string() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        authority::admin_revoke_did(&root, a, b"fraud");
+        did_registry::register_did(&s, t::did_for(a), t::cid(), t::hash(1));
+    }
+
+    // ================= update_did_document =================
+
+    #[test]
+    fun update_did_document_replaces_document_and_bumps_version() {
+        t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        t::advance(50);
+        did_registry::update_did_document(&s, t::cid_v2(), t::hash(2), 1);
+
+        let (_, _, _, cid, hash, status, created, updated, version, _) =
+            did_registry::record_fields(&did_registry::get_did_by_owner(a));
+        assert!(cid == t::cid_v2() && hash == t::hash(2), 0);
+        assert!(version == 2 && status == t::did_active(), 1);
+        assert!(created == t::t0() && updated == t::t0() + 50, 2);
+        assert!(event::was_event_emitted(&did_registry::did_document_updated_event(0, a, t::cid_v2(), 2, t::t0() + 50)), 3);
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_STABLE_DID_VERSION, location = did_registry)]
-    fun test_update_did_fails_if_version_mismatch() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let did = test_utils::did_for(owner);
-        let new_cid = test_utils::mock_cid();
-        let new_hash = test_utils::mock_hash();
-
-        did_registry::register_did(h1, did, new_cid, new_hash);
-        did_registry::update_did_document(h1, new_cid, new_hash, 2);
+    fun update_did_document_rejects_stale_version() {
+        t::setup();
+        let s = t::user(t::holder1_addr());
+        did_registry::update_did_document(&s, t::cid_v2(), t::hash(2), 1);
+        did_registry::update_did_document(&s, t::cid(), t::hash(3), 1);
     }
 
-    // Fail: `update_did_document` aborts when provided hash length invalid
-    #[test]
-    #[expected_failure(abort_code = errors::E_HASH_WRONG_LENGTH, location = did_registry)]
-    fun test_update_did_fails_if_hash_short() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let did = test_utils::did_for(owner);
-        let new_cid = test_utils::mock_cid();
-        let new_hash = test_utils::mock_hash();
-
-        did_registry::register_did(h1, did, new_cid, new_hash);
-        let short_hash = b"short";
-        did_registry::update_did_document(h1, new_cid, short_hash, 1);
-    }
-
-    // Success: owner can update DID document and event/state reflect changes
-    #[test]
-    fun test_update_did_document_success() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let did = test_utils::did_for(owner);
-        let cid = test_utils::mock_cid();
-        let hash = test_utils::mock_hash();
-        let new_cid = test_utils::mock_cid_v2();
-        let new_hash = test_utils::mock_hash_v2();
-        let now = timestamp::now_seconds();
-
-        did_registry::register_did(h1, did, cid, hash);
-        let (did_str, doc_cid, doc_hash, status, version) = did_registry::resolve_did_by_owner(owner);
-        assert!(did_str == did, 1);
-        assert!(doc_cid == cid, 2);
-        assert!(doc_hash == hash, 3);
-        assert!(status == test_utils::did_status_active(), 4);
-        assert!(version == 1, 5);
-
-        did_registry::update_did_document(h1, new_cid, new_hash, 1);
-        did_registry::assert_did_document_updated_event_emitted(0, owner, new_cid, 2, now);
-        let (did_str, doc_cid, doc_hash, status, version) = did_registry::resolve_did_by_owner(owner);
-        assert!(did_str == did, 6);
-        assert!(doc_cid == new_cid, 7);
-        assert!(doc_hash == new_hash, 8);
-        assert!(status == test_utils::did_status_active(), 9);
-        assert!(version == 2, 10);
-
-        let (record_id, record_owner, record_did, record_cid, record_hash, record_status, created_at, updated_at, record_version) = did_registry::get_did_details_by_owner(owner);
-        assert!(record_id == 0, 11);
-        assert!(record_owner == owner, 12);
-        assert!(record_did == did, 13);
-        assert!(record_cid == new_cid, 14);
-        assert!(record_hash == new_hash, 15);
-        assert!(record_status == test_utils::did_status_active(), 16);
-        assert!(created_at == now, 17);
-        assert!(updated_at == now, 18);
-        assert!(record_version == 2, 19);
-    }
-
-    // ========== Deactivate DID (owner only) ==========
-
-    // Fail: `deactivate_did` aborts when owner not exists
     #[test]
     #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
-    fun test_deactivate_did_fails_if_owner_not_exists() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-
-        did_registry::deactivate_did(h1);
+    fun update_did_document_requires_did() {
+        t::setup();
+        did_registry::update_did_document(&t::account(t::holder1_addr()), t::cid(), t::hash(2), 1);
     }
 
-    // Fail: `deactivate_did` aborts when DID already suspended
     #[test]
     #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = did_registry)]
-    fun test_deactivate_did_fails_if_did_is_suspending() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let did = test_utils::did_for(owner);
-        let cid = test_utils::mock_cid();
-        let hash = test_utils::mock_hash();
-
-        did_registry::register_did(h1, did, cid, hash);
-        did_registry::deactivate_did(h1);
-        did_registry::deactivate_did(h1);
+    fun update_did_document_rejects_suspended_did() {
+        t::setup();
+        let s = t::user(t::holder1_addr());
+        did_registry::suspend_own_did(&s);
+        did_registry::update_did_document(&s, t::cid_v2(), t::hash(2), 1);
     }
 
-    // Success: owner can deactivate DID and event/state updated accordingly
     #[test]
-    fun test_deactivate_did_success() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let did = test_utils::did_for(owner);
-        let cid = test_utils::mock_cid();
-        let hash = test_utils::mock_hash();
-        let now = timestamp::now_seconds();
-        let reason = test_utils::reason_other();
-
-        did_registry::register_did(h1, did, cid, hash);
-        assert!(did_registry::has_active_did(owner), 1);
-        did_registry::deactivate_did(h1);
-        did_registry::assert_did_status_changed_event_emitted(0, owner, owner, test_utils::did_status_suspended(), reason, now);
-        assert!(!did_registry::has_active_did(owner), 2);
-
-        let (_, _, _, status, _) = did_registry::resolve_did_by_owner(owner);
-        assert!(status == test_utils::did_status_suspended(), 43);
-
-        let (record_id, record_owner, record_did, record_cid, record_hash, record_status, created_at, updated_at, record_version) = did_registry::get_did_details_by_owner(owner);
-        assert!(record_id == 0, 3);
-        assert!(record_owner == owner, 4);
-        assert!(record_did == did, 5);
-        assert!(record_cid == cid, 6);
-        assert!(record_hash == hash, 7);
-        assert!(record_status == test_utils::did_status_suspended(), 8);
-        assert!(created_at == now, 9);
-        assert!(updated_at == now, 10);
-        assert!(record_version == 1, 11);
+    #[expected_failure(abort_code = errors::E_HASH_WRONG_LENGTH, location = did_registry)]
+    fun update_did_document_rejects_bad_hash() {
+        t::setup();
+        let s = t::user(t::holder1_addr());
+        did_registry::update_did_document(&s, t::cid_v2(), t::bytes(5, 0), 1);
     }
 
-    // ========== View DID ==========
-
-    // Fail: `resolve_did` aborts when DID not registered
     #[test]
-    #[expected_failure(abort_code = errors::E_DID_NOT_FOUND, location = did_registry)]
-    fun test_resolve_did_fails_if_did_not_exists() {
-        setup_test();
-        let did = test_utils::did_for(test_utils::random1_addr());
-        did_registry::resolve_did(did);
+    #[expected_failure(abort_code = errors::E_INVALID_CID, location = did_registry)]
+    fun update_did_document_rejects_bad_cid() {
+        t::setup();
+        let s = t::user(t::holder1_addr());
+        did_registry::update_did_document(&s, b"", t::hash(2), 1);
     }
 
-    // Fail: `resolve_did_by_owner` aborts when owner not found
+    // ================= suspend_own_did / deactivate_did =================
+
+    #[test]
+    fun suspend_own_did_marks_owner_as_locker() {
+        t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        did_registry::suspend_own_did(&s);
+        assert!(did_registry::status_of(a) == t::did_suspended(), 0);
+        assert!(did_registry::suspended_by_of(a) == a, 1);
+        assert!(!did_registry::has_active_did(a), 2);
+        assert!(event::was_event_emitted(&did_registry::did_status_changed_event(0, a, a, t::did_suspended(), b"Other", t::t0())), 3);
+    }
+
+    #[test]
+    fun deactivate_did_is_alias_of_suspend_own_did() {
+        t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        did_registry::deactivate_did(&s);
+        assert!(did_registry::status_of(a) == t::did_suspended(), 0);
+        assert!(did_registry::suspended_by_of(a) == a, 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = did_registry)]
+    fun suspend_own_did_twice_fails() {
+        t::setup();
+        let s = t::user(t::holder1_addr());
+        did_registry::suspend_own_did(&s);
+        did_registry::suspend_own_did(&s);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = did_registry)]
+    fun suspend_own_did_cannot_override_admin_lock() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        authority::admin_suspend_did(&root, a, b"x");
+        did_registry::suspend_own_did(&s);
+    }
+
     #[test]
     #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
-    fun test_resolve_did_by_owner_fails_if_owner_not_exists() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        did_registry::resolve_did_by_owner(owner);
+    fun suspend_own_did_requires_did() {
+        t::setup();
+        did_registry::suspend_own_did(&t::account(t::holder1_addr()));
     }
 
-    // Success: resolve_did and resolve_did_by_owner return correct active info
     #[test]
-    fun test_resolve_did_active_success() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let did = test_utils::did_for(owner);
-        let cid = test_utils::mock_cid();
-        let hash = test_utils::mock_hash();
-
-        did_registry::register_did(h1, did, cid, hash);
-
-        let (did_str_1, doc_cid_1, doc_hash_1, status_1, version_1) = did_registry::resolve_did(did);
-        assert!(did_str_1 == did, 1);
-        assert!(doc_cid_1 == cid, 2);
-        assert!(doc_hash_1 == hash, 3);
-        assert!(status_1 == test_utils::did_status_active(), 4);
-        assert!(version_1 == 1, 5);
-
-        let (did_str_2, doc_cid_2, doc_hash_2, status_2, version_2) = did_registry::resolve_did_by_owner(owner);
-        assert!(did_str_2 == did, 6);
-        assert!(doc_cid_2 == cid, 7);
-        assert!(doc_hash_2 == hash, 8);
-        assert!(status_2 == test_utils::did_status_active(), 9);
-        assert!(version_2 == 1, 10);
+    #[expected_failure(abort_code = errors::E_DID_ALREADY_REVOKED, location = did_registry)]
+    fun suspend_own_did_rejects_revoked_did() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        authority::admin_revoke_did(&root, a, b"x");
+        did_registry::suspend_own_did(&s);
     }
 
-    // Success: resolve_did returns suspended status after deactivation
+    // ================= reactivate_own_did =================
+
     #[test]
-    fun test_resolve_did_deactivated_success() {
-        setup_test();
-        let owner = test_utils::holder1_addr();
-        let h1 = &account::create_account_for_test(owner);
-        let did = test_utils::did_for(owner);
-        let cid = test_utils::mock_cid();
-        let hash = test_utils::mock_hash();
-
-        did_registry::register_did(h1, did, cid, hash);
-        did_registry::deactivate_did(h1);
-
-        let (did_str_1, doc_cid_1, doc_hash_1, status_1, version_1) = did_registry::resolve_did(did);
-        assert!(did_str_1 == did, 1);
-        assert!(doc_cid_1 == cid, 2);
-        assert!(doc_hash_1 == hash, 3);
-        assert!(status_1 == test_utils::did_status_suspended(), 4);
-        assert!(version_1 == 1, 5);
+    fun reactivate_own_did_restores_self_locked_did() {
+        t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        did_registry::suspend_own_did(&s);
+        did_registry::reactivate_own_did(&s);
+        assert!(did_registry::status_of(a) == t::did_active(), 0);
+        assert!(did_registry::suspended_by_of(a) == @0x0, 1);
+        assert!(event::was_event_emitted(&did_registry::did_status_changed_event(0, a, a, t::did_active(), b"Other", t::t0())), 2);
     }
 
-    // ========== MULTIPLE ACTORS ==========
-
-    // Success: multiple accounts can register DIDs independently
     #[test]
-    fun test_multiple_actors_register_did_success() {
-        setup_test();
-
-        let h1 = &account::create_account_for_test(test_utils::holder1_addr());
-        let h2 = &account::create_account_for_test(test_utils::holder2_addr());
-        let i1 = &account::create_account_for_test(test_utils::issuer1_addr());
-
-        did_registry::register_did(h1, test_utils::did_for(test_utils::holder1_addr()), test_utils::mock_cid(), test_utils::mock_hash());
-        did_registry::register_did(h2, test_utils::did_for(test_utils::holder2_addr()), test_utils::mock_cid(), test_utils::mock_hash());
-        did_registry::register_did(i1, test_utils::did_for(test_utils::issuer1_addr()), test_utils::mock_cid(), test_utils::mock_hash());
-
-        assert!(did_registry::has_active_did(test_utils::holder1_addr()), 1);
-        assert!(did_registry::has_active_did(test_utils::holder2_addr()), 2);
-        assert!(did_registry::has_active_did(test_utils::issuer1_addr()), 3);
-        assert!(did_registry::total_dids() == 3, 4);
-
-        did_registry::deactivate_did(h2);
-        assert!(did_registry::has_active_did(test_utils::holder1_addr()), 5);
-        assert!(!did_registry::has_active_did(test_utils::holder2_addr()), 6);
-        assert!(did_registry::has_active_did(test_utils::issuer1_addr()), 7);
+    #[expected_failure(abort_code = errors::E_DID_NOT_SUSPENDED, location = did_registry)]
+    fun reactivate_own_did_rejects_active_did() {
+        t::setup();
+        did_registry::reactivate_own_did(&t::user(t::holder1_addr()));
     }
 
-    // ========== Helpers ==========
+    #[test]
+    #[expected_failure(abort_code = errors::E_NOT_SELF_SUSPENDED, location = did_registry)]
+    fun reactivate_own_did_cannot_undo_admin_lock() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        authority::admin_suspend_did(&root, a, b"x");
+        did_registry::reactivate_own_did(&s);
+    }
 
-    // Helper: initialize chain state for DID tests
-    fun setup_test() {
-        let aptos_framework = &account::create_account_for_test(@aptos_framework);
-        timestamp::set_time_has_started_for_testing(aptos_framework);
-        test_utils::fast_forward_by(test_utils::initial_time_seconds());
+    #[test]
+    #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
+    fun reactivate_own_did_requires_did() {
+        t::setup();
+        did_registry::reactivate_own_did(&t::account(t::holder1_addr()));
+    }
 
-        let deployer = &account::create_account_for_test(test_utils::deployer_addr());
-        did_registry::initialize_for_test(deployer);
+    // ================= Kiem duyet cua admin (qua authority) =================
+
+    #[test]
+    fun admin_suspend_did_records_admin_as_locker() {
+        let root = t::setup();
+        let admin = t::admin(&root, t::admin1_addr());
+        let a = t::holder1_addr();
+        t::user(a);
+        authority::admin_suspend_did(&admin, a, b"policy");
+        assert!(did_registry::status_of(a) == t::did_suspended(), 0);
+        assert!(did_registry::suspended_by_of(a) == t::admin1_addr(), 1);
+        let id = did_registry::did_id_of(a);
+        assert!(event::was_event_emitted(&did_registry::did_status_changed_event(id, a, t::admin1_addr(), t::did_suspended(), b"policy", t::t0())), 2);
+    }
+
+    #[test]
+    fun admin_suspend_did_takes_over_owner_lock() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        did_registry::suspend_own_did(&s);
+        authority::admin_suspend_did(&root, a, b"investigation");
+        assert!(did_registry::status_of(a) == t::did_suspended(), 0);
+        assert!(did_registry::suspended_by_of(a) == t::root_addr(), 1);
+        // tu nay chi admin mo duoc
+        authority::admin_reactivate_did(&root, a, b"cleared");
+        assert!(did_registry::status_of(a) == t::did_active(), 2);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_NOT_SELF_SUSPENDED, location = did_registry)]
+    fun owner_cannot_reopen_after_admin_takeover() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        did_registry::suspend_own_did(&s);
+        authority::admin_suspend_did(&root, a, b"investigation");
+        did_registry::reactivate_own_did(&s);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_NOT_ACTIVE, location = did_registry)]
+    fun admin_suspend_did_twice_fails() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        t::user(a);
+        authority::admin_suspend_did(&root, a, b"x");
+        authority::admin_suspend_did(&root, a, b"x");
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_OWNER_LOCKED, location = did_registry)]
+    fun admin_reactivate_did_cannot_open_owner_lock() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        did_registry::suspend_own_did(&s);
+        authority::admin_reactivate_did(&root, a, b"x");
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_NOT_SUSPENDED, location = did_registry)]
+    fun admin_reactivate_did_rejects_active_did() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        t::user(a);
+        authority::admin_reactivate_did(&root, a, b"x");
+    }
+
+    #[test]
+    fun admin_revoke_did_works_from_active_and_suspended() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let b = t::holder2_addr();
+        t::user(a);
+        let sb = t::user(b);
+        did_registry::suspend_own_did(&sb);
+        authority::admin_revoke_did(&root, a, b"fraud");
+        authority::admin_revoke_did(&root, b, b"fraud");
+        assert!(did_registry::status_of(a) == t::did_revoked(), 0);
+        assert!(did_registry::status_of(b) == t::did_revoked(), 1);
+        assert!(did_registry::suspended_by_of(b) == @0x0, 2);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_ALREADY_REVOKED, location = did_registry)]
+    fun admin_revoke_did_twice_fails() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        t::user(a);
+        authority::admin_revoke_did(&root, a, b"x");
+        authority::admin_revoke_did(&root, a, b"x");
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_ALREADY_REVOKED, location = did_registry)]
+    fun admin_suspend_did_rejects_revoked_did() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        t::user(a);
+        authority::admin_revoke_did(&root, a, b"x");
+        authority::admin_suspend_did(&root, a, b"x");
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
+    fun admin_moderation_requires_target_did() {
+        let root = t::setup();
+        authority::admin_suspend_did(&root, t::holder1_addr(), b"x");
+    }
+
+    // ================= Views =================
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_DID_NOT_FOUND, location = did_registry)]
+    fun resolve_did_unknown_string_fails() {
+        t::setup();
+        did_registry::resolve_did(b"did:vnu:nobody");
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_OWNER_NOT_EXISTS, location = did_registry)]
+    fun resolve_did_by_owner_unknown_fails() {
+        t::setup();
+        did_registry::resolve_did_by_owner(t::holder1_addr());
+    }
+
+    #[test]
+    fun has_active_did_is_false_for_unknown_suspended_and_revoked() {
+        let root = t::setup();
+        assert!(!did_registry::has_active_did(t::holder1_addr()), 0);
+        let s = t::user(t::holder1_addr());
+        did_registry::suspend_own_did(&s);
+        assert!(!did_registry::has_active_did(t::holder1_addr()), 1);
+        t::user(t::holder2_addr());
+        authority::admin_revoke_did(&root, t::holder2_addr(), b"x");
+        assert!(!did_registry::has_active_did(t::holder2_addr()), 2);
+    }
+
+    #[test]
+    fun list_views_include_every_did_string_and_owner() {
+        let root = t::setup();
+        let a = t::holder1_addr();
+        let s = t::user(a);
+        t::user(t::holder2_addr());
+        authority::admin_revoke_did(&root, a, b"x");
+        did_registry::register_did(&s, t::did_with(b"did:vnu:v2:", a), t::cid(), t::hash(1));
+
+        let dids = did_registry::get_dids();
+        assert!(vector::length(&dids) == 3, 0);
+        assert!(vector::contains(&dids, &t::did_for(a)) && vector::contains(&dids, &t::did_with(b"did:vnu:v2:", a)), 1);
+        let owners = did_registry::get_owners();
+        assert!(vector::length(&owners) == 2, 2);
+    }
+
+    #[test]
+    fun list_views_allow_exactly_500_entries() {
+        t::setup();
+        t::many_users(500);
+        assert!(vector::length(&did_registry::get_dids()) == 500, 0);
+        assert!(vector::length(&did_registry::get_owners()) == 500, 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_RESULT_TOO_LARGE, location = did_registry)]
+    fun get_dids_refuses_more_than_500_entries() {
+        t::setup();
+        t::many_users(501);
+        did_registry::get_dids();
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_RESULT_TOO_LARGE, location = did_registry)]
+    fun get_owners_refuses_more_than_500_entries() {
+        t::setup();
+        t::many_users(501);
+        did_registry::get_owners();
+    }
+
+    #[test]
+    fun get_dids_paginated_returns_ordered_bounded_pages() {
+        t::setup();
+        t::user(@0x101);
+        t::user(@0x102);
+        t::user(@0x103);
+        let page = did_registry::get_dids_paginated(1, 5);
+        assert!(vector::length(&page) == 2, 0);
+        let (id0, owner0, _, _, _, _, _, _, _, _) = did_registry::record_fields(vector::borrow(&page, 0));
+        let (id1, owner1, _, _, _, _, _, _, _, _) = did_registry::record_fields(vector::borrow(&page, 1));
+        assert!(id0 == 1 && owner0 == @0x102 && id1 == 2 && owner1 == @0x103, 1);
+        assert!(vector::length(&did_registry::get_dids_paginated(0, 2)) == 2, 2);
+        assert!(vector::is_empty(&did_registry::get_dids_paginated(3, 5)), 3);
+        assert!(vector::is_empty(&did_registry::get_dids_paginated(18446744073709551615, 200)), 4);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_PAGE, location = did_registry)]
+    fun get_dids_paginated_rejects_zero_limit() {
+        t::setup();
+        did_registry::get_dids_paginated(0, 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = errors::E_INVALID_PAGE, location = did_registry)]
+    fun get_dids_paginated_rejects_limit_above_200() {
+        t::setup();
+        did_registry::get_dids_paginated(0, 201);
     }
 }

@@ -1,33 +1,27 @@
+/// Bit loai van bang. Mot issuer duoc cap mot MASK (hop cua nhieu bit);
+/// moi VC mang DUNG MOT bit va bit do phai nam trong mask cua issuer.
 module vnu::constants {
-
-    // VC Type bits
-    // vc_type_mask = (vc_type_1) OR (vc_type_2) OR ...
-    const VC_BACHELOR:             u64 = 1; // 0b00000001
-    const VC_MASTER:               u64 = 2; //0b00000010
-    const VC_PHD:                  u64 = 4; // 0b00000100
-    const VC_TRANSCRIPT:           u64 = 8; //0b00001000
-    const VC_MICRO_CRED:           u64 = 16; //0b00010000
-    const VC_DELEGATION:           u64 = 32; //0b00100000
-
-    // Revocation reasons
-    const REASON_FRAUD:             vector<u8> = b"fraud";
-    const REASON_ERROR:             vector<u8> = b"error";
-    const REASON_POLICY:            vector<u8> = b"policy";
-    const REASON_KEY_COMPROMISE:    vector<u8> = b"key compromise";
-    const REASON_TECHNICAL:         vector<u8> = b"technical";
-    const REASON_OTHER:             vector<u8> = b"Other";
 
     public inline fun VC_TYPE_BACHELOR():   u64 { 1 }
     public inline fun VC_TYPE_MASTER():     u64 { 2 }
     public inline fun VC_TYPE_PHD():        u64 { 4 }
     public inline fun VC_TYPE_TRANSCRIPT(): u64 { 8 }
     public inline fun VC_TYPE_MICRO_CRED(): u64 { 16 }
+    /// Quyen uy quyen: issuer co bit nay duoc cap sub-issuer. Chi root cap duoc.
     public inline fun VC_TYPE_DELEGATION(): u64 { 32 }
+    /// Hop cua moi bit da dinh nghia.
+    public inline fun ALL_VC_TYPES():       u64 { 63 }
 
-    public inline fun REASON_TYPE_FRAUD():          vector<u8> { b"fraud" }
-    public inline fun REASON_TYPE_ERROR():          vector<u8> { b"error" }
-    public inline fun REASON_TYPE_POLICY():         vector<u8> { b"policy" }
-    public inline fun REASON_TYPE_KEY_COMPROMISE(): vector<u8> { b"key compromise" }
-    public inline fun REASON_TYPE_TECHNICAL():      vector<u8> { b"technical" }
-    public inline fun REASON_TYPE_OTHER():          vector<u8> { b"Other" }
+    /// Ly do ghi vao su kien khi chu so huu tu khoa / tu mo DID.
+    public inline fun REASON_TYPE_OTHER():  vector<u8> { b"Other" }
+
+    /// Mask hop le: khac 0 va khong co bit la.
+    public inline fun is_valid_mask(mask: u64): bool {
+        mask != 0 && (mask & ALL_VC_TYPES()) == mask
+    }
+
+    /// Loai van bang hop le: dung MOT bit da dinh nghia.
+    public inline fun is_single_vc_type(vc_type: u64): bool {
+        is_valid_mask(vc_type) && (vc_type & (vc_type - 1)) == 0
+    }
 }
