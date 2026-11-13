@@ -54,6 +54,28 @@ Hợp đồng đã qua một đợt rà soát có hệ thống, trong đó mỗi
 
 Ở bản báo cáo trước, các bản sửa này chỉ tồn tại trong mã nguồn vì gói trên chuỗi vẫn là bản cũ: hàm khởi tạo chỉ chạy một lần, nên muốn đặt lại quản trị viên gốc thì phải xuất bản ở một địa chỉ mới và bỏ lại dữ liệu ở địa chỉ cũ. Gói đã được xuất bản lại tại địa chỉ \texttt{0x0ede7f6b\ldots08e3}, trong đó người xuất bản chính là quản trị viên gốc nhờ bản sửa V1. Bộ đối chiếu tầng chuỗi (Mục \ref{sec:dg-chuc-nang}) xác nhận giao diện chương trình trên chuỗi đã khớp mã nguồn: hàm cấp phát nhận đủ bảy tham số kể cả thời hạn, và hai hàm \texttt{propose\_root}, \texttt{accept\_root} đã tồn tại.
 
+\subsection{Nâng cấp tại chỗ}
+\label{sec:nang-cap}
+
+Xuất bản ở địa chỉ mới bỏ lại toàn bộ dữ liệu cũ, nên các sửa đổi sau đó được đưa lên bằng \emph{nâng cấp tại chỗ}: gói được xuất bản với chính sách tương thích, và xuất bản lại cùng địa chỉ, cùng tài khoản là nâng cấp. Chính sách này đặt ba ràng buộc lên mọi thay đổi: không đổi trường của cấu trúc đã có, không đổi hay xoá hàm công khai đã có, và hàm khởi tạo không chạy lại, nên mọi tài nguyên mới phải có một hàm khởi tạo riêng gọi đúng một lần. Gói đã được nâng cấp hai lần. Lần thứ nhất sửa tám vấn đề của đợt rà soát thứ hai, trong đó có việc thu hồi định danh thu hồi luôn vai trò, lan truyền thu hồi theo chuỗi uỷ quyền và việc bên phát hành bị đình chỉ không tự thu hồi được văn bằng của mình nữa, kèm sổ quan hệ uỷ quyền. Lần thứ hai thêm ba chức năng ở Mục \ref{sec:xem-xet}, kèm sổ liên kết thay thế.
+
+Mỗi lần nâng cấp theo cùng một quy trình. Gói được dựng thành tải tin xuất bản rồi gửi tới tuyến mô phỏng với chữ ký toàn số không: nút đầy đủ chạy đủ phép kiểm tương thích mà không ghi gì lên chuỗi. Chỉ khi mô phỏng thành công và người quản lý khoá đồng ý mới gửi thật, rồi gọi hàm khởi tạo tài nguyên mới, cũng sau khi đã mô phỏng. Cuối cùng là ba phép xác minh: số hiệu nâng cấp tăng đúng một, mã nguồn và bản đồ mã nguồn trên chuỗi rỗng, và mã byte của từng mô-đun trên chuỗi trùng khớp giá trị băm SHA-256 với bản dựng cục bộ. Lần nâng cấp thứ hai tốn 3.751 đơn vị gas, đúng bằng con số mô phỏng.
+
+Gói được xuất bản mà \emph{không} kèm mã nguồn. Điều này không giấu được logic: mã byte vẫn công khai và dịch ngược được, còn mã nguồn của lần xuất bản đầu vẫn nằm trong lịch sử giao dịch. Tài khoản xuất bản đồng thời là quản trị viên gốc và giữ quyền nâng cấp mã. Khoá của nó đã được chuyển khỏi thư mục dự án, nhưng vẫn là một khoá duy nhất có thể thay toàn bộ logic của hợp đồng; với triển khai thật, quyền nâng cấp phải thuộc về một ví đa chữ ký, hoặc gói phải được khoá bất biến sau khi ổn định.
+
+\subsection{Xem xét, cấp lại và thu hồi định danh}
+\label{sec:xem-xet}
+
+Ba chức năng được thêm ở lần nâng cấp thứ hai giải quyết cùng một câu hỏi: khi có sự cố, bằng chứng trên chuỗi phải thay đổi thế nào mà vẫn giữ được dấu vết.
+
+\textit{Định danh đã thu hồi là vĩnh viễn.} Trước đây một địa chỉ bị thu hồi định danh có thể đăng ký một định danh mới. Vai trò không sống lại, nhưng người bị thu hồi vì gian lận vẫn tự tái lập được danh tính trên đúng địa chỉ cũ mà không qua thủ tục nào. Nay hàm đăng ký từ chối với một mã lỗi riêng; lối thoát cho người dùng chính đáng là ví mới cộng quy trình cấp lại.
+
+\textit{Xem xét theo lô.} Như đã nêu ở Mục \ref{sec:uy-quyen}, thu hồi một đơn vị không vô hiệu hoá văn bằng họ đã cấp. Bốn hàm mới cho quản trị viên và bên uỷ quyền đình chỉ hoặc thu hồi tới 100 văn bằng trong một giao dịch. Mỗi văn bằng đổi trạng thái phát một sự kiện riêng, và một sự kiện tổng kết liệt kê mục nào đã đổi, mục nào bị bỏ qua. Tầng dịch vụ ghi chỉ mục theo \emph{chính sự kiện này} chứ không theo danh sách máy khách gửi lên. Danh sách mã phải tăng dần nghiêm ngặt, một ràng buộc vừa chặn trùng lặp vừa không tốn chi phí bậc hai.
+
+\textit{Cấp lại có liên kết.} Hàm cấp lại, trong \emph{một} giao dịch, cấp văn bằng mới, thu hồi văn bằng cũ với lý do cố định ``replaced'', và ghi liên kết hai chiều cũ--mới vào một sổ riêng; bên xác minh văn bằng cũ thấy ``đã được thay bằng'' cùng mã văn bằng mới. Chỉ bên đã cấp hoặc bên uỷ quyền của họ được cấp lại, và chỉ với văn bằng đang hiệu lực: nếu cho cấp lại một văn bằng đang bị quản trị viên đình chỉ, bên phát hành sẽ làm nhẹ đi quyết định đó bằng một liên kết ``đã thay thế''. Trường hợp ấy, cũng như trường hợp bên đã cấp đã mất thẩm quyền, do quản trị viên nối liên kết. Đổi người nhận sang một ví khác chỉ được phép khi định danh của ví cũ không còn hoạt động, để một bên phát hành không thể chuyển văn bằng của một người đang dùng ví sang người khác. Liên kết \emph{danh tính} giữa ví cũ và ví mới của cùng một người thì không ghi lên chuỗi, vì đó là một mối nối công khai vĩnh viễn giữa hai ví, tức là thông tin cá nhân; nó chỉ nằm trong chỉ mục và nhật ký kiểm toán.
+
+Hai mươi lăm rào chắn mới trong ba chức năng này đều được kiểm bằng kiểm thử đột biến: mỗi rào bị gỡ hoặc làm yếu trên một bản sao của gói, và phải có ít nhất một phép kiểm chuyển sang thất bại. Lần chạy đầu có một rào ``sống sót'': phép kiểm của nó đạt vì một rào khác chặn trước, đúng loại lỗi đã gặp với phép kiểm mã giao dịch bịa. Phép kiểm đã được viết lại để chỉ rào đó chặn được.
+
 \section{Tầng chỉ mục với hai cài đặt độc lập}
 \label{sec:hai-cai-dat}
 
@@ -72,6 +94,12 @@ Theo nguyên tắc ``chỉ mục không phải nguồn sự thật'', mọi bả
 Hệ thống có cờ \texttt{VERIFY\_ONCHAIN} để chạy và kiểm thử khi chưa có chuỗi. Phiên bản đầu của cờ chỉ bỏ qua bước xác minh giao dịch mà không bỏ qua việc kiểm quyền trên chuỗi, nên hệ thống vẫn không chạy được khi thiếu chuỗi. Hiện cờ áp dụng nhất quán: khi tắt, cả hai cài đặt bỏ qua xác minh giao dịch \emph{và} trả lời câu hỏi về quyền, định danh, trạng thái bằng chỉ mục cơ sở dữ liệu. Chế độ này không trả lời ``chấp nhận'' vô điều kiện: người học vẫn bị chặn khỏi tuyến của bên phát hành. Nếu không, mọi bộ kiểm thử chạy ở chế độ này chỉ chứng minh rằng hệ thống không báo lỗi. Bốn rào chắn đi kèm: khởi động ở môi trường sản xuất với cờ tắt thì tiến trình thoát ngay; tuyến kiểm tra trạng thái trả giá trị cờ để giao diện hiện dải cảnh báo; mỗi phản hồi báo đúng nguồn dữ liệu là chỉ mục chứ không khai là chuỗi; và một bộ kiểm riêng chứng minh chế độ nghiêm ngặt vẫn chặn mã giao dịch bịa.
 
 Cần lưu ý rằng ở chế độ này, câu hỏi ``trạng thái của chứng thực số hiệu $n$'' được trả lời bằng một truy vấn trên cột \texttt{on\_chain\_vc\_id}, cột không có chỉ mục trong lược đồ. Với dữ liệu thử nghiệm vài trăm bản ghi, điều này không gây ra khác biệt nào đo được; Mục \ref{sec:tn-scale} cho thấy hệ quả khi dữ liệu tăng hai bậc.
+
+\subsection{Chống phát lại và số lần truy vấn chuỗi}
+
+Bốn điều kiện ở mục trước chứng minh một giao dịch có thật, nhưng không chứng minh nó \emph{còn đúng}. Một giao dịch đình chỉ văn bằng có thật, gửi lại sau khi quản trị viên đã kích hoạt văn bằng lại, qua được cả bốn phép kiểm và làm chỉ mục nói sai trạng thái. Vì vậy mọi tuyến đổi trạng thái, sau khi xác minh giao dịch, còn hỏi lại chuỗi trạng thái \emph{hiện tại} và chỉ ghi khi nó đúng là trạng thái sắp ghi. Cũng theo nguyên tắc chỉ mục không phải nguồn sự thật, mọi tuyến quản trị, kể cả tuyến chỉ đọc nhật ký hay số liệu, đối chiếu quyền quản trị trên chuỗi chứ không chỉ đọc vai trò trong cơ sở dữ liệu, để người bị thu hồi quyền từ ngoài ứng dụng không đọc tiếp được dữ liệu của người khác.
+
+Cái giá của nguyên tắc này là số lần gọi tới nút đầy đủ. Đếm trên một nút đầy đủ giả lập cho thấy danh sách hai mươi văn bằng của một chủ thể tốn hai mươi lần gọi, một lần xác minh tám văn bằng tốn hai mươi lăm lần. Hai thay đổi đưa các con số đó về một và ba. Một là đọc trạng thái theo lô bằng hàm phân trang có sẵn trên chuỗi: bản ghi trả về đã mang trạng thái hiệu lực và giá trị băm nội dung, nên thay được cả phép tra trạng thái lẫn phép đối chiếu toàn vẹn. Hai là chỉ hỏi thẩm quyền của mỗi bên phát hành một lần. Phép kiểm quyền quản trị ở mỗi yêu cầu được đệm năm giây theo địa chỉ. Cửa sổ rủi ro được ghi rõ: người vừa bị thu hồi quyền còn đọc được tuyến quản trị tối đa năm giây, nhưng mọi thao tác ghi vẫn bị hợp đồng từ chối, và phép hỏi lại trạng thái chống phát lại không bao giờ được đệm. Kết quả đo ở Mục \ref{sec:truy-van-chuoi}.
 
 Cả hai cài đặt ghi nhật ký kiểm toán với cùng bộ tên hành động. Bảng nhật ký từng nằm sẵn trong lược đồ từ đầu mà \emph{không cài đặt nào ghi vào}, nên tuyến đọc nhật ký luôn trả về rỗng, và không bộ kiểm thử nào phát hiện vì chúng chỉ kiểm định dạng phản hồi. Một bảng có trong lược đồ không có nghĩa là có ai ghi vào nó.
 
@@ -118,6 +146,30 @@ GET  /v1/transactions/by_hash/{hash}      lap cho den khi xac nhan
 
 Mã JavaScript của giao diện giảm xuống khoảng 410\,KB (khoảng 134\,KB sau nén gzip), đổi lại thêm một vòng gọi mạng mỗi giao dịch. Đường ký được kiểm chứng trên chuỗi thật bằng tuyến mô phỏng giao dịch, tuyến chạy đủ các bước giải mã tham số, tìm hàm, vào thân hàm và tính gas nhưng không ghi gì lên chuỗi. Quá trình này làm lộ ba chi tiết không có trong tài liệu: tham số kiểu dãy byte phải truyền dạng chuỗi thập lục phân chứ không phải mảng số; nút đầy đủ từ chối mô phỏng một giao dịch có chữ ký hợp lệ, nên phải gửi chữ ký toàn số không kèm khoá công khai thật; và khoá xác thực trong thông tin tài khoản là giá trị băm của khoá công khai chứ không phải bản thân khoá.
 
+\section{Bảo mật nội dung văn bằng}
+\label{sec:ma-hoa}
+
+Ở bản báo cáo trước, nội dung văn bằng nằm dạng rõ trên IPFS và trong cơ sở dữ liệu của tầng dịch vụ: ai biết CID là đọc được họ tên, mã sinh viên và điểm. Yêu cầu được đặt ra là chỉ chủ thể, và những bên được chủ thể cho phép, đọc được nội dung, với mã hoá và giải mã chạy trên thiết bị.
+
+Hệ thống dùng mã hoá lai. Mỗi văn bằng có một khoá nội dung ngẫu nhiên 256 bit, dùng cho AES-256-GCM với dữ liệu xác thực kèm theo là giá trị băm của định danh văn bằng; nhờ đó một bản mã không thể bị ghép sang một văn bằng khác. Khoá nội dung được bọc riêng cho từng người nhận theo lược đồ ECIES: khoá X25519 của người nhận được dẫn xuất từ khoá Ed25519 vốn đã có trong ví, một khoá X25519 tạm sinh cho mỗi lần bọc, rồi HKDF-SHA256 tạo khoá bọc. Vì khoá công khai Ed25519 của mọi thực thể đã nằm trong danh bạ công khai, bên phát hành mã hoá cho chủ thể mà không cần chủ thể trực tuyến. Thứ duy nhất được ghim lên IPFS là phong bì sau:
+
+\begin{lstlisting}
+{ "v": 1, "alg": "A256GCM",
+  "aad": "vnu-vc:<gia tri bam dinh danh van bang>",
+  "iv": "<12 byte>", "ct": "<ban ma noi dung>",
+  "recipients": [
+    { "kid": "<dia chi chu the>",     "role": "holder", "epk": "...", "iv": "...", "wk": "..." },
+    { "kid": "<dia chi ben phat hanh>", "role": "issuer", "epk": "...", "iv": "...", "wk": "..." } ] }
+\end{lstlisting}
+
+Người nhận gồm chủ thể và bên phát hành; bên phát hành cần đọc lại để đối soát và cấp lại. Hệ thống cố ý \emph{không} có khoá lưu giữ của nhà trường: một khoá như vậy giúp khôi phục khi cả chủ thể lẫn bên phát hành mất khoá, nhưng người giữ nó đọc được mọi văn bằng, và lộ nó là lộ toàn bộ nội dung.
+
+\textit{Giá trị băm trên chuỗi vẫn là của nội dung rõ.} Nhờ vậy bước kiểm toàn vẹn khi xác minh và bất biến về tuần tự hoá tất định không đổi. Nội dung rõ chứa định danh văn bằng ngẫu nhiên 122 bit nên giá trị băm này không dò ngược được với kẻ chỉ đọc chuỗi, đúng như thí nghiệm B. Hệ quả là tầng dịch vụ không còn thấy nội dung, nên không tính lại được giá trị băm lúc cấp như trước. Ba rào thay thế: tầng dịch vụ kiểm cấu trúc phong bì (đúng sáu trường, gắn với đúng văn bằng, có đúng chủ thể và bên phát hành là người nhận, từ chối mọi trường lạ để không ai nhét được bản rõ cạnh bản mã); ví của chủ thể tự đối chiếu nội dung vừa giải mã với giá trị băm trên chuỗi và báo ``văn bằng lỗi'' nếu lệch; và bước 6 khi xác minh. Thực ra rào cũ cũng chưa bao giờ chặn được một bên phát hành gian lận, vì chính bên đó neo giá trị băm.
+
+\textit{Chia sẻ cho bên xác minh.} Chủ thể giải mã trên máy, dựng bản trình bày, rồi mã hoá bản trình bày bằng một khoá ngẫu nhiên đặt trong phần \emph{fragment} của liên kết, phần sau dấu \texttt{\#}. Trình duyệt không bao giờ gửi phần này lên máy chủ, nên máy chủ và IPFS chỉ giữ bản mã. Trình duyệt của bên xác minh giải mã rồi gửi bản rõ cho tầng dịch vụ để chạy bảy bước; tầng dịch vụ không lưu bản rõ, chỉ lưu báo cáo. Cách khác là chạy cả bảy bước trong trình duyệt để máy chủ không bao giờ thấy bản rõ. Cách đó bị loại vì nó tạo ra một cài đặt thứ ba của quy trình xác minh phải giữ khớp với hai cài đặt tầng dịch vụ. Giới hạn đã chấp nhận là bản rõ có mặt trong bộ nhớ máy chủ đúng lúc xác minh. Thu hồi liên kết thì máy chủ ngừng trả bản mã.
+
+Mã hoá cho hai người nhận cộng giải mã một văn bằng điển hình mất trung vị 7,6\,ms và phân vị 95 là 13\,ms, đo trên Node.js với cùng thư viện giao diện dùng; mỗi văn bằng không phải chạy lại PBKDF2. Rủi ro mới đáng kể nhất thuộc về người dùng: mất khoá ví nay đồng nghĩa với mất khả năng tự đọc văn bằng của mình, chứ không chỉ mất quyền ký.
+
 \section{Giao diện theo vai trò}
 \label{sec:giao-dien}
 
@@ -132,7 +184,7 @@ Bảy kịch bản ở Bảng \ref{tab:v2-scenarios} bao phủ vòng đời văn
 
 \input{source/v2/table/scenarios}
 
-Hai kịch bản đầu đáng được mô tả kỹ hơn vì chúng chứa những chi tiết dễ làm sai. Ở kịch bản đăng ký định danh (Hình \ref{fig:v2-seq-did}), thứ tự các bước có ý nghĩa: DID Document phải được ghim lên IPFS \emph{trước} để có CID, rồi giá trị băm được tính trên đúng bản tuần tự hoá tất định của tài liệu, rồi mới ký giao dịch. Nếu băm trên một bản tuần tự hoá khác, chẳng hạn bản có khoảng trắng do thư viện in đẹp chèn vào, bước kiểm toàn vẹn khi phân giải sẽ hỏng dù dữ liệu nguyên vẹn. Tầng dịch vụ tính lại giá trị băm từ nội dung trước khi ghi chỉ mục chứ không tin giá trị máy khách gửi lên.
+Hai kịch bản đầu đáng được mô tả kỹ hơn vì chúng chứa những chi tiết dễ làm sai. Ở kịch bản đăng ký định danh (Hình \ref{fig:v2-seq-did}), thứ tự các bước có ý nghĩa: DID Document phải được ghim lên IPFS \emph{trước} để có CID, rồi giá trị băm được tính trên đúng bản tuần tự hoá tất định của tài liệu, rồi mới ký giao dịch. Nếu băm trên một bản tuần tự hoá khác, chẳng hạn bản có khoảng trắng do thư viện in đẹp chèn vào, bước kiểm toàn vẹn khi phân giải sẽ hỏng dù dữ liệu nguyên vẹn. Tầng dịch vụ tính lại giá trị băm từ nội dung trước khi ghi chỉ mục chứ không tin giá trị máy khách gửi lên; điều này làm được vì DID Document công khai theo thiết kế, khác với nội dung văn bằng.
 
 \begin{figure}[H]
     \centering
@@ -141,7 +193,16 @@ Hai kịch bản đầu đáng được mô tả kỹ hơn vì chúng chứa nh�
     \label{fig:v2-seq-did}
 \end{figure}
 
-Ở kịch bản cấp phát (Hình \ref{fig:v2-seq-issue}), số hiệu chứng thực trên chuỗi được đọc từ sự kiện \texttt{VCIssuedEvent} trong phản hồi của giao dịch rồi mới gửi cho tầng dịch vụ, thay vì để trống hay tự đánh số. Số hiệu này là thứ quản trị viên cần khi ký thao tác thu hồi; nếu phải gõ tay, gõ nhầm một chữ số là thu hồi nhầm văn bằng của người khác. Vì vậy tầng dịch vụ có tuyến trả về số hiệu trên chuỗi theo định danh chứng thực, và màn hình quản trị đọc số hiệu qua tuyến này.
+Ở kịch bản cấp phát (Hình \ref{fig:v2-seq-issue}), số hiệu chứng thực trên chuỗi được đọc từ sự kiện \texttt{VCIssuedEvent} trong phản hồi của giao dịch rồi mới gửi cho tầng dịch vụ, thay vì để trống hay tự đánh số. Số hiệu này là thứ quản trị viên cần khi ký thao tác thu hồi; nếu phải gõ tay, gõ nhầm một chữ số là thu hồi nhầm văn bằng của người khác. Vì vậy tầng dịch vụ có tuyến trả về số hiệu trên chuỗi theo định danh chứng thực, và màn hình quản trị đọc số hiệu qua tuyến này. Số hiệu bắt đầu từ không: giao diện từng coi số không là ``chưa có số hiệu'', nên văn bằng đầu tiên của một gói mới sẽ không thu hồi được từ giao diện. Lỗi này được phát hiện khi gói trên chuỗi còn rỗng. Ở kịch bản này, nội dung văn bằng được mã hoá trước khi ghim (Mục \ref{sec:ma-hoa}), nên tầng dịch vụ chỉ kiểm cấu trúc phong bì chứ không kiểm lại giá trị băm nội dung.
+
+\section{Khôi phục khi mất hoặc lộ khoá}
+\label{sec:khoi-phuc}
+
+Dữ liệu của người dùng nằm ở chỉ mục, IPFS và trên chuỗi, đều gắn với địa chỉ ví; thứ duy nhất không thay thế được nằm trên thiết bị là khoá riêng. Còn mười hai từ hoặc tệp sao lưu thì khôi phục được trên bất kỳ máy nào. Hai trường hợp còn lại được xử lý như sau.
+
+\textit{Lộ khoá.} Chủ thể tự đình chỉ định danh của mình ngay trên giao diện. Mọi vai trò của địa chỉ ngừng ngay và không ai cấp được văn bằng mới cho nó. Tự đình chỉ thì tự mở lại được; nếu kẻ trộm khoá nhanh tay mở lại, quản trị viên đình chỉ đè và từ đó chỉ quản trị viên mở được.
+
+\textit{Mất hết khoá.} Người dùng lập ví mới và đăng ký định danh mới. Quản trị viên đình chỉ hoặc thu hồi định danh cũ, xác minh danh tính ngoài hệ thống, rồi ghi nhận liên kết ví cũ--ví mới. Bên phát hành, vốn là một người nhận của phong bì, giải mã văn bằng cũ và cấp lại sang ví mới bằng hàm cấp lại; liên kết cũ--mới nằm trên chuỗi. Không có khoá lưu giữ nên nếu cả chủ thể lẫn bên phát hành cùng mất khoá, nội dung không khôi phục được từ hệ thống. Vì vậy giao diện nhắc sao lưu khi ví chưa có cách khôi phục nào trên máy, và nhắc kiểm tra lại mười hai từ sau 90 ngày: người dùng gõ lại đủ mười hai từ, ví dẫn xuất địa chỉ và so với ví đang mở, mà không cần lưu bí mật nào để kiểm. Sao lưu mã hoá bằng passkey là một hướng mở rộng (Mục \ref{sec:huong-phat-trien}).
 
 \begin{figure}[H]
     \centering

@@ -7,16 +7,21 @@
 \begin{tabular}{|p{4.6cm}|p{3.6cm}|p{5.0cm}|}
 \hline
 \textbf{Bộ kiểm} & \textbf{Kết quả} & \textbf{Ghi chú} \\ \hline
-Hợp đồng Move & \textbf{140/140} đạt & 93 phép (66\%) là phép kiểm trường hợp vi phạm, khẳng định đúng mã lỗi \\ \hline
-Tên hàm hợp đồng ở ba nơi gọi & \textbf{19/19} khớp & Mã Move, hai cài đặt tầng chỉ mục, giao diện \\ \hline
-Luồng nghiệp vụ & \textbf{31/31} $\times$ 2 cài đặt & Cùng một bộ chạy lên cả hai \\ \hline
+Hợp đồng Move & \textbf{288/288} đạt & 196 phép (68\%) là phép kiểm trường hợp vi phạm; độ phủ 99,61\% \\ \hline
+Kiểm thử đột biến & \textbf{25/25} hợp đồng, \textbf{25/25} tầng dịch vụ & Mỗi rào chắn mới bị gỡ thì có phép kiểm thất bại \\ \hline
+Tên hàm hợp đồng ở ba nơi gọi & \textbf{28/28} khớp & Mã Move, hai cài đặt tầng chỉ mục, giao diện \\ \hline
+Luồng nghiệp vụ & \textbf{40/40} $\times$ 2 cài đặt & Cùng một bộ chạy lên cả hai \\ \hline
 Kiểm thử đầu cuối & \textbf{19/19} $\times$ 2 cài đặt & \\ \hline
-Đối chiếu hai cài đặt & \textbf{65/65} khớp & Cùng kết quả, cùng mã trạng thái, kể cả với đầu vào sai \\ \hline
-Phát hiện nội dung bị sửa & \textbf{7/7} $\times$ 2 cài đặt & Bước 6 hỏng, bước 5 vẫn đạt \\ \hline
+Đối chiếu hai cài đặt & \textbf{141/141} khớp & Cùng kết quả, cùng mã trạng thái, kể cả với đầu vào sai \\ \hline
+Xác minh giao dịch, nút đầy đủ giả lập & \textbf{84/84} đạt & Tham số, sự kiện của chính giao dịch, chống phát lại \\ \hline
+Phát hiện nội dung bị sửa & \textbf{9/9} $\times$ 2 cài đặt & Bước 6 hỏng, bước 5 vẫn đạt \\ \hline
+Hồi quy bảo mật & \textbf{28/28} $\times$ 2 cài đặt & Gồm phong bì sai cấu trúc, cổng IPFS không phát bản rõ \\ \hline
 Chế độ nghiêm ngặt & \textbf{8/8} $\times$ 2 cài đặt & Chặn mã giao dịch bịa, chặn bên tự khai \\ \hline
+Mã hoá nội dung văn bằng & \textbf{21/21} đạt & Không có khoá thì không đọc được; sửa bản mã thì phát hiện \\ \hline
 Ví trong trình duyệt & \textbf{17/17} đạt & Không gói tin nào chứa khoá riêng hay mật khẩu \\ \hline
-Đăng nhập trên máy khác & \textbf{17/17} đạt & Biết địa chỉ mà không có khoá thì bị từ chối \\ \hline
-Tầng chuỗi với fullnode thật & \textbf{12/12} đạt & Giao diện chương trình trên chuỗi khớp mã nguồn \\ \hline
-Kiểm kiểu và kiểm tĩnh & 0 lỗi & TypeScript ở hai nơi; \texttt{gofmt}, \texttt{go vet}, \texttt{go test} \\ \hline
+Đăng nhập trên máy khác & \textbf{18/18} đạt & Biết địa chỉ mà không có khoá thì bị từ chối \\ \hline
+Khôi phục ví và nhắc sao lưu & \textbf{10/10} và \textbf{7/7} đạt & Chạy chính mã nguồn của ví \\ \hline
+Tầng chuỗi với fullnode thật & \textbf{21/21} đạt & Gồm mô phỏng sáu hàm mới; mã hoá tham số khớp từng byte \\ \hline
+Kiểm kiểu và kiểm tĩnh & 0 lỗi & TypeScript ở hai nơi; \texttt{gofmt}, \texttt{go vet}, \texttt{go test}; \texttt{govulncheck}: 0 lỗ hổng được gọi tới \\ \hline
 \end{tabular}
 \end{table}

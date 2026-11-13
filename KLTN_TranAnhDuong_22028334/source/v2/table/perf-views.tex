@@ -1,0 +1,16 @@
+\begin{table}[H]
+\centering
+\caption{Số lần gọi view mỗi yêu cầu và độ trễ trung vị, trước và sau khi đọc theo lô (nút đầy đủ giả lập, 30\,ms mỗi lần gọi, 30 yêu cầu tuần tự)}
+\label{tab:v2-perf-views}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabular}{|p{4.0cm}|r|r|r|p{2.9cm}|}
+\hline
+\textbf{Tuyến} & \textbf{Lần gọi} & \textbf{TS p50 (ms)} & \textbf{Go p50 (ms)} & \textbf{Ghi chú} \\ \hline
+Danh sách văn bằng của chủ thể (20) & 20 $\to$ 1 & 43 $\to$ 38 & 628 $\to$ 34 & bản Go từng gọi tuần tự \\ \hline
+Xác minh bản trình bày ($k=8$) & 25 $\to$ 3 & 373 $\to$ 105 & 360 $\to$ 98 & \\ \hline
+Hồ sơ của tài khoản quản trị & 4 & 35 $\to$ 43 & 127 $\to$ 33 & Go: gọi song song \\ \hline
+Nhật ký kiểm toán & 1 & 35 $\to$ 4 & 33 $\to$ 1 & đệm quyền quản trị 5\,s \\ \hline
+Bên được uỷ quyền (10) & 22 & 674 $\to$ 106 & 765 $\to$ 129 & song song có giới hạn \\ \hline
+\end{tabular}
+\end{table}

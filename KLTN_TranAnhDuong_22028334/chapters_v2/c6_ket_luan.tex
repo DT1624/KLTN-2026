@@ -40,24 +40,28 @@ Quá trình thực hiện để lại một số bài học về cách đánh gi
 
 \textbf{Niềm tin gốc không phi tập trung hoàn toàn.} Hệ thống dùng một nguồn niềm tin gốc. Như Mục \ref{sec:khung-quan-tri} đã phân tích, thẩm quyền của nguồn gốc đến từ sự công nhận pháp lý bên ngoài hệ thống, không cơ chế mật mã nào thay được. Ambati và cộng sự mô tả tự chủ như một phổ, và các hệ thống do nhà nước bảo đảm được mô tả chính xác hơn là ``hướng người dùng'' \cite{Ambati2026}. Hệ thống này nằm ở đúng vị trí đó.
 
-\textbf{Gánh nặng quản lý khoá.} Mất cả cụm từ ghi nhớ lẫn thiết bị thì không có đường khôi phục. Khoá trong trình duyệt được bảo vệ khi ví đóng, không được bảo vệ khi ví mở. Quan trọng hơn, chưa có đánh giá nào với người dùng thật về việc họ có sao lưu và bảo vệ khoá đúng cách hay không. Khoá luận kết luận về tính khả thi kỹ thuật, không về tính khả dụng.
+\textbf{Gánh nặng quản lý khoá.} Mất cả cụm từ ghi nhớ lẫn thiết bị thì không khôi phục được ví; từ khi nội dung văn bằng được mã hoá, người dùng còn mất luôn khả năng tự đọc văn bằng của mình, và lối thoát duy nhất là quy trình cấp lại sang ví mới, vốn cần bên phát hành và quản trị viên. Khoá trong trình duyệt được bảo vệ khi ví đóng, không được bảo vệ khi ví mở. Quan trọng hơn, chưa có đánh giá nào với người dùng thật về việc họ có sao lưu và bảo vệ khoá đúng cách hay không. Khoá luận kết luận về tính khả thi kỹ thuật, không về tính khả dụng.
 
 \textbf{Một khoá cho mỗi bên phát hành.} Khoá của một trường bị lộ cho phép cấp chứng thực hợp lệ trong toàn bộ phạm vi của trường cho tới khi bị thu hồi. Đây là lớp tấn công mà cả hai phân tích an toàn trong lĩnh vực đều chỉ ra \cite{Baldi2019, Zonneveld2026}.
 
-\textbf{Thu hồi không lan truyền theo chuỗi uỷ quyền.} Hàm kiểm thẩm quyền chỉ đọc bản ghi của chính bên phát hành. Thu hồi một trường không vô hiệu hoá các khoa mà trường đã uỷ quyền; ràng buộc về thời hạn chỉ giới hạn thiệt hại theo thời gian. Trường hợp thời hạn bằng không trong uỷ quyền lại được hợp đồng xử lý đúng nhưng chưa có phép kiểm riêng.
+\textbf{Xem xét văn bằng sau thu hồi là việc thủ công.} Thu hồi một đơn vị nay chặn ngay quyền cấp phát của cả chuỗi uỷ quyền, nhưng văn bằng họ đã cấp vẫn hiệu lực cho tới khi cấp trên xem xét theo lô, tối đa 100 văn bằng mỗi giao dịch. Đó là lựa chọn có chủ ý để bảo vệ văn bằng thật của người học; cái giá là một khoảng thời gian trong đó văn bằng do khoá bị lộ cấp ra vẫn qua được xác minh, chỉ kèm cảnh báo.
 
-\textbf{Quyền xoá dữ liệu.} Kiến trúc giảm mức phơi nhiễm nhưng không bảo đảm quyền xoá, vì giá trị băm không muối trên chuỗi vẫn là dữ liệu cá nhân theo cách giải thích hiện hành \cite{EDPB2025}, và thí nghiệm B cho thấy nó khôi phục được trong một số điều kiện. Nội dung chứng thực trên IPFS chưa được mã hoá.
+\textbf{Một khoá giữ quyền nâng cấp.} Tài khoản xuất bản vừa là gốc vừa giữ quyền nâng cấp mã của hợp đồng. Khoá đã được đưa ra khỏi thư mục dự án nhưng vẫn ở dạng rõ trên một máy, và chuyển quyền gốc sang địa chỉ khác không lấy đi quyền nâng cấp.
+
+\textbf{Quyền xoá dữ liệu.} Kiến trúc giảm mức phơi nhiễm nhưng không bảo đảm quyền xoá, vì giá trị băm không muối trên chuỗi vẫn là dữ liệu cá nhân theo cách giải thích hiện hành \cite{EDPB2025}, và thí nghiệm B cho thấy nó khôi phục được trong một số điều kiện. Nội dung chứng thực nay được mã hoá cho chủ thể và bên phát hành, nhưng giá trị băm của nội dung rõ vẫn nằm công khai trên chuỗi, và bản rõ có mặt trong bộ nhớ tầng dịch vụ trong lúc xác minh.
 
 \textbf{Điểm chưa tuân thủ chuẩn.} Phương thức \texttt{did:vnu} chưa đăng ký với W3C; phép chuẩn hoá dùng JSON thay vì RDF \cite{W3C_RDFC2024}; bằng chứng lưu tách rời thay vì nhúng; trạng thái theo bản ghi thay vì danh sách bit \cite{W3C_BitstringStatusList2025}; ngữ cảnh dùng phiên bản 1.1 của mô hình dữ liệu thay vì 2.0.
 
-\textbf{Phạm vi đánh giá.} Các phép đo chạy trên một máy ảo bốn luồng; dữ liệu độn tối đa $10^5$ bản ghi; đường ghi lên chuỗi không được đo vì không gửi giao dịch thật; mẫu gọi song song tới fullnode không đo sạch được do hạn mức của fullnode công khai.
+\textbf{Phạm vi đánh giá.} Các phép đo chạy trên một máy ảo bốn luồng; dữ liệu độn tối đa $10^5$ bản ghi; đường ghi lên chuỗi không được đo vì không gửi giao dịch thật; mẫu gọi song song tới fullnode không đo sạch được do hạn mức của fullnode công khai; số lần truy vấn sau tối ưu được đo trên nút đầy đủ giả lập. Các màn hình mới của đợt cuối (xem xét theo lô, cấp lại, khoá khẩn cấp, mã hoá văn bằng) đã được kiểm qua tầng dịch vụ và kiểm kiểu, nhưng chưa được thao tác thử trên trình duyệt; chi phí mã hoá được đo trên Node.js chứ chưa đo trong trình duyệt.
 
 \section{Hướng phát triển}
 \label{sec:huong-phat-trien}
 
-\textbf{Sửa ngay các điểm mà thực nghiệm chỉ ra.} Ba thay đổi có chi phí thấp và lợi ích đã đo được: thêm chỉ mục trên \texttt{on\_chain\_vc\_id} (một dòng trong lược đồ, giảm hai bậc thời gian xác minh ở $10^5$ bản ghi); song song hoá bước 5 của quy trình xác minh và vòng lặp kiểm trạng thái trong tuyến danh sách văn bằng ở cài đặt Go; và thêm một trường muối ngẫu nhiên 128 bit vào nội dung chứng thực, giữ bí mật cùng nội dung, để định danh chứng thực không còn là thứ duy nhất ngăn tấn công từ điển.
+\textbf{Sửa ngay các điểm mà thực nghiệm chỉ ra.} Việc giảm số vòng gọi chuỗi ở bước 5 và ở tuyến danh sách văn bằng đã được thực hiện (Mục \ref{sec:truy-van-chuoi}). Còn hai thay đổi có chi phí thấp và lợi ích đã đo được: thêm chỉ mục trên \texttt{on\_chain\_vc\_id} (một dòng trong lược đồ, giảm hai bậc thời gian xác minh ở $10^5$ bản ghi); và thêm một trường muối ngẫu nhiên 128 bit vào nội dung chứng thực, giữ bí mật cùng nội dung, để định danh chứng thực không còn là thứ duy nhất ngăn tấn công từ điển.
 
-\textbf{Lan truyền thu hồi theo chuỗi uỷ quyền.} Bổ sung vào hàm kiểm thẩm quyền một bước kiểm bên đã phê duyệt khi bên phát hành là cấp dưới. Vì chuỗi tối đa hai cấp, chi phí chỉ là thêm một lần đọc bản ghi; kèm theo là phép kiểm cho trường hợp thời hạn bằng không.
+\textbf{Sao lưu khoá không phụ thuộc trí nhớ.} Mã hoá cụm từ ghi nhớ bằng một khoá sinh từ passkey qua phần mở rộng PRF của WebAuthn và lưu bản mã ở tầng dịch vụ: kẻ chiếm được máy chủ có bản mã nhưng không dò được khoá như dò một mật khẩu. Cần một đường dự phòng bằng mật khẩu khôi phục vì không phải trình duyệt nào cũng hỗ trợ PRF.
+
+\textbf{Quyền nâng cấp đa chữ ký.} Chuyển quyền nâng cấp mã và quyền gốc sang một ví đa chữ ký, hoặc khoá gói bất biến khi đã ổn định.
 
 \textbf{Mô hình quản trị nhiều tổ chức.} Chuyển từ một gốc sang sổ đăng ký do nhiều tổ chức cùng quản trị qua chữ ký đa bên, chữ ký ngưỡng hoặc biểu quyết trên chuỗi. Nhờ phân lớp, thay đổi chỉ đụng tới lớp quản trị. Áp dụng giao thức truy vấn sổ đăng ký đã chuẩn hoá \cite{ToIP_TRQP2026}; mô hình uỷ quyền ở Mục \ref{sec:uy-quyen} có thể là một điểm dữ liệu cho phần đặc tả còn hoãn.
 
@@ -65,7 +69,7 @@ Quá trình thực hiện để lại một số bài học về cách đánh gi
 
 \textbf{Chữ ký nhiều bên cho cấp phát.} Yêu cầu nhiều chữ ký hoặc chữ ký ngưỡng cho thao tác cấp phát, phù hợp với thực tiễn hành chính nơi cấp một văn bằng vốn cần nhiều cấp phê duyệt.
 
-\textbf{Quyền riêng tư.} Theo thứ tự: mã hoá nội dung trước khi ghim; thay giá trị băm bằng cam kết có khoá mà khoá huỷ được khi có yêu cầu xoá; rồi mới bổ sung tiết lộ chọn lọc ở mức thuộc tính qua SD-JWT \cite{RFC9901} hoặc BBS \cite{Looker_BBS2025}. Thí nghiệm B cho thấy thứ tự này bắt buộc: chừng nào giá trị băm của toàn bộ nội dung còn neo công khai mà không muối, việc ẩn một thuộc tính có không gian giá trị nhỏ chỉ là hình thức.
+\textbf{Quyền riêng tư.} Mã hoá nội dung trước khi ghim đã được thực hiện (Mục \ref{sec:ma-hoa}). Các bước tiếp theo, theo thứ tự: thay giá trị băm bằng cam kết có khoá mà khoá huỷ được khi có yêu cầu xoá; rồi mới bổ sung tiết lộ chọn lọc ở mức thuộc tính qua SD-JWT \cite{RFC9901} hoặc BBS \cite{Looker_BBS2025}. Thí nghiệm B cho thấy thứ tự này bắt buộc: chừng nào giá trị băm của toàn bộ nội dung còn neo công khai mà không muối, việc ẩn một thuộc tính có không gian giá trị nhỏ chỉ là hình thức.
 
 \textbf{Danh sách bit trạng thái và hạ tầng đọc riêng.} Chuyển sang Bitstring Status List để giảm chi phí thu hồi và khôi phục quyền riêng tư theo nhóm; vận hành fullnode hoặc bộ lập chỉ mục sự kiện riêng để đường xác minh on-chain không phụ thuộc vào hạn mức của fullnode công khai.
 
