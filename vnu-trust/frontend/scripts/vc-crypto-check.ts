@@ -24,7 +24,33 @@ const wallet = () => {
   const pub = ed25519.getPublicKey(privateKey);
   return { privateKey, publicKeyHex: hex(pub), address: hex(sha3_256(new Uint8Array([...pub, 0]))) };
 };
+// Dac ta doi 17/11: vcIdHash = SHA3-256 THO cua vcId (byte UTF-8), khop backend TS/Go
+// (vc.service.ts:73, credential.go:214). Ham cu sha3_256Hex(vcId) bam chuoi JSON co dau nhay
+// nen may chu bao 400 "Hash cua vcId khong khop". Dung ham giao dien that neu da co,
+// con khong thi dung ham tho cuc bo de cac phep ben duoi van kiem dung dieu cu (AAD).
+const rawVcIdHash = (v: string) => "0x" + Buffer.from(sha3_256(new TextEncoder().encode(v))).toString("hex");
+let uiVcIdHash: ((v: string) => string) | null = null;
+let uiVcIdMissing = "";
+try { uiVcIdHash = (await import("../src/lib/vcid")).vcIdHash; } catch (e) { uiVcIdMissing = String(e); }
+const vcIdHashOf = uiVcIdHash ?? rawVcIdHash;
 const throws = async (f: () => Promise<unknown>) => { try { await f(); return false; } catch { return true; } };
+
+console.log("\n=== Quy ước băm vcId khớp máy chủ ===");
+{
+  const { createHash } = await import("node:crypto");
+  const vectors: [string, string][] = [
+    ["urn:uuid:00000000-0000-4000-8000-000000000000", "0xf618bc0a0c3e9391cd60c27430da73a3cd434ff1cce8685ff4dca1a3907519f3"],
+    ["x", "0x741efa311f97686956946758e0d95f70f11ff2da4f2feb7c54314f44134ac49f"],
+  ];
+  for (const [v, want] of vectors) {
+    check(`Vector độc lập (@noble = node:crypto như backend TS) cho "${v.slice(0, 20)}"`,
+      rawVcIdHash(v) === want && "0x" + createHash("sha3-256").update(v).digest("hex") === want);
+    check(`Hàm cũ sha3_256Hex("${v.slice(0, 20)}") KHÁC vector (băm chuỗi JSON có nháy → máy chủ 400)`, sha3_256Hex(v) !== want);
+    check(`Hàm giao diện thật vcIdHash("${v.slice(0, 20)}") = vector`,
+      uiVcIdHash !== null && uiVcIdHash(v) === want,
+      uiVcIdHash ? "" : "chưa có src/lib/vcid.ts — giao diện vẫn băm vcId bằng sha3_256Hex (có nháy)");
+  }
+}
 
 console.log("\n=== Dẫn khoá X25519 từ khoá Ed25519 của ví ===");
 let same = true;
@@ -37,7 +63,7 @@ check("Khoá công khai X25519 dẫn từ khoá riêng = dẫn từ khoá công 
 console.log("\n=== Phong bì văn bằng ===");
 const issuer = wallet(), holder = wallet(), stranger = wallet();
 const vcId = `urn:uuid:${crypto.randomUUID()}`;
-const vcIdHash = sha3_256Hex(vcId);
+const vcIdHash = vcIdHashOf(vcId);
 const vc = {
   "@context": ["https://www.w3.org/2018/credentials/v1"], id: vcId, type: ["VerifiableCredential"],
   issuer: `did:vnu:issuer:${issuer.address}`, issuanceDate: new Date().toISOString(),
@@ -69,7 +95,7 @@ const flip = (b64s: string) => { const b = Buffer.from(b64s, "base64"); b[b.leng
 check("Sửa 1 bit bản mã → GCM phát hiện", await throws(() => decryptCredential({ ...env, ct: flip(env.ct) }, holder)));
 check("Sửa khoá bọc của holder → phát hiện", await throws(() => decryptCredential(
   { ...env, recipients: env.recipients.map((r) => (r.role === "holder" ? { ...r, wk: flip(r.wk) } : r)) }, holder)));
-check("Đổi aad (ghép phong bì sang văn bằng khác) → phát hiện", await throws(() => decryptCredential({ ...env, aad: envelopeAad(sha3_256Hex("urn:uuid:khac")) }, holder)));
+check("Đổi aad (ghép phong bì sang văn bằng khác) → phát hiện", await throws(() => decryptCredential({ ...env, aad: envelopeAad(vcIdHashOf("urn:uuid:khac")) }, holder)));
 
 console.log("\n=== Ví holder tự kiểm sau khi giải mã (thay phép kiểm hash máy chủ không còn làm được) ===");
 const exp = { vcId, contentHash, holderDid: `did:vnu:holder:${holder.address}`, vcIdHash };

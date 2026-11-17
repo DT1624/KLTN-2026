@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type VerificationReport } from "../lib/api";
-import { Card, Spinner, Empty, Badge, Mono } from "../components/ui";
+import { useTitle } from "../hooks/useTitle";
+import { Section, Alert, Spinner, Empty, Badge, Mono } from "../components/ui";
 import { ValidityMeter } from "../components/charts";
 
 interface HistoryRow {
@@ -10,6 +11,7 @@ interface HistoryRow {
 }
 
 export default function Verifier() {
+  useTitle("Lịch sử xác minh");
   const history = useQuery({
     queryKey: ["verifier", "history"],
     queryFn: () => api.get<HistoryRow[]>("/verify/history"),
@@ -19,44 +21,52 @@ export default function Verifier() {
   const valid = rows.filter((r) => r.overall_valid).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <header className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-ink-900">Bên xác minh</h1>
-          <p className="text-sm text-ink-600 mt-1">Lịch sử các lần kiểm tra văn bằng của bạn.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Lịch sử xác minh</h1>
+          <p className="mt-2 text-muted max-w-prose">Các lần bạn đã kiểm tra văn bằng.</p>
         </div>
-        <Link className="btn-primary" to="/verify">Xác minh mã mới</Link>
+        <Link className="btn-primary" to="/verify">Xác minh văn bằng</Link>
       </header>
 
-      {rows.length > 0 && (
-        <Card title="Tỉ lệ hợp lệ">
-          <ValidityMeter total={rows.length} valid={valid} />
-        </Card>
+      {history.isError && (
+        <Alert tone="bad" title="Không tải được lịch sử xác minh">
+          {(history.error as Error).message}
+        </Alert>
       )}
 
-      <Card title="Lịch sử xác minh">
+      {rows.length > 0 && (
+        <Section title="Tỉ lệ hợp lệ">
+          <ValidityMeter total={rows.length} valid={valid} />
+        </Section>
+      )}
+
+      <Section title="Các lần xác minh">
         {history.isLoading ? <Spinner /> : rows.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-ink-400">
-                <tr><th className="py-2">Thời điểm</th><th>Người trình bày</th><th>Số văn bằng</th><th>Kết quả</th></tr>
+            <table className="table">
+              <thead>
+                <tr><th>Thời điểm</th><th>Người trình bày</th><th>Số văn bằng</th><th>Kết quả</th></tr>
               </thead>
-              <tbody className="divide-y divide-ink-100">
+              <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td className="py-2.5 text-ink-600">{new Date(r.created_at).toLocaleString("vi-VN")}</td>
-                    <td><Mono value={r.report?.holderDid ?? "—"} /></td>
-                    <td className="tabular-nums text-ink-600">{r.report?.credentials?.length ?? 0}</td>
+                    <td>{new Date(r.created_at).toLocaleString("vi-VN")}</td>
+                    <td>{r.report?.holderDid ? <Mono value={r.report.holderDid} /> : "Không rõ"}</td>
+                    <td className="tabular-nums">{r.report?.credentials?.length ?? 0}</td>
                     <td>{r.overall_valid ? <Badge tone="ok">Hợp lệ</Badge> : <Badge tone="bad">Không hợp lệ</Badge>}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : <Empty title="Chưa có lượt xác minh nào"
-              hint="Quét mã QR của người sở hữu văn bằng để bắt đầu."
-              action={<Link className="btn-primary" to="/verify">Xác minh ngay</Link>} />}
-      </Card>
+        ) : history.isError ? null : (
+          <Empty title="Chưa có lần xác minh nào"
+            hint="Khi bạn xác minh một liên kết người học gửi, kết quả sẽ được lưu ở đây."
+            action={<Link className="btn-primary" to="/verify">Xác minh văn bằng</Link>} />
+        )}
+      </Section>
     </div>
   );
 }

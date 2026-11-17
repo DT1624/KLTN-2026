@@ -7,7 +7,7 @@
  * trên chuỗi — thay cho phép kiểm máy chủ không còn làm được.
  */
 import { api, type Credential } from "./api";
-import { sha3_256Hex } from "./wallet";
+import { vcIdHash } from "./vcid";
 import {
   encryptCredential, decryptCredential, checkCredential, encryptShare, decryptShare,
   type VcEnvelope, type ShareBlob,
@@ -34,7 +34,7 @@ export async function openCredential(c: Credential, wallet: WalletLike): Promise
   const env = await loadEnvelope(c.ipfs_cid);
   const plain = await decryptCredential(env, { address: wallet.address, privateKey: wallet.keyPair.privateKey });
   const problems = checkCredential(plain, {
-    vcId: c.vc_id, contentHash: c.content_hash, holderDid: c.holder_did, vcIdHash: sha3_256Hex(c.vc_id),
+    vcId: c.vc_id, contentHash: c.content_hash, holderDid: c.holder_did, vcIdHash: vcIdHash(c.vc_id),
   }, env);
   return { plain, problems };
 }

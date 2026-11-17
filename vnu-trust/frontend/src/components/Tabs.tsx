@@ -1,5 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 
 export interface TabDef {
   id: string;
@@ -38,24 +38,40 @@ export function TabBar({ tabs, active, onSelect }: {
   active: string;
   onSelect: (id: string) => void;
 }) {
+  // Phím mũi tên chuyển tab; chỉ tab đang chọn nằm trong thứ tự Tab (roving tabIndex).
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+    if (!next) return;
+    onSelect(next.id);
+    document.getElementById("tab-" + next.id)?.focus();
+  };
+
   return (
-    <div className="flex gap-1 p-1 bg-ink-100 rounded-xl overflow-x-auto" role="tablist">
-      {tabs.map((t) => (
+    <div className="flex gap-1 border-b border-rule overflow-x-auto" role="tablist">
+      {tabs.map((t, i) => (
         <button
           key={t.id}
+          id={"tab-" + t.id}
           role="tab"
           type="button"
           aria-selected={active === t.id}
+          aria-controls={"panel-" + t.id}
+          tabIndex={active === t.id ? 0 : -1}
           onClick={() => onSelect(t.id)}
-          className={`px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition ${
-            active === t.id ? "bg-white text-ink-900 shadow-sm" : "text-ink-600 hover:text-ink-900"
+          onKeyDown={(e) => onKeyDown(e, i)}
+          className={`px-3.5 py-3 -mb-px text-sm whitespace-nowrap border-b-2 ${
+            active === t.id
+              ? "text-primary font-semibold border-primary"
+              : "text-ink-2 hover:text-ink font-medium border-transparent"
           }`}
         >
           {t.label}
           {t.count !== undefined && (
-            <span className={`ml-1.5 tabular-nums text-xs ${active === t.id ? "text-ink-500" : "text-ink-400"}`}>
-              {t.count}
-            </span>
+            <span className={`ml-1.5 chip tabular-nums text-xs ${
+              active === t.id ? "bg-primary-soft text-primary" : "bg-tint text-muted"
+            }`}>{t.count}</span>
           )}
         </button>
       ))}
@@ -63,12 +79,21 @@ export function TabBar({ tabs, active, onSelect }: {
   );
 }
 
+/** Nội dung của một tab; `id` trùng với `TabDef.id`. */
+export function TabPanel({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <div role="tabpanel" id={"panel-" + id} aria-labelledby={"tab-" + id}>
+      {children}
+    </div>
+  );
+}
+
 /** Khung hai cột cho tab có panel phụ bên cạnh (dùng ở tab Nhật ký & truy vết). */
 export function SplitPane({ side, children }: { side: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-5 items-start">
-      <div className="min-w-0 space-y-5">{children}</div>
-      <div className="space-y-5 lg:sticky lg:top-20">{side}</div>
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
+      <div className="min-w-0 space-y-6">{children}</div>
+      <div className="min-w-0 space-y-6 lg:sticky lg:top-6">{side}</div>
     </div>
   );
 }

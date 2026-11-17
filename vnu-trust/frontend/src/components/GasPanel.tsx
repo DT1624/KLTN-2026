@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "../hooks/useWallet";
 import { useChainMode } from "../hooks/useChain";
-import { faucet, getBalance, formatMove, chainConfigured, CHAIN } from "../lib/chain";
-import { Card, Alert, Mono } from "./ui";
+import { faucet, getBalance, formatMove, chainConfigured } from "../lib/chain";
+import { Section, Alert, Mono } from "./ui";
 
 /** Dưới mức này thì một vài giao dịch nữa là hết — nhắc người dùng nạp trước. */
 const LOW = 20_000_000n;
@@ -42,13 +42,11 @@ export default function GasPanel({ compact = false }: { compact?: boolean }) {
   if (!live || !chainConfigured()) {
     if (compact) return null;
     return (
-      <Card title="Gas cho giao dịch">
-        <Alert tone="warn" title="Đang chạy chế độ không nối chuỗi">
-          Máy chủ không xác minh giao dịch trên chuỗi nên giao diện cũng không gửi giao dịch nào
-          lên. Không cần gas. Khi bật lại <span className="mono">VERIFY_ONCHAIN=true</span>, thẻ này
-          sẽ hiện số dư và nút nhận token.
+      <Section title="Phí giao dịch">
+        <Alert tone="warn">
+          Đang ở chế độ thử, chưa nối chuỗi. Không cần phí giao dịch.
         </Alert>
-      </Card>
+      </Section>
     );
   }
 
@@ -59,23 +57,29 @@ export default function GasPanel({ compact = false }: { compact?: boolean }) {
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Số dư gas</p>
-          <p className="mt-1 text-3xl font-bold text-ink-900 tabular-nums">
+          <p className="label">Số dư</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">
             {balance.isLoading ? "…" : formatMove(bal)}
-            <span className="ml-1.5 text-base font-semibold text-ink-400">MOVE</span>
+            <span className="ml-1.5 text-base font-semibold text-muted">MOVE</span>
           </p>
         </div>
-        <button className="btn-primary" type="button" disabled={mint.isPending}
+        <button className="btn-secondary" type="button" disabled={mint.isPending}
           onClick={() => mint.mutate()}>
           {mint.isPending ? "Đang nhận…" : "Nhận token thử nghiệm"}
         </button>
       </div>
 
+      <div role="status" aria-live="polite">
+        {mint.isSuccess && !mint.isPending && !err && (
+          <p className="mt-4 text-sm">Đã nhận token thử nghiệm</p>
+        )}
+      </div>
+
       {low && !balance.isLoading && (
         <div className="mt-4">
-          <Alert tone="warn" title="Sắp hết gas">
-            Mỗi lần ký một giao dịch (đăng ký DID, cấp văn bằng, phê duyệt issuer…) đều tốn một ít
-            phí. Bấm “Nhận token thử nghiệm” để tự nạp trước khi thao tác.
+          <Alert tone="warn" title="Sắp hết phí giao dịch">
+            Mỗi lần ký một giao dịch (đăng ký DID, cấp văn bằng, phê duyệt đơn vị cấp bằng) đều tốn
+            một ít phí. Bấm “Nhận token thử nghiệm” để tự nạp trước khi thao tác.
           </Alert>
         </div>
       )}
@@ -83,16 +87,20 @@ export default function GasPanel({ compact = false }: { compact?: boolean }) {
       {err && <div className="mt-4"><Alert tone="bad" title="Không nhận được token">{err}</Alert></div>}
 
       {!compact && (
-        <p className="mt-4 text-xs text-ink-400 leading-relaxed">
-          Token thử nghiệm chỉ để trả phí gọi hàm hợp đồng, không có giá trị và không chuyển được
-          cho ai — hệ thống không có chức năng gửi token. Nguồn:{" "}
-          <span className="mono">{CHAIN.faucet.replace(/^https?:\/\//, "")}</span> · ví{" "}
-          <Mono value={wallet.address} />
+        <p className="mt-4 text-sm text-muted max-w-prose">
+          Token thử nghiệm chỉ để trả phí giao dịch, không có giá trị và không chuyển được
+          cho ai. Ví của bạn: <Mono value={wallet.address} />
         </p>
       )}
     </>
   );
 
-  return compact ? <div>{body}</div> : <Card title="Gas cho giao dịch"
-    subtitle="Tự nhận token thử nghiệm để ký được giao dịch on-chain.">{body}</Card>;
+  return compact
+    ? <div className="rounded-sheet border border-rule p-4 bg-sheet">{body}</div>
+    : (
+      <Section title="Phí giao dịch"
+        description="Mỗi lần ký cần một ít token MOVE để trả phí. Trên mạng thử nghiệm, bạn nhận miễn phí.">
+        {body}
+      </Section>
+    );
 }

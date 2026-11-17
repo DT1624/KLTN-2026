@@ -5,9 +5,9 @@ import { useWallet } from "../../hooks/useWallet";
 import { useAuthorityRoot, useChainTx } from "../../hooks/useChain";
 import { ENTRY, bytesArg, hashArg, u64Arg } from "../../lib/chain";
 import { sha3_256Hex } from "../../lib/wallet";
-import { VC_TYPES, VC_TYPE_DELEGATION } from "../../lib/constants";
-import { Card, Alert, Mono, Badge, Spinner, Empty, Field } from "../../components/ui";
-import TxProgress from "../../components/ChainTx";
+import { VC_TYPES, maskLabel } from "../../lib/constants";
+import { Section, Alert, Mono, Badge, RoleStatusBadge, Spinner, Empty, Field } from "../../components/ui";
+import TxProgress, { SignSheet } from "../../components/ChainTx";
 import type { RoleRow } from "./OverviewTab";
 
 /**
@@ -28,12 +28,15 @@ export default function IssuersTab() {
   return (
     <div className="space-y-6">
       <ApproveIssuerCard />
-      <Card title="Đơn vị cấp bằng"
-        subtitle="Trạng thái đọc trực tiếp từ hợp đồng, không phải từ vai trò khai trong ứng dụng.">
+      <Section title="Đơn vị cấp bằng"
+        description="Trạng thái đọc trực tiếp từ chuỗi, không phải từ vai trò khai trong ứng dụng.">
         {issuers.isLoading && <Spinner />}
-        {!issuers.isLoading && !issuers.data?.length && <Empty title="Chưa có đơn vị nào" />}
+        {!issuers.isLoading && !issuers.data?.length && (
+          <Empty title="Chưa có đơn vị cấp bằng nào"
+            hint="Phê duyệt đơn vị đầu tiên bằng biểu mẫu ở trên." />
+        )}
         {!!issuers.data?.length && <IssuerTable rows={issuers.data} />}
-      </Card>
+      </Section>
     </div>
   );
 }
@@ -96,53 +99,69 @@ function ApproveIssuerCard() {
     });
 
   return (
-    <Card title="Phê duyệt đơn vị cấp bằng"
-      subtitle="Ví của bạn ký trực tiếp — không cần dán mã giao dịch.">
-      <Alert tone="info" title="Điều kiện của hợp đồng">
-        Địa chỉ được duyệt phải <strong>đã đăng ký DID và DID còn hoạt động</strong>, và{" "}
-        <strong>không đang là admin</strong>. Bit “Chứng chỉ uỷ quyền” cho phép đơn vị đó cấp
-        quyền tiếp cho đơn vị con — <strong>chỉ root</strong> cấp được bit này.
-      </Alert>
+    <Section title="Phê duyệt đơn vị cấp bằng"
+      description="Ví của bạn ký trực tiếp giao dịch phê duyệt.">
+      <div className="mb-4">
+        <Alert tone="info" title="Điều kiện phê duyệt">
+          Địa chỉ được duyệt phải <strong>đã đăng ký DID và DID còn hoạt động</strong>, và{" "}
+          <strong>không đang là quản trị viên</strong>. Quyền “Chứng chỉ uỷ quyền” cho phép đơn vị
+          đó cấp quyền tiếp cho đơn vị con, và <strong>chỉ quản trị gốc</strong> giao được quyền này.
+        </Alert>
+      </div>
 
-      <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); approve(); }}>
-        <Field label="Địa chỉ ví đơn vị" value={address} onChange={setAddress} mono required
-          placeholder="0x…" />
+      <SignSheet tx={tx}>
+        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); approve(); }}>
+          <Field label="Địa chỉ ví đơn vị" value={address} onChange={setAddress} mono required
+            placeholder="0x…" />
 
-        <div>
-          <span className="label">Loại văn bằng được phép cấp</span>
-          <div className="flex flex-wrap gap-x-5 gap-y-2 mt-1">
-            {VC_TYPES.map((t) => {
-              const locked = Boolean(t.rootOnly) && !isRoot;
-              return (
-                <label key={t.bit}
-                  className={`flex items-center gap-2 text-sm ${locked ? "text-ink-300" : "text-ink-700"}`}
-                  title={locked ? "Chỉ root mới cấp được bit uỷ quyền" : undefined}>
-                  <input type="checkbox" disabled={locked} checked={(mask & t.bit) !== 0}
-                    onChange={(e) => setMask((m) => (e.target.checked ? m | t.bit : m & ~t.bit))} />
-                  {t.label}
-                  {t.rootOnly && <span className="text-xs text-ink-400">(root)</span>}
-                </label>
-              );
-            })}
-          </div>
-          <p className="text-xs text-ink-400 mt-1.5">
-            mask hiện tại: <span className="mono">{mask}</span>
-            {(mask & VC_TYPE_DELEGATION) !== 0 && " — có bit uỷ quyền"}
-          </p>
-        </div>
+          <fieldset>
+            <legend className="label">Loại văn bằng được cấp</legend>
+            <ul className="mt-1 space-y-2">
+              {VC_TYPES.map((t) => {
+                const locked = Boolean(t.rootOnly) && !isRoot;
+                return (
+                  <li key={t.bit}>
+                    <label className={`flex items-center gap-2 min-h-[44px] ${locked ? "text-muted" : ""}`}>
+                      <input type="checkbox" disabled={locked} checked={(mask & t.bit) !== 0}
+                        onChange={(e) => setMask((m) => (e.target.checked ? m | t.bit : m & ~t.bit))} />
+                      {t.label}
+                      {t.rootOnly && <span className="text-sm text-muted">(chỉ quản trị gốc)</span>}
+                    </label>
+                    {locked && (
+                      <p className="text-sm text-muted ml-6">
+                        Chỉ quản trị gốc mới giao được quyền uỷ quyền lại.
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="text-sm text-muted mt-2">
+              Quyền hiện tại: {mask === 0 ? "chưa chọn loại nào" : maskLabel(mask)}
+            </p>
+          </fieldset>
 
-        <Field label="Hạn uỷ quyền (để trống = vĩnh viễn)" value={expiresAt} onChange={setExpiresAt}
-          type="datetime-local"
-          hint="Hợp đồng nhận giây Unix; 0 nghĩa là không hết hạn." />
+          <Field label="Hạn uỷ quyền (để trống nếu không hết hạn)" value={expiresAt} onChange={setExpiresAt}
+            type="datetime-local"
+            hint="Để trống nếu quyền không có ngày hết hạn." />
 
-        <button className="btn-primary" disabled={!address.trim() || mask === 0 || tx.busy}>
-          {tx.busy ? tx.label : "Ký & phê duyệt issuer"}
-        </button>
-      </form>
+          <button className="btn-primary" disabled={!address.trim() || mask === 0 || tx.busy}>
+            {tx.busy ? tx.label : "Ký và phê duyệt"}
+          </button>
+        </form>
 
-      <div className="mt-4"><TxProgress tx={tx} okTitle="Đã phê duyệt đơn vị cấp bằng" /></div>
-    </Card>
+        <div className="mt-4"><TxProgress tx={tx} okTitle="Đã phê duyệt đơn vị cấp bằng" /></div>
+      </SignSheet>
+    </Section>
   );
+}
+
+type IssuerStatus = "suspended" | "active" | "revoked";
+
+function okTitle(s: IssuerStatus): string {
+  if (s === "suspended") return "Đã tạm ngưng đơn vị";
+  if (s === "active") return "Đã kích hoạt lại đơn vị";
+  return "Đã thu hồi quyền đơn vị";
 }
 
 /** Bảng issuer kèm ba thao tác đổi trạng thái, mỗi thao tác là một giao dịch tự ký. */
@@ -151,9 +170,11 @@ function IssuerTable({ rows }: { rows: RoleRow[] }) {
   const tx = useChainTx();
   const [target, setTarget] = useState<RoleRow | null>(null);
   const [reason, setReason] = useState("");
+  const [lastStatus, setLastStatus] = useState<IssuerStatus>("suspended");
 
-  const change = (status: "suspended" | "active" | "revoked") => {
+  const change = (status: IssuerStatus) => {
     if (!target) return;
+    setLastStatus(status);
     const fn =
       status === "suspended" ? ENTRY.suspendIssuer
         : status === "active" ? ENTRY.reactivateIssuer
@@ -176,20 +197,21 @@ function IssuerTable({ rows }: { rows: RoleRow[] }) {
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wide text-ink-400">
-            <tr><th className="py-2">Tên</th><th>DID</th><th>Trên chuỗi</th><th></th></tr>
+        <table className="table">
+          <thead>
+            <tr><th>Tên</th><th>DID</th><th>Trên chuỗi</th><th><span className="sr-only">Thao tác</span></th></tr>
           </thead>
-          <tbody className="divide-y divide-ink-100">
+          <tbody>
             {rows.map((r) => (
               <tr key={r.address}>
-                <td className="py-2.5 font-medium text-ink-800">{r.label}</td>
+                <td>{r.label}</td>
                 <td><Mono value={r.did} /></td>
                 <td>{r.activeOnChain
-                  ? <Badge tone="ok">Đang hoạt động</Badge>
-                  : <Badge tone="bad">Chưa/không còn quyền</Badge>}</td>
+                  ? <RoleStatusBadge status="active" />
+                  : <Badge tone="bad">Chưa có hoặc đã mất quyền</Badge>}</td>
                 <td className="text-right">
-                  <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs"
+                  <button type="button" className="btn-secondary"
+                    aria-label={`Đổi trạng thái của ${r.label}`}
                     onClick={() => { setTarget(r); setReason(""); tx.reset(); }}>
                     Đổi trạng thái
                   </button>
@@ -200,34 +222,40 @@ function IssuerTable({ rows }: { rows: RoleRow[] }) {
         </table>
       </div>
 
-      {target && (
-        <div className="mt-5 rounded-xl border border-ink-200 bg-ink-50/60 p-4 space-y-4">
-          <p className="text-sm text-ink-700">
-            Đổi trạng thái của <strong>{target.label}</strong> — <Mono value={target.address} />
-          </p>
-          <Field label="Lý do (ghi vào nhật ký kiểm toán)" value={reason} onChange={setReason}
-            placeholder="Tạm ngưng do rà soát hồ sơ" />
-          <div className="flex flex-wrap gap-3">
-            <button className="btn-ghost" type="button"
-              disabled={reason.trim().length < 2 || tx.busy}
-              onClick={() => change("suspended")}>Tạm ngưng</button>
-            <button className="btn-ghost" type="button"
-              disabled={reason.trim().length < 2 || tx.busy}
-              onClick={() => change("active")}>Kích hoạt lại</button>
-            <button className="btn-danger" type="button"
-              disabled={reason.trim().length < 2 || tx.busy}
-              onClick={() => change("revoked")}>Thu hồi quyền</button>
-            <button className="btn-ghost !text-ink-500" type="button"
-              onClick={() => { setTarget(null); setReason(""); }}>Đóng</button>
-          </div>
-          <p className="text-xs text-ink-400">
-            Thu hồi là vĩnh viễn với bản ghi hiện tại, nhưng địa chỉ vẫn được phê duyệt lại sau
-            này (F-04) — bản ghi cũ ở lại trong hợp đồng làm vết kiểm toán.
-          </p>
+      {target ? (
+        <div className="mt-5">
+          <SignSheet tx={tx}>
+            <div className="space-y-4">
+              <div>
+                <p>Đổi trạng thái của <strong>{target.label}</strong></p>
+                <Mono value={target.address} />
+              </div>
+              <Field label="Lý do (ghi vào nhật ký kiểm toán)" value={reason} onChange={setReason}
+                placeholder="Tạm ngưng do rà soát hồ sơ" />
+              <div className="flex flex-wrap gap-3">
+                <button className="btn-secondary" type="button"
+                  disabled={reason.trim().length < 2 || tx.busy}
+                  onClick={() => change("suspended")}>Ký và tạm ngưng</button>
+                <button className="btn-primary" type="button"
+                  disabled={reason.trim().length < 2 || tx.busy}
+                  onClick={() => change("active")}>Ký và kích hoạt lại</button>
+                <button className="btn-danger" type="button"
+                  disabled={reason.trim().length < 2 || tx.busy}
+                  onClick={() => change("revoked")}>Ký và thu hồi quyền</button>
+                <button className="btn-quiet" type="button"
+                  onClick={() => { setTarget(null); setReason(""); }}>Đóng</button>
+              </div>
+              <p className="text-sm text-muted">
+                Thu hồi là vĩnh viễn với bản ghi hiện tại, nhưng địa chỉ vẫn được phê duyệt lại sau
+                này. Bản ghi cũ ở lại trên chuỗi làm vết kiểm toán.
+              </p>
+            </div>
+            <div className="mt-4"><TxProgress tx={tx} okTitle={okTitle(lastStatus)} /></div>
+          </SignSheet>
         </div>
+      ) : (
+        <div className="mt-4"><TxProgress tx={tx} okTitle={okTitle(lastStatus)} /></div>
       )}
-
-      <div className="mt-4"><TxProgress tx={tx} okTitle="Đã đổi trạng thái issuer" /></div>
     </>
   );
 }

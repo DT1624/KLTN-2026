@@ -81,8 +81,16 @@ const bogus = await restoreFromMnemonic(phrase, NEW, "holder", "x", undefined, "
 check("DID máy chủ không kết thúc bằng địa chỉ ví thì bị bỏ qua", bogus.did === serverDid, bogus.did);
 
 // Đối chứng: cụm từ sai vẫn bị từ chối (phép thử phải đỏ được).
-check("cụm từ sai mã kiểm tra bị từ chối",
-  await rejects(restoreFromMnemonic(phrase.split(" ").reverse().join(" "), NEW, "holder", "x")));
+// Lý do sửa (17/11/2026): bản cũ đảo thứ tự từ, nhưng 12 từ có 4 bit kiểm tra nên ~1/16 hoán vị
+// vẫn hợp lệ -> test chập chờn (đỏ 2/8 lần chạy). Nay chọn cụm từ SAI mã kiểm tra một cách tất định:
+// đổi từ cuối lần lượt qua danh sách từ cho tới khi isValidMnemonic = false.
+const { isValidMnemonic } = await import("../src/lib/mnemonic");
+const { wordlist: WL } = await import("@scure/bip39/wordlists/english");
+const head = phrase.split(" ").slice(0, 11).join(" ");
+const badTail = WL.find((w) => !isValidMnemonic(`${head} ${w}`))!;
+const badPhrase = `${head} ${badTail}`;
+check("tiền đề: cụm từ thử là cụm từ sai mã kiểm tra", !isValidMnemonic(badPhrase));
+check("cụm từ sai mã kiểm tra bị từ chối", await rejects(restoreFromMnemonic(badPhrase, NEW, "holder", "x")));
 
-console.log(`\n${failed ? `${failed} FAIL` : "10/10 PASS  — khôi phục ví từ cụm từ"}`);
+console.log(`\n${failed ? `${failed} FAIL` : "11/11 PASS  — khôi phục ví từ cụm từ"}`);
 process.exit(failed ? 1 : 0);

@@ -4,12 +4,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Credential } from "../lib/api";
 import { useWallet } from "../hooks/useWallet";
 import { useChainTx, useMe } from "../hooks/useChain";
+import { useTitle } from "../hooks/useTitle";
 import { canonicalize, signMessage, sha3_256Hex } from "../lib/wallet";
+import { vcIdHash } from "../lib/vcid";
 import { ENTRY, bytesArg, hashArg, u64Arg, vcIdFromEvents } from "../lib/chain";
 import { ISSUABLE_VC_TYPES, maskLabel } from "../lib/constants";
-import { Card, StatusBadge, Alert, Spinner, Empty, Mono, Stat, Field, Badge } from "../components/ui";
-import { TabBar, useTabs } from "../components/Tabs";
-import TxProgress from "../components/ChainTx";
+import { Section, StatusBadge, RoleStatusBadge, Alert, Spinner, Empty, Mono, Ledger, Field, Badge, Row } from "../components/ui";
+import { TabBar, TabPanel, useTabs } from "../components/Tabs";
+import TxProgress, { SignSheet } from "../components/ChainTx";
 import GasPanel from "../components/GasPanel";
 import ReviewPanel from "../components/ReviewPanel";
 import { openCredential, sealCredential } from "../lib/vcStore";
@@ -29,11 +31,12 @@ interface Stats {
  * `VCIssuedEvent` → gửi cho backend ghi chỉ mục. Không còn ô "Mã giao dịch".
  */
 export default function Issuer() {
+  useTitle("Cấp văn bằng");
   const me = useMe();
   const stats = useQuery({ queryKey: ["issuer", "stats"], queryFn: () => api.get<Stats>("/issuer/stats") });
 
   const { active, select, visible } = useTabs([
-    { id: "cap", label: "Cấp văn bằng" },
+    { id: "cap", label: "Cấp văn bằng mới" },
     { id: "da-cap", label: "Văn bằng đã cấp", count: stats.data?.total },
     // Chỉ issuer có bit uỷ quyền (do root cấp) mới cấp được sub-issuer.
     { id: "uy-quyen", label: "Uỷ quyền", hidden: !me.data?.onChain.canDelegate },
@@ -44,44 +47,46 @@ export default function Issuer() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-ink-900">Đơn vị cấp bằng</h1>
-        <p className="text-sm text-ink-600 mt-1">Cấp và quản lý văn bằng đã phát hành.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Cấp văn bằng</h1>
+        <p className="text-muted mt-2 max-w-prose">Văn bằng bạn cấp được ghi lên sổ đăng ký trên chuỗi.</p>
       </header>
 
       {on && !on.hasActiveDid && (
         <Alert tone="warn" title="Ví này chưa đăng ký DID">
-          Hợp đồng kiểm DID của <strong>cả</strong> đơn vị cấp lẫn người nhận trước khi cho cấp
-          văn bằng. Sang <Link className="underline" to="/account">Danh tính &amp; gas</Link> để
+          Sổ đăng ký trên chuỗi kiểm tra DID của <strong>cả</strong> đơn vị cấp lẫn người nhận trước khi cho cấp
+          văn bằng. Sang <Link className="link" to="/account">trang Tài khoản</Link> để
           đăng ký trước.
         </Alert>
       )}
       {on && on.hasActiveDid && !on.isActiveIssuer && (
-        <Alert tone="bad" title="Ví này chưa có quyền issuer trên chuỗi">
-          Quyền cấp bằng do quản trị viên phê duyệt bằng{" "}
-          <span className="mono">authority::approve_issuer</span>. Chưa có quyền thì giao dịch
-          cấp văn bằng sẽ bị hợp đồng từ chối.
+        <Alert tone="bad" title="Ví này chưa có quyền cấp bằng trên chuỗi">
+          Ví này chưa được quản trị viên phê duyệt làm đơn vị cấp bằng trên chuỗi. Chưa có quyền thì giao dịch
+          cấp văn bằng sẽ bị sổ đăng ký từ chối.
         </Alert>
       )}
 
       {stats.data && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Stat label="Đang hiệu lực" value={stats.data.active} />
-            <Stat label="Tạm ngưng" value={stats.data.suspended} />
-            <Stat label="Đã thu hồi" value={stats.data.revoked} />
-            <Stat label="Tổng đã cấp" value={stats.data.total} />
-          </div>
+          <Ledger items={[
+            { label: "Còn hiệu lực", value: stats.data.active },
+            { label: "Tạm ngưng", value: stats.data.suspended },
+            { label: "Đã thu hồi", value: stats.data.revoked },
+            { label: "Tổng đã cấp", value: stats.data.total },
+          ]} />
           {stats.data.total > 0 && (
             <div className="grid lg:grid-cols-3 gap-4">
-              <Card title="Văn bằng cấp theo tháng" className="lg:col-span-2">
+              <div className="sheet p-5 min-w-0">
+                <h3 className="text-base font-semibold mb-3">Văn bằng cấp theo tháng</h3>
                 <MonthlyBars data={stats.data.byMonth} />
-              </Card>
-              <Card title="Theo loại văn bằng">
+              </div>
+              <div className="sheet p-5 min-w-0">
+                <h3 className="text-base font-semibold mb-3">Theo loại văn bằng</h3>
                 <BarList items={stats.data.byType.map((t) => ({ key: String(t.vcType), label: t.label, count: t.count }))} />
-              </Card>
-              <Card title="Tình trạng văn bằng đã cấp" className="lg:col-span-3">
+              </div>
+              <div className="sheet p-5 min-w-0">
+                <h3 className="text-base font-semibold mb-3">Tình trạng văn bằng đã cấp</h3>
                 <StatusBar counts={stats.data} />
-              </Card>
+              </div>
             </div>
           )}
         </>
@@ -90,13 +95,15 @@ export default function Issuer() {
       <TabBar tabs={visible} active={active} onSelect={select} />
 
       {active === "cap" && (
-        <>
-          <GasPanel />
-          <IssueCard />
-        </>
+        <TabPanel id="cap">
+          <div className="space-y-6">
+            <GasPanel compact />
+            <IssueCard />
+          </div>
+        </TabPanel>
       )}
-      {active === "da-cap" && <IssuedList />}
-      {active === "uy-quyen" && <DelegationPanel />}
+      {active === "da-cap" && <TabPanel id="da-cap"><IssuedList onNew={() => select("cap")} /></TabPanel>}
+      {active === "uy-quyen" && <TabPanel id="uy-quyen"><DelegationPanel /></TabPanel>}
     </div>
   );
 }
@@ -128,6 +135,8 @@ function DelegationPanel() {
   const [mask, setMask] = useState(0);
   const [expiresAt, setExpiresAt] = useState("");
   const [reason, setReason] = useState("");
+  // Thao tác gần nhất, để thông báo đúng động từ và hiện tiến trình ở đúng khung.
+  const [lastAct, setLastAct] = useState<"approve" | "suspended" | "revoked" | null>(null);
 
   if (info.isLoading) return <Spinner />;
   if (!info.data) return <Alert tone="bad" title="Không đọc được quyền uỷ quyền">{String(info.error ?? "")}</Alert>;
@@ -137,7 +146,8 @@ function DelegationPanel() {
   const expiryOk = myExpiry === 0 || (expiresUnix !== 0 && expiresUnix <= myExpiry);
   const types = ISSUABLE_VC_TYPES.filter((t) => (d.delegableMask & t.bit) !== 0);
 
-  const approve = () =>
+  const approve = () => {
+    setLastAct("approve");
     void tx.run({
       fn: ENTRY.approveIssuer,
       args: async () => {
@@ -160,8 +170,10 @@ function DelegationPanel() {
         return r;
       },
     });
+  };
 
-  const setStatus = (target: string, status: "suspended" | "revoked") =>
+  const setStatus = (target: string, status: "suspended" | "revoked") => {
+    setLastAct(status);
     void tx.run({
       fn: status === "suspended" ? ENTRY.suspendIssuer : ENTRY.revokeIssuer,
       args: [target, bytesArg(reason.trim())],
@@ -172,57 +184,78 @@ function DelegationPanel() {
         return r;
       },
     });
+  };
+
+  const statusPhase = lastAct === "suspended" || lastAct === "revoked";
 
   return (
     <div className="space-y-6">
-      <Card title="Cấp sub-issuer"
-        subtitle={`Phạm vi được giao: ${maskLabel(d.delegableMask)} · Hạn của bạn: ${myExpiry === 0 ? "vĩnh viễn" : new Date(myExpiry * 1000).toLocaleString("vi-VN")}`}>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Địa chỉ ví sub-issuer (đã đăng ký DID, chưa từng là issuer)" value={address} onChange={setAddress} mono placeholder="0x…" />
+      <SignSheet tx={tx} phase={statusPhase ? "draft" : undefined}>
+        <h2 className="text-lg font-semibold">Uỷ quyền cho đơn vị khác</h2>
+        <dl className="mt-3 space-y-1">
+          <Row label="Phạm vi được giao">{maskLabel(d.delegableMask)}</Row>
+          <Row label="Hạn của bạn">{myExpiry === 0 ? "Vĩnh viễn" : new Date(myExpiry * 1000).toLocaleString("vi-VN")}</Row>
+        </dl>
+        <div className="mt-5 grid md:grid-cols-2 gap-4">
+          <Field label="Địa chỉ ví đơn vị được uỷ quyền (đã đăng ký DID, chưa từng là đơn vị cấp bằng)" value={address} onChange={setAddress} mono placeholder="0x…" />
           <Field label={myExpiry === 0 ? "Hạn (để trống = vĩnh viễn)" : "Hạn (bắt buộc, không vượt hạn của bạn)"} value={expiresAt} type="datetime-local" onChange={setExpiresAt} />
         </div>
-        <div className="mt-4 flex flex-wrap gap-4">
-          {types.map((t) => (
-            <label key={t.bit} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={(mask & t.bit) !== 0} onChange={(e) => setMask(e.target.checked ? mask | t.bit : mask & ~t.bit)} />
-              {t.label}
-            </label>
-          ))}
+        <fieldset className="mt-4 min-w-0">
+          <legend className="label mb-2">Loại văn bằng được giao</legend>
+          <div className="flex flex-wrap gap-4">
+            {types.map((t) => (
+              <label key={t.bit} className="flex items-center gap-2">
+                <input type="checkbox" className="w-5 h-5" checked={(mask & t.bit) !== 0} onChange={(e) => setMask(e.target.checked ? mask | t.bit : mask & ~t.bit)} />
+                {t.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {!expiryOk && <div className="mt-3"><Alert tone="warn" title="Hạn không hợp lệ">Đơn vị được uỷ quyền không được có hạn dài hơn hạn uỷ quyền của bạn.</Alert></div>}
+        <div className="mt-5 space-y-4">
+          <button className="btn-primary" type="button"
+            disabled={tx.busy || mask === 0 || address.trim().length < 3 || !expiryOk} onClick={approve}>
+            Ký và uỷ quyền
+          </button>
+          {!statusPhase && <TxProgress tx={tx} okTitle="Đã uỷ quyền" />}
         </div>
-        {!expiryOk && <div className="mt-3"><Alert tone="warn" title="Hạn không hợp lệ">Sub-issuer không được có hạn dài hơn hạn uỷ quyền của bạn.</Alert></div>}
-        <button className="btn-primary mt-4" type="button"
-          disabled={tx.busy || mask === 0 || address.trim().length < 3 || !expiryOk} onClick={approve}>
-          Ký &amp; cấp sub-issuer
-        </button>
-      </Card>
+      </SignSheet>
 
-      <Card title="Sub-issuer do bạn cấp" subtitle="Bạn tạm ngưng hoặc thu hồi được; kích hoạt lại thì nhờ quản trị viên.">
-        {d.subIssuers.length === 0 ? <Empty title="Chưa cấp sub-issuer nào" /> : (
-          <>
-            <Field label="Lý do (bắt buộc khi tạm ngưng / thu hồi)" value={reason} onChange={setReason} placeholder="Hết hợp đồng cộng tác" />
-            <table className="w-full text-sm mt-4">
-              <thead><tr className="text-left text-ink-500"><th>Địa chỉ</th><th>Phạm vi</th><th>Hạn</th><th>Trạng thái</th><th /></tr></thead>
-              <tbody>
-                {d.subIssuers.map((s) => (
-                  <tr key={s.address} className="border-t border-ink-100">
-                    <td className="py-2"><Mono value={s.address} />{s.label && <div className="text-xs text-ink-500">{s.label}</div>}</td>
-                    <td>{maskLabel(s.vcTypeMask)}</td>
-                    <td>{s.expiresAt === 0 ? "Vĩnh viễn" : new Date(s.expiresAt * 1000).toLocaleDateString("vi-VN")}</td>
-                    <td><Badge tone={s.status === "active" ? "ok" : s.status === "suspended" ? "warn" : "muted"}>{s.status}</Badge></td>
-                    <td className="text-right space-x-2 whitespace-nowrap">
-                      <button className="btn-ghost" type="button" disabled={tx.busy || reason.trim().length < 2 || s.status !== "active"}
-                        onClick={() => setStatus(s.address, "suspended")}>Tạm ngưng</button>
-                      <button className="btn-danger" type="button" disabled={tx.busy || reason.trim().length < 2 || s.status === "revoked"}
-                        onClick={() => setStatus(s.address, "revoked")}>Thu hồi</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
+      <Section title="Đơn vị được uỷ quyền do bạn cấp" description="Bạn tạm ngưng hoặc thu hồi được; kích hoạt lại thì nhờ quản trị viên.">
+        {d.subIssuers.length === 0 ? <Empty title="Chưa uỷ quyền cho đơn vị nào" /> : (
+          <div className="space-y-4">
+            <SignSheet tx={tx} phase={statusPhase ? undefined : "draft"}>
+              <Field label="Lý do (bắt buộc khi tạm ngưng hoặc thu hồi uỷ quyền)" value={reason} onChange={setReason} placeholder="Hết hợp đồng cộng tác" />
+              {statusPhase && (
+                <div className="mt-4">
+                  <TxProgress tx={tx} okTitle={lastAct === "suspended" ? "Đã tạm ngưng uỷ quyền" : "Đã thu hồi uỷ quyền"} />
+                </div>
+              )}
+            </SignSheet>
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead><tr><th>Địa chỉ</th><th>Phạm vi</th><th>Hạn</th><th>Trạng thái</th><th></th></tr></thead>
+                <tbody>
+                  {d.subIssuers.map((s) => (
+                    <tr key={s.address}>
+                      <td><Mono value={s.address} />{s.label && <div className="text-sm text-muted">{s.label}</div>}</td>
+                      <td>{maskLabel(s.vcTypeMask)}</td>
+                      <td>{s.expiresAt === 0 ? "Vĩnh viễn" : new Date(s.expiresAt * 1000).toLocaleDateString("vi-VN")}</td>
+                      <td><RoleStatusBadge status={s.status} /></td>
+                      <td className="text-right whitespace-nowrap space-x-2">
+                        <button className="btn-secondary" type="button" disabled={tx.busy || reason.trim().length < 2 || s.status !== "active"}
+                          onClick={() => setStatus(s.address, "suspended")}>Tạm ngưng uỷ quyền</button>
+                        <button className="btn-danger" type="button" disabled={tx.busy || reason.trim().length < 2 || s.status === "revoked"}
+                          onClick={() => setStatus(s.address, "revoked")}>Thu hồi uỷ quyền</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
-      </Card>
-      <TxProgress tx={tx} okTitle="Đã cập nhật uỷ quyền" />
+      </Section>
       {d.subIssuers.length > 0 && <ReviewPanel mode="parent" issuers={d.subIssuers} />}
     </div>
   );
@@ -272,7 +305,7 @@ function buildCredential(
   return {
     vcId, issuedAt, expiresIso, expiresUnix, vc,
     contentHash: sha3_256Hex(vc),
-    vcIdHash: sha3_256Hex(vcId),
+    vcIdHash: vcIdHash(vcId),
     proofValue: signMessage(wallet, canonicalize(vc)),
   };
 }
@@ -344,85 +377,99 @@ function IssueCard() {
   };
 
   return (
-    <Card title="Cấp văn bằng mới"
-      subtitle="Ký bằng khoá riêng trong trình duyệt, ghim lên IPFS, rồi neo lên chuỗi — một lần bấm.">
-      <form className="grid sm:grid-cols-2 gap-4" onSubmit={(e) => { e.preventDefault(); issue(); }}>
-        <Field label="Địa chỉ ví người nhận" value={form.holderAddress} mono required
-          onChange={(v) => set("holderAddress", v)} placeholder="0x…"
-          hint="Người nhận phải đã đăng ký DID — hợp đồng từ chối nếu chưa." />
-        <Field label="DID người nhận" value={form.holderDid} mono required
-          onChange={(v) => set("holderDid", v)} placeholder="did:vnu:holder:0x…" />
-        <Field label="Mã sinh viên" value={form.studentId} required
-          onChange={(v) => set("studentId", v)} placeholder="21020123" />
-        <Field label="Tên văn bằng" value={form.degreeName} required
-          onChange={(v) => set("degreeName", v)} placeholder="Cử nhân Công nghệ thông tin" />
-        <Field label="Khoa / Trường" value={form.faculty}
-          onChange={(v) => set("faculty", v)} placeholder="Trường Đại học Công nghệ" />
-        <Field label="Điểm trung bình" value={form.gpa}
-          onChange={(v) => set("gpa", v)} placeholder="3.42" />
-        <Field label="Năm tốt nghiệp" value={form.year} onChange={(v) => set("year", v)} />
+    <SignSheet tx={tx}>
+      <h2 className="text-lg font-semibold">Văn bằng mới</h2>
+      <p className="text-muted max-w-prose mt-1">
+        Ký bằng khoá riêng trong trình duyệt, lưu nội dung đã mã hoá lên IPFS, rồi ghi lên chuỗi chỉ bằng một lần bấm.
+      </p>
+      <form className="mt-5 space-y-6" onSubmit={(e) => { e.preventDefault(); issue(); }}>
+        <fieldset className="min-w-0">
+          <legend className="text-base font-semibold mb-3">Người nhận</legend>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Field label="Địa chỉ ví người nhận" value={form.holderAddress} mono required
+              onChange={(v) => set("holderAddress", v)} placeholder="0x…"
+              hint="Người nhận phải đã đăng ký DID, nếu chưa thì sổ đăng ký từ chối." />
+            <Field label="DID người nhận" value={form.holderDid} mono required
+              onChange={(v) => set("holderDid", v)} placeholder="did:vnu:holder:0x…" />
+            <Field label="Mã sinh viên" value={form.studentId} required
+              onChange={(v) => set("studentId", v)} placeholder="21020123" />
+          </div>
+        </fieldset>
 
-        <div>
-          <label className="label" htmlFor="vt">Loại văn bằng</label>
-          <select id="vt" className="input" value={form.vcType}
-            onChange={(e) => set("vcType", Number(e.target.value))}>
-            {ISSUABLE_VC_TYPES.map((t) => <option key={t.bit} value={t.bit}>{t.label}</option>)}
-          </select>
-        </div>
+        <fieldset className="min-w-0">
+          <legend className="text-base font-semibold mb-3">Nội dung văn bằng</legend>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Field label="Tên văn bằng" value={form.degreeName} required
+              onChange={(v) => set("degreeName", v)} placeholder="Cử nhân Công nghệ thông tin" />
+            <Field label="Khoa hoặc trường" value={form.faculty}
+              onChange={(v) => set("faculty", v)} placeholder="Trường Đại học Công nghệ" />
+            <Field label="Điểm trung bình" value={form.gpa}
+              onChange={(v) => set("gpa", v)} placeholder="3.42" />
+            <Field label="Năm tốt nghiệp" value={form.year} onChange={(v) => set("year", v)} />
 
-        <div className="sm:col-span-2">
-          <Field label="Hạn dùng (để trống = vĩnh viễn)" value={form.expiresAt} type="datetime-local"
-            onChange={(v) => set("expiresAt", v)}
-            hint="Bằng tốt nghiệp thì để trống. Thẻ sinh viên và chứng chỉ ngắn hạn nên đặt hạn." />
-        </div>
+            <div>
+              <label className="label" htmlFor="vt">Loại văn bằng</label>
+              <select id="vt" className="input" value={form.vcType}
+                onChange={(e) => set("vcType", Number(e.target.value))}>
+                {ISSUABLE_VC_TYPES.map((t) => <option key={t.bit} value={t.bit}>{t.label}</option>)}
+              </select>
+            </div>
 
-        <div className="sm:col-span-2 space-y-4">
+            <div className="md:col-span-2">
+              <Field label="Hạn dùng (để trống = vĩnh viễn)" value={form.expiresAt} type="datetime-local"
+                onChange={(v) => set("expiresAt", v)}
+                hint="Bằng tốt nghiệp thì để trống. Thẻ sinh viên và chứng chỉ ngắn hạn nên đặt hạn." />
+            </div>
+          </div>
+        </fieldset>
+
+        <div className="space-y-4">
           <button className="btn-primary" disabled={tx.busy}>
-            {tx.busy ? tx.label : "Ký & cấp văn bằng"}
+            {tx.busy ? tx.label : "Ký và cấp văn bằng"}
           </button>
           <TxProgress tx={tx} okTitle="Đã cấp văn bằng" />
           {tx.step === "done" && (
             onChainId !== null ? (
               <Alert tone="ok" title="Số hiệu trên chuỗi">
-                Hợp đồng cấp số <span className="mono">{onChainId}</span> cho văn bằng này (đọc từ
-                sự kiện <span className="mono">VCIssuedEvent</span>).
+                Số hiệu văn bằng trên chuỗi: <span className="hex">{onChainId}</span>.
               </Alert>
             ) : (
               <Alert tone="warn" title="Chưa đọc được số hiệu trên chuỗi">
-                Văn bằng đã ghi vào chỉ mục nhưng không lấy được{" "}
-                <span className="mono">VCIssuedEvent</span> — thường là do đang chạy chế độ không
-                nối chuỗi. Không có số hiệu này thì sau không thu hồi trên chuỗi được.
+                Văn bằng đã ghi vào chỉ mục nhưng chưa lấy được số hiệu trên chuỗi, thường do đang chạy chế độ không
+                nối chuỗi. Thiếu số hiệu này thì sau không thu hồi trên chuỗi được.
               </Alert>
             )
           )}
         </div>
       </form>
-    </Card>
+    </SignSheet>
   );
 }
 
 /** Danh sách văn bằng đã cấp, kèm thao tác tạm ngưng / thu hồi tự ký. */
-function IssuedList() {
+function IssuedList({ onNew }: { onNew: () => void }) {
   const qc = useQueryClient();
   const tx = useChainTx();
   const [target, setTarget] = useState<Credential | null>(null);
   const [reissuing, setReissuing] = useState<Credential | null>(null);
   const [reason, setReason] = useState("");
+  const [kind, setKind] = useState<"revoke" | "suspend">("suspend");
 
   const list = useQuery({
     queryKey: ["issuer", "credentials"],
     queryFn: () => api.get<Credential[]>("/issuer/credentials"),
   });
 
-  const act = (kind: "revoke" | "suspend") => {
+  const act = (k: "revoke" | "suspend") => {
     // Số hiệu bắt đầu từ 0: kiểm `== null`, không kiểm truthy (id 0 là falsy).
     if (target?.on_chain_vc_id == null) return;
+    setKind(k);
     void tx.run({
-      fn: kind === "revoke" ? ENTRY.revokeVc : ENTRY.suspendVc,
+      fn: k === "revoke" ? ENTRY.revokeVc : ENTRY.suspendVc,
       args: [u64Arg(target.on_chain_vc_id), bytesArg(reason.trim())],
       index: async (out) => {
         const r = await api.post(
-          `/issuer/credentials/${encodeURIComponent(target.vc_id)}/${kind}`,
+          `/issuer/credentials/${encodeURIComponent(target.vc_id)}/${k}`,
           { reason: reason.trim(), txHash: out.hash },
         );
         setTarget(null); setReason("");
@@ -432,38 +479,46 @@ function IssuedList() {
     });
   };
 
-  if (list.isLoading) return <Card><Spinner /></Card>;
-  if (!list.data?.length) return <Card><Empty title="Chưa cấp văn bằng nào" /></Card>;
+  if (list.isLoading) return <Spinner />;
+  if (!list.data?.length) {
+    return (
+      <Empty title="Chưa cấp văn bằng nào"
+        hint="Văn bằng bạn cấp sẽ hiện ở đây, kèm nút đổi trạng thái và cấp lại."
+        action={<button type="button" className="btn-secondary" onClick={onNew}>Cấp văn bằng mới</button>} />
+    );
+  }
+
+  const okTitle = kind === "revoke" ? "Đã thu hồi văn bằng" : "Đã tạm ngưng văn bằng";
 
   return (
-    <Card title="Văn bằng đã cấp">
+    <Section title="Văn bằng đã cấp">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wide text-ink-400">
+        <table className="table">
+          <thead>
             <tr>
-              <th className="py-2">Văn bằng</th><th>Người nhận</th><th>Số hiệu</th>
+              <th>Văn bằng</th><th>Người nhận</th><th>Số hiệu</th>
               <th>Ngày cấp</th><th>Trạng thái</th><th></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-ink-100">
+          <tbody>
             {list.data.map((c) => (
               <tr key={c.vc_id}>
                 {/* P3: máy chủ chỉ giữ loại + ngày; tên đầy đủ nằm trong phong bì mã hoá. */}
-                <td className="py-2.5 font-medium text-ink-800">{maskLabel(c.vc_type)}</td>
+                <td className="font-semibold">{maskLabel(c.vc_type)}</td>
                 <td><Mono value={c.holder_did} /></td>
-                <td className="mono text-ink-600">{c.on_chain_vc_id ?? "—"}</td>
-                <td className="text-ink-600">{new Date(c.issued_at).toLocaleDateString("vi-VN")}</td>
+                <td className="hex">{c.on_chain_vc_id ?? "không có"}</td>
+                <td>{new Date(c.issued_at).toLocaleDateString("vi-VN")}</td>
                 <td><StatusBadge status={c.status} /></td>
                 <td className="text-right whitespace-nowrap space-x-1">
                   {c.replaced_by_vc_id && <Badge tone="muted">đã cấp lại</Badge>}
                   {c.status === "active" && !c.replaced_by_vc_id && c.on_chain_vc_id != null && (
-                    <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs"
+                    <button type="button" className="btn-quiet"
                       onClick={() => { setReissuing(c); setTarget(null); }}>
                       Cấp lại
                     </button>
                   )}
                   {c.status !== "revoked" && (
-                    <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs"
+                    <button type="button" className="btn-quiet"
                       onClick={() => { setTarget(c); setReissuing(null); setReason(""); tx.reset(); }}>
                       Đổi trạng thái
                     </button>
@@ -476,43 +531,47 @@ function IssuedList() {
       </div>
 
       {target && (
-        <div className="mt-5 rounded-xl border border-ink-200 bg-ink-50/60 p-4 space-y-4">
-          <p className="text-sm text-ink-700">
-            Văn bằng <Mono value={target.vc_id} /> · số hiệu trên chuỗi{" "}
-            <span className="mono">{target.on_chain_vc_id ?? "không có"}</span>
+        <SignSheet tx={tx} className="mt-5">
+          <h3 className="text-base font-semibold">Đổi trạng thái văn bằng</h3>
+          <p className="mt-2">
+            Văn bằng <Mono value={target.vc_id} />, số hiệu trên chuỗi{" "}
+            <span className="hex">{target.on_chain_vc_id ?? "không có"}</span>.
           </p>
 
           {target.on_chain_vc_id == null ? (
-            <Alert tone="warn" title="Không thao tác trên chuỗi được">
-              Bản ghi này không có số hiệu on-chain (cấp từ thời giao diện còn ghi cứng số 0), nên
-              không gọi được <span className="mono">revoke_vc</span>.
-            </Alert>
+            <div className="mt-4">
+              <Alert tone="warn" title="Không thao tác trên chuỗi được">
+                Bản ghi này không có số hiệu trên chuỗi (cấp từ thời giao diện còn ghi cứng số 0), nên
+                không thu hồi hay tạm ngưng trên chuỗi được.
+              </Alert>
+            </div>
           ) : (
-            <>
+            <div className="mt-4 space-y-4">
               <Field label="Lý do (ghi vào nhật ký kiểm toán)" value={reason} onChange={setReason}
                 placeholder="Cấp nhầm thông tin" />
               <div className="flex flex-wrap gap-3">
-                <button className="btn-ghost" type="button"
+                <button className="btn-secondary" type="button"
                   disabled={reason.trim().length < 2 || tx.busy || target.status !== "active"}
-                  onClick={() => act("suspend")}>Tạm ngưng</button>
+                  onClick={() => act("suspend")}>Ký và tạm ngưng</button>
                 <button className="btn-danger" type="button"
                   disabled={reason.trim().length < 2 || tx.busy}
-                  onClick={() => act("revoke")}>Thu hồi</button>
-                <button className="btn-ghost !text-ink-500" type="button"
+                  onClick={() => act("revoke")}>Ký và thu hồi</button>
+                <button className="btn-quiet" type="button"
                   onClick={() => setTarget(null)}>Đóng</button>
               </div>
-              <p className="text-xs text-ink-400">
-                Đơn vị cấp bằng <strong>không</strong> tự kích hoạt lại được văn bằng đã tạm ngưng —
-                việc đó chỉ admin làm, để không ai tự ngưng rồi tự bật né kiểm toán.
+              <p className="text-sm text-muted">
+                Thu hồi là vĩnh viễn; tạm ngưng thì quản trị viên kích hoạt lại được. Đơn vị cấp bằng <strong>không</strong> tự
+                kích hoạt lại được văn bằng đã tạm ngưng, để không ai tự ngưng rồi tự bật mà né kiểm toán.
               </p>
-            </>
+              <TxProgress tx={tx} okTitle={okTitle} />
+            </div>
           )}
-        </div>
+        </SignSheet>
       )}
 
-      <div className="mt-4"><TxProgress tx={tx} okTitle="Đã đổi trạng thái văn bằng" /></div>
+      {!target && <div className="mt-4"><TxProgress tx={tx} okTitle={okTitle} /></div>}
       {reissuing && <ReissuePanel old={reissuing} onClose={() => setReissuing(null)} />}
-    </Card>
+    </Section>
   );
 }
 
@@ -596,54 +655,59 @@ function ReissuePanel({ old, onClose }: { old: Credential; onClose: () => void }
   };
 
   return (
-    <div className="mt-5 rounded-xl border border-ink-200 bg-ink-50/60 p-4 space-y-4">
+    <SignSheet tx={tx} className="mt-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-ink-700">
-          Cấp lại văn bằng <Mono value={old.vc_id} /> (số hiệu <span className="mono">{old.on_chain_vc_id}</span>).
-          Văn bằng cũ sẽ bị thu hồi với lý do <span className="mono">replaced</span> trong cùng giao dịch.
-        </p>
-        <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs" onClick={onClose}>Đóng</button>
-      </div>
-
-      {opened.isError && (
-        <Alert tone="warn" title="Không giải mã được văn bằng cũ">
-          Ví này không nằm trong danh sách người đọc của văn bằng cũ (thường gặp khi bạn là đơn vị
-          cấp trên). Hãy nhập lại nội dung từ hồ sơ gốc.
-        </Alert>
-      )}
-      {opened.data && opened.data.problems.length > 0 && (
-        <Alert tone="bad" title="Văn bằng cũ không khớp bản neo">{opened.data.problems.join("; ")}</Alert>
-      )}
-      {movedTo && !changingHolder && (
-        <Alert tone="info" title="Holder đã chuyển sang ví mới">
-          Admin đã ghi nhận ví <Mono value={movedTo.new_address} /> thay cho ví cũ ({movedTo.note}).{" "}
-          <button type="button" className="underline"
-            onClick={() => setForm((f) => ({ ...f, holderAddress: movedTo.new_address, holderDid: movedTo.new_did }))}>
-            Cấp sang ví mới
-          </button>
-        </Alert>
-      )}
-
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Địa chỉ ví người nhận" value={form.holderAddress} mono required
-          onChange={(v) => set("holderAddress", v)}
-          hint={changingHolder ? "Đổi ví chỉ được khi DID của ví cũ đã bị khoá/thu hồi." : undefined} />
-        <Field label="DID người nhận" value={form.holderDid} mono required onChange={(v) => set("holderDid", v)} />
-        <Field label="Mã sinh viên" value={form.studentId} required onChange={(v) => set("studentId", v)} />
-        <Field label="Tên văn bằng" value={form.degreeName} required onChange={(v) => set("degreeName", v)} />
-        <Field label="Khoa / Trường" value={form.faculty} onChange={(v) => set("faculty", v)} />
-        <Field label="Điểm trung bình" value={form.gpa} onChange={(v) => set("gpa", v)} />
-        <Field label="Năm tốt nghiệp" value={form.year} onChange={(v) => set("year", v)} />
-        <Field label="Loại văn bằng (giữ nguyên)" value={maskLabel(form.vcType)} onChange={() => {}} disabled />
-        <div className="sm:col-span-2">
-          <Field label="Hạn dùng (để trống = vĩnh viễn)" value={form.expiresAt} type="datetime-local"
-            onChange={(v) => set("expiresAt", v)} />
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold">Cấp lại văn bằng</h3>
+          <p className="mt-2 max-w-prose">
+            Cấp lại văn bằng <Mono value={old.vc_id} />, số hiệu <span className="hex">{old.on_chain_vc_id}</span>.
+            Văn bằng cũ sẽ bị thu hồi với lý do đã được thay thế, trong cùng giao dịch.
+          </p>
         </div>
+        <button type="button" className="btn-quiet" onClick={onClose}>Đóng</button>
       </div>
-      <button className="btn-primary" type="button" disabled={tx.busy || !wallet} onClick={reissue}>
-        {tx.busy ? tx.label : "Ký & cấp lại"}
-      </button>
-      <TxProgress tx={tx} okTitle="Đã cấp lại văn bằng" />
-    </div>
+
+      <div className="mt-4 space-y-4">
+        {opened.isError && (
+          <Alert tone="warn" title="Không giải mã được văn bằng cũ">
+            Ví này không nằm trong danh sách người đọc của văn bằng cũ (thường gặp khi bạn là đơn vị
+            cấp trên). Hãy nhập lại nội dung từ hồ sơ gốc.
+          </Alert>
+        )}
+        {opened.data && opened.data.problems.length > 0 && (
+          <Alert tone="bad" title="Văn bằng cũ không khớp bản neo">{opened.data.problems.join("; ")}</Alert>
+        )}
+        {movedTo && !changingHolder && (
+          <Alert tone="info" title="Người học đã chuyển sang ví mới">
+            Quản trị viên đã ghi nhận ví <Mono value={movedTo.new_address} /> thay cho ví cũ ({movedTo.note}).{" "}
+            <button type="button" className="link"
+              onClick={() => setForm((f) => ({ ...f, holderAddress: movedTo.new_address, holderDid: movedTo.new_did }))}>
+              Cấp sang ví mới
+            </button>
+          </Alert>
+        )}
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <Field label="Địa chỉ ví người nhận" value={form.holderAddress} mono required
+            onChange={(v) => set("holderAddress", v)}
+            hint={changingHolder ? "Đổi ví chỉ được khi DID của ví cũ đã bị khoá hoặc thu hồi." : undefined} />
+          <Field label="DID người nhận" value={form.holderDid} mono required onChange={(v) => set("holderDid", v)} />
+          <Field label="Mã sinh viên" value={form.studentId} required onChange={(v) => set("studentId", v)} />
+          <Field label="Tên văn bằng" value={form.degreeName} required onChange={(v) => set("degreeName", v)} />
+          <Field label="Khoa hoặc trường" value={form.faculty} onChange={(v) => set("faculty", v)} />
+          <Field label="Điểm trung bình" value={form.gpa} onChange={(v) => set("gpa", v)} />
+          <Field label="Năm tốt nghiệp" value={form.year} onChange={(v) => set("year", v)} />
+          <Field label="Loại văn bằng (giữ nguyên)" value={maskLabel(form.vcType)} onChange={() => {}} disabled />
+          <div className="md:col-span-2">
+            <Field label="Hạn dùng (để trống = vĩnh viễn)" value={form.expiresAt} type="datetime-local"
+              onChange={(v) => set("expiresAt", v)} />
+          </div>
+        </div>
+        <button className="btn-primary" type="button" disabled={tx.busy || !wallet} onClick={reissue}>
+          {tx.busy ? tx.label : "Ký và cấp lại"}
+        </button>
+        <TxProgress tx={tx} okTitle="Đã cấp lại văn bằng" />
+      </div>
+    </SignSheet>
   );
 }

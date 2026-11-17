@@ -1,53 +1,117 @@
+import { useEffect, useId, useState } from "react";
 import type { ReactNode } from "react";
+import { IconCheck, IconCross, IconPause, IconAlert, IconInfo, IconCopy } from "./icons";
+
+const CHIP = "inline-flex items-center gap-1";
 
 export function Badge({ tone, children }: { tone: "ok" | "warn" | "bad" | "info" | "muted"; children: ReactNode }) {
   const map = {
-    ok: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
-    warn: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
-    bad: "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
-    info: "bg-brand-50 text-brand-700 ring-1 ring-brand-200",
-    muted: "bg-ink-100 text-ink-600 ring-1 ring-ink-200",
+    ok: "bg-success-soft text-success",
+    warn: "bg-warning-soft text-warning",
+    bad: "bg-son-tint text-son",
+    info: "bg-primary-soft text-primary",
+    muted: "bg-tint text-muted",
   } as const;
-  return <span className={`chip ${map[tone]}`}>{children}</span>;
+  return <span className={`chip ${CHIP} ${map[tone]}`}>{children}</span>;
 }
 
-const STATUS_TONE = {
-  active: "ok", suspended: "warn", expired: "muted", revoked: "bad",
-} as const;
+/** Nhãn trạng thái: xanh (còn hiệu lực), vàng (tạm), xám (hết hạn), đỏ (thu hồi); có biểu tượng đi kèm. */
+function ShapeChip({ kind, label }: { kind: "active" | "suspended" | "expired" | "revoked" | "other"; label: string }) {
+  switch (kind) {
+    case "active":
+      return <span className={`chip ${CHIP} bg-success-soft text-success`}><IconCheck />{label}</span>;
+    case "suspended":
+      return <span className={`chip ${CHIP} bg-warning-soft text-warning`}><IconPause />{label}</span>;
+    case "expired":
+      return <span className={`chip ${CHIP} bg-tint text-muted`}>{label}</span>;
+    case "revoked":
+      return <span className={`chip ${CHIP} bg-son-tint text-son`}><IconCross />{label}</span>;
+    default:
+      return <Badge tone="muted">{label}</Badge>;
+  }
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  active: "Còn hiệu lực",
+  suspended: "Tạm ngưng",
+  expired: "Hết hạn",
+  revoked: "Đã thu hồi",
+  pending: "Đang chờ",
+};
+
+export function statusLabel(s: string): string {
+  return STATUS_LABEL[s] ?? s;
+}
+
+export function roleLabel(role: string): string {
+  const map: Record<string, string> = {
+    root: "Quản trị gốc",
+    admin: "Quản trị viên",
+    issuer: "Đơn vị cấp bằng",
+    holder: "Người học",
+    verifier: "Bên xác minh",
+  };
+  return map[role] ?? role;
+}
 
 export function StatusBadge({ status }: { status: string }) {
-  const label: Record<string, string> = {
-    active: "Đang hiệu lực", suspended: "Tạm ngưng",
-    expired: "Hết hạn", revoked: "Đã thu hồi",
-  };
-  const tone = STATUS_TONE[status as keyof typeof STATUS_TONE] ?? "muted";
-  return <Badge tone={tone}>{label[status] ?? status}</Badge>;
+  if (status === "active" || status === "suspended" || status === "expired" || status === "revoked") {
+    return <ShapeChip kind={status} label={statusLabel(status)} />;
+  }
+  return <ShapeChip kind="other" label={statusLabel(status)} />;
+}
+
+export function DidStatusBadge({ status }: { status: string }) {
+  if (status === "active") return <ShapeChip kind="active" label="Đang hoạt động" />;
+  if (status === "suspended") return <ShapeChip kind="suspended" label="Đang khoá" />;
+  if (status === "revoked") return <ShapeChip kind="revoked" label="Đã thu hồi" />;
+  return <ShapeChip kind="other" label={statusLabel(status)} />;
+}
+
+export function RoleStatusBadge({ status }: { status: string }) {
+  if (status === "active") return <ShapeChip kind="active" label="Đang hoạt động" />;
+  if (status === "suspended") return <ShapeChip kind="suspended" label="Tạm ngưng" />;
+  if (status === "revoked") return <ShapeChip kind="revoked" label="Đã thu hồi" />;
+  return <ShapeChip kind="other" label={statusLabel(status)} />;
 }
 
 export function RoleBadge({ role }: { role: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    root: { label: "Quản trị gốc", cls: "bg-accent-100 text-accent-700 ring-1 ring-accent-200" },
-    admin: { label: "Quản trị viên", cls: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200" },
-    issuer: { label: "Đơn vị cấp bằng", cls: "bg-brand-50 text-brand-700 ring-1 ring-brand-200" },
-    holder: { label: "Người sở hữu", cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
-    verifier: { label: "Bên xác minh", cls: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
-  };
-  const v = map[role] ?? { label: role, cls: "bg-ink-100 text-ink-600" };
-  return <span className={`chip ${v.cls}`}>{v.label}</span>;
+  const cls = role === "root" ? "bg-primary-soft text-primary ring-1 ring-primary" : "bg-primary-soft text-primary";
+  return <span className={`chip ${CHIP} ${cls}`}>{roleLabel(role)}</span>;
 }
 
 export function Card({ title, subtitle, actions, children, className = "" }: {
   title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string;
 }) {
   return (
-    <section className={`card p-5 sm:p-6 ${className}`}>
+    <section className={`sheet p-5 sm:p-6 ${className}`}>
       {(title || actions) && (
-        <header className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            {title && <h2 className="text-base font-bold text-ink-900">{title}</h2>}
-            {subtitle && <p className="text-sm text-ink-500 mt-0.5">{subtitle}</p>}
+        <header className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            {title && <h2 className="text-lg font-semibold text-ink">{title}</h2>}
+            {subtitle && <p className="text-sm text-muted max-w-prose mt-1">{subtitle}</p>}
           </div>
-          {actions}
+          {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
+        </header>
+      )}
+      {children}
+    </section>
+  );
+}
+
+/** Mục dạng thẻ, có thể gắn `id` để neo. */
+export function Section({ title, description, actions, children, className = "", id }: {
+  title?: ReactNode; description?: ReactNode; actions?: ReactNode; children?: ReactNode; className?: string; id?: string;
+}) {
+  return (
+    <section id={id} className={`sheet p-5 sm:p-6 ${className}`}>
+      {(title || description || actions) && (
+        <header className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            {title && <h2 className="text-lg font-semibold text-ink">{title}</h2>}
+            {description && <p className="text-sm text-muted max-w-prose mt-1">{description}</p>}
+          </div>
+          {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
         </header>
       )}
       {children}
@@ -57,20 +121,34 @@ export function Card({ title, subtitle, actions, children, className = "" }: {
 
 export function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
-    <div className="card p-5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-ink-900 tabular-nums">{value}</p>
-      {hint && <p className="mt-1 text-xs text-ink-400">{hint}</p>}
+    <div className="sheet p-4 min-w-0">
+      <p className="text-sm text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{value}</p>
+      {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
     </div>
+  );
+}
+
+/** Lưới thẻ số liệu. */
+export function Ledger({ items }: { items: { label: string; value: ReactNode; hint?: string }[] }) {
+  return (
+    <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {items.map((it, i) => (
+        <div key={`${i}-${it.label}`} className="sheet p-4 min-w-0">
+          <dt className="text-sm text-muted">{it.label}</dt>
+          <dd className="mt-1 text-2xl font-bold tabular-nums text-ink">{it.value}</dd>
+          {it.hint && <dd className="mt-1 text-xs text-muted">{it.hint}</dd>}
+        </div>
+      ))}
+    </dl>
   );
 }
 
 export function Empty({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
   return (
-    <div className="text-center py-12 px-4">
-      <div className="mx-auto w-12 h-12 rounded-2xl bg-ink-100 grid place-items-center text-2xl">📭</div>
-      <p className="mt-3 font-semibold text-ink-700">{title}</p>
-      {hint && <p className="mt-1 text-sm text-ink-500 max-w-sm mx-auto">{hint}</p>}
+    <div className="rounded-sheet border border-dashed border-pencil bg-sheet p-6 text-left">
+      <p className="text-base font-semibold text-ink">{title}</p>
+      {hint && <p className="mt-1 text-sm text-muted max-w-prose">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -80,19 +158,20 @@ export function Alert({ tone = "info", title, children }: {
   tone?: "info" | "ok" | "warn" | "bad"; title?: string; children: ReactNode;
 }) {
   const map = {
-    info: "bg-brand-50 border-brand-200 text-brand-900",
-    ok: "bg-emerald-50 border-emerald-200 text-emerald-900",
-    warn: "bg-amber-50 border-amber-200 text-amber-900",
-    bad: "bg-rose-50 border-rose-200 text-rose-900",
+    info: "bg-primary-soft",
+    ok: "bg-success-soft",
+    warn: "bg-warning-soft",
+    bad: "bg-son-tint",
   } as const;
-  const icon = { info: "ℹ️", ok: "✅", warn: "⚠️", bad: "⛔" } as const;
+  const text = { info: "text-primary", ok: "text-success", warn: "text-warning", bad: "text-son" } as const;
+  const Icon = { info: IconInfo, ok: IconCheck, warn: IconAlert, bad: IconCross }[tone];
   return (
-    <div className={`rounded-xl border px-4 py-3 text-sm ${map[tone]}`} role={tone === "bad" ? "alert" : undefined}>
-      <div className="flex gap-2.5">
-        <span aria-hidden>{icon[tone]}</span>
+    <div className={`rounded-sheet p-4 text-ink ${map[tone]}`} role={tone === "bad" ? "alert" : undefined}>
+      <div className="flex gap-3">
+        <Icon className={`w-4 h-4 mt-1 shrink-0 ${text[tone]}`} />
         <div className="min-w-0">
-          {title && <p className="font-semibold mb-0.5">{title}</p>}
-          <div className="leading-relaxed">{children}</div>
+          {title && <p className={`font-semibold mb-0.5 ${text[tone]}`}>{title}</p>}
+          <div className="text-sm leading-relaxed text-ink-2 break-words [overflow-wrap:anywhere]">{children}</div>
         </div>
       </div>
     </div>
@@ -101,8 +180,11 @@ export function Alert({ tone = "info", title, children }: {
 
 export function Spinner({ label = "Đang tải…" }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-3 py-10 text-ink-500 text-sm">
-      <span className="w-4 h-4 rounded-full border-2 border-ink-200 border-t-brand-600 animate-spin" />
+    <div role="status" aria-live="polite" className="flex items-center gap-3 py-10 text-muted text-sm">
+      <span
+        aria-hidden
+        className="w-4 h-4 rounded-full border-2 border-rule border-t-primary animate-spin motion-reduce:hidden"
+      />
       {label}
     </div>
   );
@@ -110,17 +192,29 @@ export function Spinner({ label = "Đang tải…" }: { label?: string }) {
 
 /** Hiển thị chuỗi dài (địa chỉ, CID, hash) có nút sao chép. */
 export function Mono({ value, truncate = true }: { value: string; truncate?: boolean }) {
+  const [copied, setCopied] = useState<"" | "ok" | "fail">("");
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(""), copied === "fail" ? 2000 : 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
   const shown = truncate && value.length > 22 ? `${value.slice(0, 10)}…${value.slice(-8)}` : value;
   return (
-    <button
-      type="button"
-      onClick={() => navigator.clipboard?.writeText(value)}
-      title={`Bấm để sao chép: ${value}`}
-      className="mono inline-flex items-center gap-1.5 rounded-md bg-ink-50 px-2 py-1 hover:bg-ink-100 transition text-ink-700"
-    >
-      {shown}
-      <span className="text-ink-400" aria-hidden>⧉</span>
-    </button>
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 max-w-full">
+      <span className="hex" title={value}>{shown}</span>
+      <button
+        type="button"
+        aria-label={"Sao chép " + value}
+        onClick={() => {
+          if (!navigator.clipboard?.writeText) { setCopied("fail"); return; }
+          navigator.clipboard.writeText(value).then(() => setCopied("ok"), () => setCopied("fail"));
+        }}
+        className="btn-quiet inline-flex items-center gap-1 text-sm"
+      >
+        <IconCopy />
+      </button>
+      <span aria-live="polite" className="text-sm text-muted">{copied === "ok" ? "Đã chép" : copied === "fail" ? "Không chép được, hãy bôi đen để chép" : ""}</span>
+    </span>
   );
 }
 
@@ -139,21 +233,24 @@ export function Field({ label, value, onChange, placeholder, required, mono, typ
   hint?: ReactNode;
   disabled?: boolean;
 }) {
-  const id = "f-" + label.toLowerCase().replace(/[^a-z0-9]+/gi, "-");
+  const uid = useId();
+  const id = "f-" + uid;
+  const hintId = hint ? id + "-hint" : undefined;
   return (
     <div>
       <label className="label" htmlFor={id}>{label}</label>
       <input
         id={id}
         type={type}
-        className={`input ${mono ? "mono" : ""}`}
+        className={`input ${mono ? "hex" : ""}`}
         value={value}
         required={required}
         disabled={disabled}
         placeholder={placeholder}
+        aria-describedby={hintId}
         onChange={(e) => onChange(e.target.value)}
       />
-      {hint && <p className="text-xs text-ink-400 mt-1">{hint}</p>}
+      {hint && <p id={hintId} className="text-sm text-muted mt-1">{hint}</p>}
     </div>
   );
 }
@@ -161,9 +258,9 @@ export function Field({ label, value, onChange, placeholder, required, mono, typ
 /** Dòng nhãn — giá trị, dùng trong các bảng tóm tắt. */
 export function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div>
-      <dt className="text-ink-400 text-xs uppercase tracking-wide">{label}</dt>
-      <dd className="text-ink-800 mt-0.5">{children}</dd>
+    <div className="grid grid-cols-1 sm:grid-cols-[12rem_1fr] gap-x-4 gap-y-1">
+      <dt className="text-sm text-muted">{label}</dt>
+      <dd className="text-base min-w-0">{children}</dd>
     </div>
   );
 }

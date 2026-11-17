@@ -1,7 +1,7 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useWallet } from "../hooks/useWallet";
-import { Spinner, Alert } from "./ui";
+import { Spinner, Alert, roleLabel } from "./ui";
 import type { Role } from "../lib/api";
 
 /**
@@ -18,8 +18,12 @@ export default function Protected({ roles, children }: { roles?: Role[]; childre
 
   if (roles && !roles.includes(wallet.role)) {
     return (
-      <Alert tone="bad" title="Không đủ quyền truy cập">
-        Trang này dành cho: {roles?.join(", ")}. Ví hiện tại có vai trò <strong>{wallet.role}</strong>.
+      <Alert tone="bad" title="Trang này không dành cho vai trò của bạn">
+        <p>
+          Trang này dành cho: {roles.map((r) => roleLabel(r)).join(", ")}. Ví hiện tại có vai trò{" "}
+          <strong>{roleLabel(wallet.role)}</strong>.
+        </p>
+        <p className="mt-2"><Link className="link" to="/account">Về trang Tài khoản</Link></p>
       </Alert>
     );
   }

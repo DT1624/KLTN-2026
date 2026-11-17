@@ -95,3 +95,17 @@ func TestChallengeMessageFormat(t *testing.T) {
 		t.Errorf("ChallengeMessage\n  nhận = %q\n  mong = %q", got, want)
 	}
 }
+
+// Vector vc_id_hash: SHA3-256 cua byte UTF-8 THO cua chuoi (khong qua canonicalize).
+// Gia tri sinh tu @noble/hashes va node:crypto (hai nguon doc lap, bang nhau) ngay 17/11.
+func TestSHA3256StringVcIdVectors(t *testing.T) {
+	cases := map[string]string{
+		"x": "0x741efa311f97686956946758e0d95f70f11ff2da4f2feb7c54314f44134ac49f",
+		"urn:uuid:00000000-0000-4000-8000-000000000000": "0xf618bc0a0c3e9391cd60c27430da73a3cd434ff1cce8685ff4dca1a3907519f3",
+	}
+	for in, want := range cases {
+		if got := SHA3256String(in); got != want {
+			t.Errorf("SHA3256String(%q) = %s, want %s", in, got, want)
+		}
+	}
+}

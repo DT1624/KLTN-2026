@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { getBackend } from "../lib/backend";
+import { IconAlert } from "./icons";
 
 interface Health {
   status: string;
@@ -27,13 +28,13 @@ export default function OfflineModeBanner() {
   if (health.data?.verifyOnChain !== false) return null;
 
   return (
-    <div className="bg-amber-50 border-b border-amber-200" role="status">
-      <div className="mx-auto max-w-6xl px-4 py-2.5 text-sm text-amber-900 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span aria-hidden="true">⚠️</span>
-        <strong className="font-semibold">Chế độ phát triển — không kiểm chứng trên chuỗi.</strong>
-        <span className="text-amber-800">
+    <div className="bg-mark-soft border-b-2 border-mark text-ink" role="status">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-2.5 text-sm flex flex-wrap items-center gap-x-2 gap-y-1">
+        <IconAlert className="w-4 h-4 shrink-0 text-warning" />
+        <strong className="font-bold">Chế độ thử, chưa nối chuỗi.</strong>
+        <span>
           Máy chủ đang bỏ qua bước xác minh giao dịch và đọc quyền từ cơ sở dữ liệu.
-          Dữ liệu hiển thị ở đây chưa được blockchain bảo chứng.
+          Những gì hiện ở đây chưa được sổ đăng ký trên chuỗi xác nhận.
         </span>
       </div>
     </div>

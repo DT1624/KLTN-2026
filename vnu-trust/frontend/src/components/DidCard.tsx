@@ -4,8 +4,8 @@ import { useWallet } from "../hooks/useWallet";
 import { useChainTx, useMe } from "../hooks/useChain";
 import { ENTRY, bytesArg, hashArg } from "../lib/chain";
 import { sha3_256Hex } from "../lib/wallet";
-import { Card, Alert, Mono, Badge } from "./ui";
-import TxProgress from "./ChainTx";
+import { Alert, Mono, Badge } from "./ui";
+import TxProgress, { SignSheet } from "./ChainTx";
 
 /**
  * Đăng ký danh tính DID — TỰ KÝ, không dán mã giao dịch.
@@ -89,9 +89,14 @@ export default function DidCard() {
   }
 
   return (
-    <Card title="Danh tính DID"
-      subtitle="Định danh của bạn trên chuỗi. Mọi thao tác khác đều yêu cầu DID còn hoạt động.">
+    <SignSheet tx={tx}>
       <div className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Danh tính trên chuỗi (DID)</h2>
+          <p className="text-muted max-w-prose mt-1">
+            Định danh của bạn trên chuỗi. Mọi thao tác khác đều yêu cầu DID còn hoạt động.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Mono value={wallet.did} truncate={false} />
           {registered
@@ -103,18 +108,18 @@ export default function DidCard() {
         </div>
 
         {existing.data && (
-          <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <div>
-              <dt className="text-ink-400 text-xs uppercase tracking-wide">CID tài liệu</dt>
+              <dt className="label">Mã nội dung tài liệu (CID)</dt>
               <dd><Mono value={existing.data.documentCid} /></dd>
             </div>
             <div>
-              <dt className="text-ink-400 text-xs uppercase tracking-wide">Toàn vẹn nội dung</dt>
+              <dt className="label">Toàn vẹn nội dung</dt>
               <dd>
                 {existing.data.integrityOk === null
                   ? <Badge tone="muted">Chưa kiểm được</Badge>
                   : existing.data.integrityOk
-                    ? <Badge tone="ok">Khớp bản neo</Badge>
+                    ? <Badge tone="ok">Khớp bản ghi trên chuỗi</Badge>
                     : <Badge tone="bad">Nội dung đã bị sửa</Badge>}
               </dd>
             </div>
@@ -123,20 +128,18 @@ export default function DidCard() {
 
         {!registered && (
           <>
-            <Alert tone="info" title="Cần đăng ký một lần duy nhất">
-              Trình duyệt sẽ dựng DID Document chứa khoá công khai của bạn, ghim lên IPFS, rồi
-              ví <strong>tự ký</strong> giao dịch <span className="mono">register_did</span>. Bạn
-              không phải nhập mã giao dịch nào.
+            <Alert tone="info">
+              Ký một giao dịch để ghi danh tính này lên sổ đăng ký. Chỉ cần làm một lần.
             </Alert>
             <button className="btn-primary" type="button" disabled={tx.busy}
               onClick={() => void register()}>
-              {tx.busy ? tx.label : "Đăng ký DID"}
+              {tx.busy ? tx.label : "Ký và đăng ký DID"}
             </button>
           </>
         )}
 
         <TxProgress tx={tx} okTitle="Đã đăng ký DID" />
       </div>
-    </Card>
+    </SignSheet>
   );
 }

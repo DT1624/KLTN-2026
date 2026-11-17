@@ -8,19 +8,22 @@ import { useWallet } from "../hooks/useWallet";
 import { useMe, useAuthorityRoot, useChainTx, useChainMode } from "../hooks/useChain";
 import { ENTRY, VIEW, view } from "../lib/chain";
 import { api } from "../lib/api";
-import { Card, Alert, Mono, Badge, RoleBadge, Spinner } from "../components/ui";
+import { Alert, Mono, Badge, RoleBadge, Spinner, Section, roleLabel } from "../components/ui";
+import { useTitle } from "../hooks/useTitle";
+import Rosette from "../components/Rosette";
 import DidCard from "../components/DidCard";
 import GasPanel from "../components/GasPanel";
-import TxProgress from "../components/ChainTx";
+import TxProgress, { SignSheet } from "../components/ChainTx";
 
 /**
- * Trang "Danh tính & Gas" — nơi mọi tài khoản chuẩn bị để hoạt động được.
+ * Trang "Tài khoản" — nơi mọi tài khoản chuẩn bị để hoạt động được.
  *
  * Hai thứ một tài khoản mới cần trước khi làm bất cứ việc gì: **gas** để trả
  * phí giao dịch, và **DID** vì hợp đồng đòi DID đang hoạt động ở hầu hết các
  * hàm. Gom cả hai về một chỗ để không ai phải đoán vì sao nút của mình báo lỗi.
  */
 export default function Account() {
+  useTitle("Tài khoản");
   const { wallet } = useWallet();
   const me = useMe();
   const root = useAuthorityRoot();
@@ -34,32 +37,35 @@ export default function Account() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-ink-900">Danh tính &amp; gas</h1>
-        <p className="text-sm text-ink-600 mt-1">
-          Chuẩn bị tài khoản: nhận gas, đăng ký DID, xem quyền thật của mình trên chuỗi.
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Tài khoản</h1>
+        <p className="text-muted max-w-prose mt-2">
+          Chuẩn bị tài khoản: nhận phí giao dịch, đăng ký DID, xem quyền thật của mình trên chuỗi.
         </p>
       </header>
 
-      <Card title="Tài khoản">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="font-semibold text-ink-900">{me.data?.entity.label ?? wallet.label}</span>
-          <RoleBadge role={serverRole} />
-          <Mono value={wallet.address} />
+      <section className="sheet p-5 sm:p-6 space-y-5">
+        <div className="flex flex-wrap gap-5 items-center">
+          <Rosette seed={wallet.did || wallet.address} size={96} title="Hoa văn danh tính của bạn" />
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-semibold">{me.data?.entity.label ?? wallet.label}</h2>
+              <RoleBadge role={serverRole} />
+            </div>
+            <Mono value={wallet.address} />
+          </div>
         </div>
 
-        <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-1.5">
-            Quyền thật trên chuỗi
-          </p>
+        <div>
+          <p className="label mb-1.5">Quyền trên chuỗi</p>
           <div className="flex flex-wrap gap-2">
             <Badge tone={on?.hasActiveDid ? "ok" : "warn"}>
               {on?.hasActiveDid ? "DID đang hoạt động" : "Chưa có DID hoạt động"}
             </Badge>
             <Badge tone={on?.isActiveIssuer ? "ok" : "muted"}>
-              {on?.isActiveIssuer ? "Issuer đang hoạt động" : "Không phải issuer"}
+              {on?.isActiveIssuer ? "Đơn vị cấp bằng đang hoạt động" : "Không phải đơn vị cấp bằng"}
             </Badge>
             <Badge tone={on?.isActiveAdmin ? "ok" : "muted"}>
-              {on?.isActiveAdmin ? "Admin đang hoạt động" : "Không phải admin"}
+              {on?.isActiveAdmin ? "Quản trị viên đang hoạt động" : "Không phải quản trị viên"}
             </Badge>
             {on?.canDelegate && <Badge tone="info">Được uỷ quyền lại</Badge>}
             {root.data?.callerIsRoot && <Badge tone="info">Quản trị gốc</Badge>}
@@ -67,35 +73,37 @@ export default function Account() {
 
           {me.data && !me.data.consistent && (
             <div className="mt-3">
-              <Alert tone="warn" title="Vai trò khai trong ứng dụng chưa khớp quyền trên chuỗi">
-                Hồ sơ ghi vai trò <strong>{serverRole}</strong> nhưng chuỗi chưa công nhận quyền
-                tương ứng. Nút bấm trong khu vực đó sẽ bị hợp đồng từ chối cho tới khi quyền được
-                cấp thật.
+              <Alert tone="warn" title="Vai trò chưa khớp quyền trên chuỗi">
+                Vai trò trong ứng dụng ({roleLabel(serverRole)}) chưa khớp quyền trên chuỗi
+                ({on?.isActiveAdmin ? "Quản trị viên" : on?.isActiveIssuer ? "Đơn vị cấp bằng" : "Người học"}).
+                Nút bấm trong khu vực đó sẽ bị chuỗi từ chối cho tới khi quyền được cấp thật.
               </Alert>
             </div>
           )}
         </div>
-      </Card>
+      </section>
 
-      <DidCard />
+      <div className="grid lg:grid-cols-2 gap-6 items-start">
+        <DidCard />
+        <GasPanel />
+      </div>
       <BackupCard />
       <SelfLockCard />
-      <GasPanel />
 
       {root.data?.callerIsPendingRoot && <AcceptRootCard />}
 
-      <Card title="Khu vực làm việc">
-        <div className="flex flex-wrap gap-3">
-          <Link className="btn-ghost" to="/holder">Văn bằng của tôi</Link>
+      <Section title="Đi tới">
+        <ul className="space-y-2">
+          <li><Link className="link" to="/holder">Văn bằng của tôi</Link></li>
           {(on?.isActiveIssuer || serverRole === "issuer") && (
-            <Link className="btn-ghost" to="/issuer">Cấp văn bằng</Link>
+            <li><Link className="link" to="/issuer">Cấp văn bằng</Link></li>
           )}
           {(on?.isActiveAdmin || serverRole === "admin" || serverRole === "root") && (
-            <Link className="btn-ghost" to="/admin">Quản trị</Link>
+            <li><Link className="link" to="/admin">Quản trị</Link></li>
           )}
-          {root.data?.callerIsRoot && <Link className="btn-primary" to="/root">Quản trị gốc</Link>}
-        </div>
-      </Card>
+          {root.data?.callerIsRoot && <li><Link className="link" to="/root">Quản trị gốc</Link></li>}
+        </ul>
+      </Section>
     </div>
   );
 }
@@ -113,14 +121,18 @@ function AcceptRootCard() {
   const tx = useChainTx();
 
   return (
-    <Card title="Bạn đang được đề cử làm quản trị gốc"
-      subtitle="Quyền root chỉ thật sự chuyển sang khi chính bạn ký nhận.">
+    <SignSheet tx={tx}>
+      <h2 className="text-lg font-semibold">Bạn đang được đề cử làm quản trị gốc</h2>
+      <p className="text-muted max-w-prose mt-1 mb-4">
+        Quyền quản trị gốc chỉ thật sự chuyển sang khi chính bạn ký nhận.
+      </p>
       <Alert tone="warn" title="Đọc kỹ trước khi nhận">
-        Nhận quyền root nghĩa là bạn chịu trách nhiệm cấp và thu hồi toàn bộ quyền admin, issuer
-        của hệ thống. Root cũ sẽ mất quyền ngay khi giao dịch này thành công.
+        Nhận quyền quản trị gốc nghĩa là bạn chịu trách nhiệm cấp và thu hồi toàn bộ quyền quản trị
+        viên và đơn vị cấp bằng của hệ thống. Quản trị gốc cũ sẽ mất quyền ngay khi giao dịch này
+        thành công.
       </Alert>
 
-      <button className="btn-danger mt-4" type="button" disabled={tx.busy}
+      <button className="btn-primary mt-4" type="button" disabled={tx.busy}
         onClick={() => void tx.run({
           fn: ENTRY.acceptRoot,
           args: [],
@@ -134,7 +146,7 @@ function AcceptRootCard() {
       </button>
 
       <div className="mt-4"><TxProgress tx={tx} okTitle="Đã nhận quyền quản trị gốc" /></div>
-    </Card>
+    </SignSheet>
   );
 }
 
@@ -151,6 +163,7 @@ function SelfLockCard() {
   const { live } = useChainMode();
   const qc = useQueryClient();
   const tx = useChainTx();
+  const [last, setLast] = useState<"suspended" | "active" | null>(null);
   const did = useQuery({
     queryKey: ["did", "self", wallet?.address],
     queryFn: () => api.get<{ status: string; did: string }>(`/did/by-address/${wallet!.address}`),
@@ -166,59 +179,67 @@ function SelfLockCard() {
   const status = did.data.status;
   if (status === "revoked") {
     return (
-      <Card title="DID đã bị thu hồi">
+      <Section title="DID đã bị thu hồi">
         <Alert tone="bad" title="Địa chỉ này không dùng lại được">
           Thu hồi DID là vĩnh viễn. Hãy lập ví mới, đăng ký DID mới, rồi nhờ quản trị viên ghi nhận
           chuyển ví để đơn vị cấp bằng cấp lại văn bằng sang ví mới.
         </Alert>
-      </Card>
+      </Section>
     );
   }
   const norm = (a: string) => "0x" + a.replace(/^0x/, "").toLowerCase().padStart(64, "0");
   const by = record.data?.[0]?.suspended_by;
   const lockedBySelf = by ? norm(by) === norm(wallet.address) : null;
 
-  const run = (next: "suspended" | "active") => void tx.run({
-    fn: next === "suspended" ? ENTRY.suspendOwnDid : ENTRY.reactivateOwnDid,
-    args: [],
-    index: async (out) => {
-      const r = await api.post("/did/self-status", { status: next, txHash: out.hash });
-      qc.invalidateQueries();
-      return r;
-    },
-  });
+  const run = (next: "suspended" | "active") => {
+    setLast(next);
+    void tx.run({
+      fn: next === "suspended" ? ENTRY.suspendOwnDid : ENTRY.reactivateOwnDid,
+      args: [],
+      index: async (out) => {
+        const r = await api.post("/did/self-status", { status: next, txHash: out.hash });
+        qc.invalidateQueries();
+        return r;
+      },
+    });
+  };
 
   return (
-    <Card title="Khoá khẩn cấp"
-      subtitle="Nghi lộ khoá riêng hoặc 12 từ? Khoá DID ngay để không ai dùng được danh tính này.">
+    <SignSheet tx={tx}>
+      <h2 className="text-lg font-semibold">Khoá khẩn cấp</h2>
+      <p className="text-muted max-w-prose mt-1 mb-4">
+        Nghi lộ khoá riêng hoặc 12 từ? Khoá DID ngay để không ai dùng được danh tính này.
+      </p>
       {status === "active" ? (
         <>
           <Alert tone="warn" title="Hệ quả của việc khoá">
             Mọi vai trò (đơn vị cấp bằng, quản trị) của địa chỉ này ngừng ngay; không ai cấp được
-            văn bằng mới cho bạn. Văn bằng đã có vẫn còn nguyên. Bạn tự mở lại được — trừ khi quản
+            văn bằng mới cho bạn. Văn bằng đã có vẫn còn nguyên. Bạn tự mở lại được, trừ khi quản
             trị viên khoá đè, khi đó chỉ quản trị viên mở được.
           </Alert>
           <button className="btn-danger mt-4" type="button" disabled={tx.busy} onClick={() => run("suspended")}>
-            {tx.busy ? tx.label : "Ký & khoá DID của tôi"}
+            {tx.busy ? tx.label : "Ký và khoá DID của tôi"}
           </button>
         </>
       ) : (
         <>
           <Alert tone={lockedBySelf === false ? "bad" : "info"} title="DID đang bị khoá">
             {lockedBySelf === false
-              ? "Quản trị viên đã khoá DID này — chỉ quản trị viên mở được. Liên hệ phòng đào tạo."
+              ? "Quản trị viên đã khoá DID này, chỉ quản trị viên mở được. Liên hệ phòng đào tạo."
               : lockedBySelf === true
                 ? "Bạn đã tự khoá DID này. Chỉ mở lại khi chắc chắn khoá riêng chưa bị lộ."
-                : "Không đọc được ai đã khoá (chế độ không nối chuỗi). Nếu quản trị viên khoá, hợp đồng sẽ từ chối giao dịch mở."}
+                : "Không đọc được ai đã khoá (chế độ không nối chuỗi). Nếu quản trị viên khoá, chuỗi sẽ từ chối giao dịch mở khoá."}
           </Alert>
-          <button className="btn-ghost mt-4" type="button" disabled={tx.busy || lockedBySelf === false}
+          <button className="btn-primary mt-4" type="button" disabled={tx.busy || lockedBySelf === false}
             onClick={() => run("active")}>
-            {tx.busy ? tx.label : "Ký & mở khoá DID"}
+            {tx.busy ? tx.label : "Ký và mở khoá DID"}
           </button>
         </>
       )}
-      <div className="mt-4"><TxProgress tx={tx} okTitle="Đã cập nhật trạng thái DID" /></div>
-    </Card>
+      <div className="mt-4">
+        <TxProgress tx={tx} okTitle={last === "active" ? "Đã mở khoá DID" : "Đã khoá DID"} />
+      </div>
+    </SignSheet>
   );
 }
 
@@ -252,15 +273,15 @@ function BackupCard() {
 
   return (
     <div id="sao-luu">
-      <Card title="Sao lưu ví" subtitle="Mất khoá là mất tài khoản — và không đọc được văn bằng của chính mình (nội dung đã mã hoá).">
+      <Section title="Sao lưu ví" description="Mất khoá là mất tài khoản, và không đọc được văn bằng của chính mình (nội dung đã mã hoá).">
         <dl className="grid sm:grid-cols-3 gap-3 text-sm">
-          <div><dt className="text-ink-500">Đã xác nhận chép 12 từ</dt><dd className="font-medium">{fmt(st.mnemonicAt)}</dd></div>
-          <div><dt className="text-ink-500">Đã tải tệp sao lưu</dt><dd className="font-medium">{fmt(st.keystoreAt)}</dd></div>
-          <div><dt className="text-ink-500">Lần kiểm tra 12 từ gần nhất</dt><dd className="font-medium">{fmt(st.checkedAt)}</dd></div>
+          <div><dt className="label">Đã xác nhận chép 12 từ</dt><dd className="font-semibold">{fmt(st.mnemonicAt)}</dd></div>
+          <div><dt className="label">Đã tải tệp sao lưu</dt><dd className="font-semibold">{fmt(st.keystoreAt)}</dd></div>
+          <div><dt className="label">Lần kiểm tra 12 từ gần nhất</dt><dd className="font-semibold">{fmt(st.checkedAt)}</dd></div>
         </dl>
         {need === "backup" && (
           <div className="mt-3"><Alert tone="bad" title="Chưa có cách khôi phục nào trên máy này">
-            Tải tệp sao lưu ở trang <Link className="underline" to="/wallet">Ví</Link>, hoặc kiểm tra 12 từ bên dưới nếu bạn đã chép.
+            Tải tệp sao lưu ở trang <Link className="link" to="/wallet">Ví</Link>, hoặc kiểm tra 12 từ bên dưới nếu bạn đã chép.
           </Alert></div>
         )}
         {need === "check" && (
@@ -269,15 +290,17 @@ function BackupCard() {
           </Alert></div>
         )}
         <form className="mt-4 flex flex-col sm:flex-row gap-3" onSubmit={(e) => { e.preventDefault(); check(); }}>
-          <input className="input flex-1 mono" type="password" autoComplete="off" value={phrase}
+          <input className="input flex-1" type="password" autoComplete="off" value={phrase}
             onChange={(e) => { setPhrase(e.target.value); setResult(null); }}
             placeholder="Gõ đủ 12 từ, cách nhau bằng dấu cách" aria-label="12 từ khôi phục" />
-          <button className="btn-ghost" type="submit" disabled={phrase.trim().split(/\s+/).length < 12}>Kiểm tra</button>
+          <button className="btn-secondary" type="submit" disabled={phrase.trim().split(/\s+/).length < 12}>Kiểm tra</button>
         </form>
-        {result === "ok" && <div className="mt-3"><Alert tone="ok" title="Đúng">12 từ này khôi phục đúng ví đang mở.</Alert></div>}
-        {result === "bad" && <div className="mt-3"><Alert tone="bad" title="Không khớp">12 từ hợp lệ nhưng sinh ra một ví KHÁC — tờ giấy có thể chép sai thứ tự hoặc sai từ.</Alert></div>}
-        {result === "invalid" && <div className="mt-3"><Alert tone="bad" title="Cụm từ không hợp lệ">Kiểm tra lại chính tả và đủ 12 từ.</Alert></div>}
-      </Card>
+        <div role="status" aria-live="polite">
+          {result === "ok" && <div className="mt-3"><Alert tone="ok" title="Đúng">12 từ này khôi phục đúng ví đang mở.</Alert></div>}
+          {result === "bad" && <div className="mt-3"><Alert tone="bad" title="Không khớp">12 từ hợp lệ nhưng sinh ra một ví khác. Tờ giấy có thể chép sai thứ tự hoặc sai từ.</Alert></div>}
+          {result === "invalid" && <div className="mt-3"><Alert tone="bad" title="Cụm từ không hợp lệ">Kiểm tra lại chính tả và đủ 12 từ.</Alert></div>}
+        </div>
+      </Section>
     </div>
   );
 }

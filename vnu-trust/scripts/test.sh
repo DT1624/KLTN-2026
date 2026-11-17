@@ -26,6 +26,8 @@ static_checks() {
   run "Ví: khôi phục từ cụm từ"  "cd '$ROOT/frontend' && ../backend/node_modules/.bin/tsx scripts/wallet-restore.ts | tail -1"
   run "Mã hoá văn bằng (P3)"     "cd '$ROOT/frontend' && ../backend/node_modules/.bin/tsx scripts/vc-crypto-check.ts | tail -1"
   run "Nhắc sao lưu (P4.3)"      "cd '$ROOT/frontend' && ../backend/node_modules/.bin/tsx scripts/backup-check.ts | tail -1"
+  run "Frontend: hoa văn đối chiếu" "cd '$ROOT/frontend' && ../backend/node_modules/.bin/tsx scripts/rosette-check.ts | tail -1"
+  run "Frontend: phiên ví qua tải lại" "cd '$ROOT/frontend' && ../backend/node_modules/.bin/tsx scripts/session-check.ts | tail -1"
 }
 
 cleanup() {

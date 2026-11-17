@@ -1,15 +1,32 @@
-import { useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, type VerificationReport } from "../lib/api";
 import { useWallet } from "../hooks/useWallet";
+import { useTitle } from "../hooks/useTitle";
 import { openPresentation, parseShareInput } from "../lib/vcStore";
-import { Card, Alert, Spinner, Badge, Mono, Empty } from "../components/ui";
+import { Alert, Spinner, Mono, Empty, Row, StatusBadge, Badge, Section } from "../components/ui";
+import { IconCheck, IconCross } from "../components/icons";
+import Rosette from "../components/Rosette";
+import Seal from "../components/Seal";
 
-/** Trang xác minh công khai — bên xác minh quét QR là vào thẳng đây. */
+// Tên bước do máy chủ trả về sang nhãn dễ hiểu; không khớp thì hiện nguyên tên.
+const CHECK_LABEL: Record<string, string> = {
+  "Tải VP từ IPFS": "Lấy được bản trình bày đã mã hoá",
+  "Toàn vẹn nội dung VP": "Bản trình bày còn nguyên vẹn",
+  "Chữ ký của người trình bày": "Chữ ký của người trình bày hợp lệ",
+  "DID người trình bày còn hiệu lực": "Danh tính người trình bày còn hoạt động",
+  "Tất cả chứng chỉ còn hiệu lực": "Văn bằng chưa bị thu hồi, tạm ngưng hay hết hạn",
+};
+const checkLabel = (name: string) => CHECK_LABEL[name] ?? name;
+
+/** Trang xác minh công khai: bên xác minh mở liên kết người học gửi là vào thẳng đây. */
 export default function Verify() {
+  useTitle("Xác minh văn bằng");
   const { token: routeToken } = useParams();
   const { wallet } = useWallet();
+  const inputId = useId();
+  const verdictRef = useRef<HTMLHeadingElement>(null);
   // P3: khoá giải mã nằm trong FRAGMENT (#k=…) — trình duyệt không gửi phần này lên máy chủ.
   const routeKey = new URLSearchParams(location.hash.slice(1)).get("k");
   const [token, setToken] = useState(routeToken ? `${routeToken}${routeKey ? `#k=${routeKey}` : ""}` : "");
@@ -47,22 +64,31 @@ export default function Verify() {
     onError: (e) => { setErr((e as Error).message); setReport(null); },
   });
 
+  // Kết quả vừa về thì đưa focus tới kết luận.
+  useEffect(() => {
+    if (report) verdictRef.current?.focus();
+  }, [report]);
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
+    <div className="max-w-4xl space-y-10">
       <header>
-        <h1 className="text-2xl font-bold text-ink-900">Xác minh văn bằng</h1>
-        <p className="text-sm text-ink-600 mt-1">
-          Dán mã chia sẻ hoặc quét QR. Hệ thống kiểm 7 bước độc lập và đối chiếu trực tiếp với blockchain.
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Xác minh văn bằng</h1>
+        <p className="mt-2 text-muted max-w-prose">
+          Dán liên kết người học gửi cho bạn. Trình duyệt của bạn tự giải mã văn bằng rồi đối chiếu bảy bước
+          với sổ đăng ký trên chuỗi.
         </p>
       </header>
 
-      <Card>
-        <form className="flex flex-col sm:flex-row gap-3"
+      <section className="sheet p-5">
+        <form className="flex flex-col sm:flex-row sm:items-end gap-3"
           onSubmit={(e) => { e.preventDefault(); run.mutate(token.trim()); }}>
-          <input className="input flex-1 mono" value={token} onChange={(e) => setToken(e.target.value)}
-            placeholder="Liên kết chia sẻ (…/verify/<mã>#k=<khoá>)" aria-label="Liên kết chia sẻ" />
+          <div className="flex-1 min-w-0">
+            <label className="label" htmlFor={inputId}>Liên kết chia sẻ</label>
+            <input id={inputId} className="input hex" value={token} onChange={(e) => setToken(e.target.value)}
+              placeholder="…/verify/<mã>#k=<khoá>" />
+          </div>
           <button className="btn-primary" disabled={run.isPending || token.trim().length < 8}>
-            {run.isPending ? "Đang kiểm…" : "Xác minh"}
+            {run.isPending ? "Đang xác minh…" : "Xác minh"}
           </button>
         </form>
 
@@ -72,74 +98,149 @@ export default function Verify() {
           </Alert></div>
         )}
         {preview.data && !report && (
-          <div className="mt-4 text-sm text-ink-600">
-            Liên kết hợp lệ, chứa {preview.data.vcIds.length} văn bằng, hết hạn lúc{" "}
-            <strong>{new Date(preview.data.expiresAt).toLocaleString("vi-VN")}</strong>.
-            Bấm “Xác minh” để kiểm tra đầy đủ.
-          </div>
+          <p className="mt-4 text-sm text-muted">
+            Liên kết còn hạn đến{" "}
+            <strong className="font-semibold">{new Date(preview.data.expiresAt).toLocaleString("vi-VN")}</strong>,
+            chứa {preview.data.vcIds.length} văn bằng. Bấm Xác minh để kiểm đủ bảy bước.
+          </p>
         )}
-      </Card>
+      </section>
 
       {err && <Alert tone="bad" title="Xác minh thất bại">{err}</Alert>}
-      {run.isPending && <Spinner label="Đang đối chiếu với blockchain…" />}
+      {run.isPending && <Spinner label="Đang đối chiếu với sổ đăng ký trên chuỗi…" />}
 
-      {report && (
-        <>
-          <div className={`rounded-2xl p-6 text-center border-2 ${
-            report.overallValid ? "bg-emerald-50 border-emerald-300" : "bg-rose-50 border-rose-300"
-          }`}>
-            <div className="text-5xl" aria-hidden>{report.overallValid ? "✅" : "⛔"}</div>
-            <p className={`mt-3 text-xl font-bold ${report.overallValid ? "text-emerald-800" : "text-rose-800"}`}>
-              {report.overallValid ? "Văn bằng hợp lệ" : "Không vượt qua xác minh"}
-            </p>
-            <p className="mt-1 text-sm text-ink-600">
-              Kiểm lúc {new Date(report.verifiedAt).toLocaleString("vi-VN")}
-            </p>
-          </div>
+      <div aria-live="polite">
+        {report && <Report report={report} verdictRef={verdictRef} />}
+      </div>
+    </div>
+  );
+}
 
-          <Card title="Chi tiết 7 bước kiểm tra">
-            <ul className="space-y-2.5">
-              {report.checks.map((c) => (
-                <li key={c.name} className="flex items-start gap-3 text-sm">
-                  {/* Bước cảnh báo (bước 6 — C2): không quyết định kết quả, hiện màu vàng. */}
-                  <span aria-hidden className="mt-0.5">{c.passed ? "✅" : c.advisory ? "⚠️" : "❌"}</span>
-                  <div className="min-w-0">
-                    <p className={`font-semibold ${c.passed ? "text-ink-800" : c.advisory ? "text-amber-700" : "text-rose-700"}`}>
-                      {c.name}{!c.passed && c.advisory && <span className="font-normal text-xs"> · cảnh báo, không ảnh hưởng kết quả</span>}
-                    </p>
-                    <p className="text-ink-500 text-xs mt-0.5 break-words">{c.detail}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
+function Report({ report, verdictRef }: { report: VerificationReport; verdictRef: React.RefObject<HTMLHeadingElement> }) {
+  const ok = report.overallValid;
+  const n = report.credentials.length;
+  const failIdx = report.checks.findIndex((c) => !c.passed && !c.advisory);
+  const failed = failIdx >= 0 ? report.checks[failIdx] : undefined;
+  // Hoa văn: seed tính một lần từ báo cáo, không đổi giữa các lần render.
+  const firstVcId = report.credentials[0]?.vcId;
+  const seed = useMemo(
+    () => (n === 1 && firstVcId ? firstVcId : report.vpId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [report.vpId, firstVcId],
+  );
+  // Hiệu ứng vẽ chỉ chạy ở lần render đầu của mỗi báo cáo (theo vpId). Render lại
+  // cùng vpId thì tắt animate, để hoa văn không bị vẽ lại từ đầu (bản 1 hiện trống).
+  const drawnFor = useRef<string | null>(null);
+  const animate = drawnFor.current !== report.vpId;
+  useEffect(() => {
+    drawnFor.current = report.vpId;
+  }, [report.vpId]);
 
-          <Card title="Văn bằng trong bản trình bày">
-            {report.credentials.length ? (
-              <ul className="divide-y divide-ink-100">
-                {report.credentials.map((c) => (
-                  <li key={c.vcId} className="py-3 flex items-center justify-between gap-3">
+  return (
+    <div className="space-y-6">
+      <section className="sheet shadow-raised p-6 sm:p-8 relative">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_220px] gap-8">
+          <div>
+            <div className="flex gap-4 items-start">
+              <span
+                className={`w-11 h-11 shrink-0 rounded-full grid place-items-center ${ok ? "bg-success-soft text-success" : "bg-son-tint text-son"}`}
+              >
+                {ok ? <IconCheck className="w-6 h-6" /> : <IconCross className="w-6 h-6" />}
+              </span>
+              <div className="min-w-0">
+                <h2
+                  ref={verdictRef}
+                  tabIndex={-1}
+                  className={`text-3xl font-bold tracking-tight ${ok ? "text-ink" : "text-son"}`}
+                >
+                  {ok ? (n > 1 ? `${n} văn bằng đều thật` : "Văn bằng thật") : "Không xác minh được"}
+                </h2>
+                {ok ? (
+                  <p className="mt-2 text-lg text-ink-2 max-w-[52ch]">
+                    Còn hiệu lực. Đã đối chiếu với sổ đăng ký trên chuỗi lúc {new Date(report.verifiedAt).toLocaleString("vi-VN")}.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-lg text-ink-2 max-w-[52ch]">
+                    {failed
+                      ? <>Bước {failIdx + 1} không đạt: {checkLabel(failed.name)}. {failed.detail}</>
+                      : "Có bước kiểm không đạt."}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <ol className="rounded-sheet border border-rule overflow-hidden mt-5">
+              {report.checks.map((c, i) => {
+                const flagged = !c.passed;
+                return (
+                  <li
+                    key={c.name}
+                    className="grid grid-cols-[1.75rem_minmax(0,1fr)_auto] gap-3 px-4 py-3 border-t border-rule first:border-t-0 items-center"
+                  >
+                    <span className="text-muted tabular-nums">{i + 1}</span>
                     <div className="min-w-0">
-                      <p className="font-medium text-ink-800">{c.typeLabel}</p>
-                      <p className="text-xs text-ink-500 mt-0.5">Cấp bởi <Mono value={c.issuerDid} /></p>
-                      {c.replacedBy && (
-                        <p className="text-xs text-amber-700 mt-1">
-                          Văn bằng này đã được cấp lại — thay bằng <Mono value={c.replacedBy} /> (liên kết ghi trên chuỗi).
-                        </p>
+                      <p className="font-semibold">{checkLabel(c.name)}</p>
+                      {(flagged || c.advisory) && c.detail && (
+                        <p className="mt-0.5 text-sm text-muted break-words">{c.detail}</p>
+                      )}
+                      {c.advisory && !c.passed && (
+                        <p className="text-sm text-muted">Không ảnh hưởng kết quả xác minh.</p>
                       )}
                     </div>
-                    <Badge tone={c.status === "active" ? "ok" : "bad"}>{c.status}</Badge>
+                    {c.passed ? (
+                      c.advisory ? <Badge tone="muted">Tham khảo</Badge> : <Badge tone="ok">Đạt</Badge>
+                    ) : c.advisory ? (
+                      <Badge tone="warn">Cần lưu ý</Badge>
+                    ) : (
+                      <Badge tone="bad">Không đạt</Badge>
+                    )}
                   </li>
-                ))}
-              </ul>
-            ) : <Empty title="Bản trình bày không chứa văn bằng nào" />}
-          </Card>
+                );
+              })}
+            </ol>
+          </div>
 
-          <p className="text-xs text-ink-400 text-center">
-            Người trình bày: <Mono value={report.holderDid} /> · Mã VP: <Mono value={report.vpId} />
-          </p>
-        </>
-      )}
+          <div className="relative lg:self-start">
+            <div className="max-w-full">
+              <Rosette seed={seed} size={220} animate={animate} title="Hoa văn đối chiếu của văn bằng" />
+            </div>
+            <p className="mt-4 text-sm text-muted">
+              Người học mở văn bằng này trong ví sẽ thấy đúng hoa văn này.
+            </p>
+            {ok && (
+              <div className="absolute top-0 right-4 lg:-top-4 lg:-right-4">
+                <Seal size={130} animate={animate} />
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <Section title="Văn bằng trong bản trình bày">
+        {n ? (
+          <ul className="border-t border-rule">
+            {report.credentials.map((c) => (
+              <li key={c.vcId} className="flex items-start gap-4 border-b border-rule py-4 last:border-b-0">
+                <Rosette seed={c.vcId} size={56} />
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-semibold">{c.typeLabel}</h3>
+                  <p className="mt-1 text-sm text-muted">Cấp bởi <Mono value={c.issuerDid} /></p>
+                  {c.replacedBy && (
+                    <p className="mt-2 rounded-ctrl bg-warning-soft text-ink p-2 text-sm">
+                      Văn bằng này đã được cấp lại. Bản mới: <Mono value={c.replacedBy} />
+                    </p>
+                  )}
+                </div>
+                <StatusBadge status={c.status} />
+              </li>
+            ))}
+          </ul>
+        ) : <Empty title="Bản trình bày không chứa văn bằng nào" />}
+        <dl className="space-y-3 mt-4">
+          <Row label="Người trình bày"><Mono value={report.holderDid} /></Row>
+          <Row label="Mã bản trình bày"><Mono value={report.vpId} /></Row>
+        </dl>
+      </Section>
     </div>
   );
 }

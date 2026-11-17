@@ -3,8 +3,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Credential } from "../../lib/api";
 import { useChainTx } from "../../hooks/useChain";
 import { ENTRY, bytesArg, u64Arg } from "../../lib/chain";
-import { Card, Alert, Mono, Field, Row, StatusBadge } from "../../components/ui";
-import TxProgress from "../../components/ChainTx";
+import { Section, Alert, Mono, Field, Row, StatusBadge } from "../../components/ui";
+import TxProgress, { SignSheet } from "../../components/ChainTx";
+import Rosette from "../../components/Rosette";
 import ReviewPanel from "../../components/ReviewPanel";
 
 /**
@@ -35,8 +36,15 @@ export default function CredentialsTab() {
   const canSign = onChainId !== null;
 
   const FN = { revoke: ENTRY.adminRevokeVc, suspend: ENTRY.adminSuspendVc, reinstate: ENTRY.adminReinstateVc };
+  const OK_TITLE = {
+    revoke: "Đã thu hồi văn bằng",
+    suspend: "Đã tạm ngưng văn bằng",
+    reinstate: "Đã kích hoạt lại văn bằng",
+  };
+  const [lastKind, setLastKind] = useState<keyof typeof FN>("revoke");
   const act = (kind: keyof typeof FN) => {
     if (!vc || !canSign) return;
+    setLastKind(kind);
     void tx.run({
       fn: FN[kind],
       args: [u64Arg(onChainId!), bytesArg(reason.trim())],
@@ -57,75 +65,84 @@ export default function CredentialsTab() {
     <div className="space-y-6">
       <ReviewPanel mode="admin" />
       <LinkReplacementCard />
-      <Card title="Tra văn bằng" subtitle="Nhập mã văn bằng để xem trạng thái và thao tác.">
+      <Section title="Tra văn bằng" description="Nhập mã văn bằng để xem trạng thái và thao tác.">
         <form className="flex flex-col sm:flex-row gap-3 sm:items-end"
           onSubmit={(e) => { e.preventDefault(); find.mutate(); }}>
           <div className="flex-1">
-            <Field label="Mã văn bằng (vcId)" value={vcId} onChange={setVcId} mono required
+            <Field label="Mã văn bằng" value={vcId} onChange={setVcId} mono required
               placeholder="urn:uuid:…" />
           </div>
-          <button className="btn-primary sm:w-36" type="submit" disabled={find.isPending}>
-            {find.isPending ? "Đang tra…" : "Tra cứu"}
+          <button className="btn-secondary sm:w-40" type="submit" disabled={find.isPending}>
+            {find.isPending ? "Đang tra…" : "Tra văn bằng"}
           </button>
         </form>
-        {err && <div className="mt-4"><Alert tone="bad" title="Không tìm thấy">{err}</Alert></div>}
-      </Card>
+        {err && <div className="mt-4" role="status" aria-live="polite"><Alert tone="bad" title="Không tìm thấy">{err}</Alert></div>}
 
-      {vc && (
-        <Card title="Văn bằng">
-          <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            <Row label="Trạng thái"><StatusBadge status={vc.status} /></Row>
-            <Row label="Số hiệu trên chuỗi">
-              {canSign
-                ? <span className="mono">{onChainId}</span>
-                : <span className="text-amber-700">không có</span>}
-            </Row>
-            <Row label="Đơn vị cấp"><Mono value={vc.issuer_did} /></Row>
-            <Row label="Người sở hữu"><Mono value={vc.holder_did} /></Row>
-            <Row label="Ngày cấp">{new Date(vc.issued_at).toLocaleString("vi-VN")}</Row>
-            <Row label="Hạn dùng">
-              {vc.expires_at ? new Date(vc.expires_at).toLocaleString("vi-VN") : "Vĩnh viễn"}
-            </Row>
-            <Row label="Mã giao dịch cấp"><Mono value={vc.tx_hash} /></Row>
-            {vc.replaces_vc_id && <Row label="Thay cho văn bằng"><Mono value={vc.replaces_vc_id} /></Row>}
-            {vc.replaced_by_vc_id && <Row label="Đã được thay bằng"><Mono value={vc.replaced_by_vc_id} /></Row>}
-            <Row label="CID nội dung"><Mono value={vc.ipfs_cid} /></Row>
-          </dl>
-
-          {!canSign && (
-            <div className="mt-4">
-              <Alert tone="warn" title="Không cưỡng chế được trên chuỗi">
-                Bản ghi này không có số hiệu on-chain. Đây là văn bằng cấp từ thời giao diện còn
-                ghi <span className="mono">onChainVcId = 0</span> vì không tự gửi giao dịch nên
-                không đọc được sự kiện trả về. Những văn bằng cấp từ nay đều có số thật.
-              </Alert>
+        {vc && (
+          <>
+          <div className="sheet p-5 sm:p-6 mt-5" role="status" aria-live="polite">
+            <div className="flex flex-wrap items-center gap-4 mb-4">
+              <Rosette seed={vc.vc_id} size={64} />
+              <div className="min-w-0 space-y-1">
+                <h3 className="text-base font-semibold">Văn bằng</h3>
+                <Mono value={vc.vc_id} />
+                <div><StatusBadge status={vc.status} /></div>
+              </div>
             </div>
-          )}
+            <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+              <Row label="Số hiệu trên chuỗi">
+                {canSign
+                  ? <span className="hex">{onChainId}</span>
+                  : "Không có"}
+              </Row>
+              <Row label="Đơn vị cấp"><Mono value={vc.issuer_did} /></Row>
+              <Row label="Người học"><Mono value={vc.holder_did} /></Row>
+              <Row label="Ngày cấp">{new Date(vc.issued_at).toLocaleString("vi-VN")}</Row>
+              <Row label="Hạn dùng">
+                {vc.expires_at ? new Date(vc.expires_at).toLocaleString("vi-VN") : "Vĩnh viễn"}
+              </Row>
+              <Row label="Mã giao dịch cấp"><Mono value={vc.tx_hash} /></Row>
+              {vc.replaces_vc_id && <Row label="Thay cho văn bằng"><Mono value={vc.replaces_vc_id} /></Row>}
+              {vc.replaced_by_vc_id && <Row label="Đã được thay bằng"><Mono value={vc.replaced_by_vc_id} /></Row>}
+              <Row label="Mã nội dung (CID)"><Mono value={vc.ipfs_cid} /></Row>
+            </dl>
 
-          <div className="mt-5 space-y-4">
-            <Field label="Lý do (bắt buộc, ghi vào nhật ký kiểm toán)" value={reason}
-              onChange={setReason} placeholder="Phát hiện sai sót hồ sơ" />
-            <div className="flex flex-wrap gap-3">
-              <button className="btn-danger" type="button"
-                disabled={!canSign || reason.trim().length < 2 || tx.busy || vc.status === "revoked"}
-                onClick={() => act("revoke")}>Ký &amp; thu hồi</button>
-              <button className="btn-ghost" type="button"
-                disabled={!canSign || reason.trim().length < 2 || tx.busy || vc.status !== "active"}
-                onClick={() => act("suspend")}>Ký &amp; tạm ngưng</button>
-              <button className="btn-ghost" type="button"
-                disabled={!canSign || reason.trim().length < 2 || tx.busy || vc.status !== "suspended"}
-                onClick={() => act("reinstate")}>Ký &amp; kích hoạt lại</button>
-            </div>
-            <p className="text-xs text-ink-400">
-              Thu hồi là vĩnh viễn — hợp đồng không cho đổi trạng thái của văn bằng đã thu hồi.
-              Tạm ngưng chỉ áp dụng cho văn bằng đang hiệu lực, và chỉ admin kích hoạt lại được.
-              Văn bằng đã hết hạn chỉ còn thu hồi được.
-            </p>
+            {!canSign && (
+              <div className="mt-4">
+                <Alert tone="warn" title="Không thao tác được trên chuỗi">
+                  Văn bằng này chưa có số hiệu trên chuỗi (được cấp ở chế độ thử), nên không thao tác
+                  trên chuỗi được.
+                </Alert>
+              </div>
+            )}
           </div>
 
-          <div className="mt-4"><TxProgress tx={tx} okTitle="Đã cập nhật trạng thái văn bằng" /></div>
-        </Card>
-      )}
+          <SignSheet tx={tx} className="mt-4">
+            <div className="space-y-4">
+              <Field label="Lý do (bắt buộc, ghi vào nhật ký kiểm toán)" value={reason}
+                onChange={setReason} placeholder="Phát hiện sai sót hồ sơ" />
+              <div className="flex flex-wrap gap-3">
+                <button className="btn-danger" type="button"
+                  disabled={!canSign || reason.trim().length < 2 || tx.busy || vc.status === "revoked"}
+                  onClick={() => act("revoke")}>Ký và thu hồi</button>
+                <button className="btn-secondary" type="button"
+                  disabled={!canSign || reason.trim().length < 2 || tx.busy || vc.status !== "active"}
+                  onClick={() => act("suspend")}>Ký và tạm ngưng</button>
+                <button className="btn-primary" type="button"
+                  disabled={!canSign || reason.trim().length < 2 || tx.busy || vc.status !== "suspended"}
+                  onClick={() => act("reinstate")}>Ký và kích hoạt lại</button>
+              </div>
+              <p className="text-sm text-muted max-w-prose">
+                Thu hồi là vĩnh viễn: sổ đăng ký không cho đổi trạng thái của văn bằng đã thu hồi.
+                Tạm ngưng chỉ áp dụng cho văn bằng đang hiệu lực, và chỉ quản trị viên kích hoạt lại
+                được. Văn bằng đã hết hạn chỉ còn thu hồi được.
+              </p>
+              <TxProgress tx={tx} okTitle={OK_TITLE[lastKind]} />
+            </div>
+          </SignSheet>
+          </>
+        )}
+      </Section>
     </div>
   );
 }
@@ -178,25 +195,34 @@ function LinkReplacementCard() {
   };
 
   return (
-    <Card title="Nối văn bằng thay thế"
-      subtitle="Dùng khi đơn vị cấp văn bằng cũ đã mất quyền và một đơn vị khác đã cấp văn bằng mới.">
+    <Section title="Nối văn bằng thay thế"
+      description="Dùng khi đơn vị cấp văn bằng cũ đã mất quyền và một đơn vị khác đã cấp văn bằng mới.">
       <form className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end"
         onSubmit={(e) => { e.preventDefault(); load.mutate(); }}>
-        <Field label="Văn bằng cũ (vcId)" value={oldId} onChange={setOldId} mono required placeholder="urn:uuid:…" />
-        <Field label="Văn bằng mới (vcId)" value={newId} onChange={setNewId} mono required placeholder="urn:uuid:…" />
-        <button className="btn-ghost" type="submit" disabled={load.isPending}>Kiểm tra</button>
+        <Field label="Văn bằng cũ" value={oldId} onChange={setOldId} mono required placeholder="urn:uuid:…" />
+        <Field label="Văn bằng mới" value={newId} onChange={setNewId} mono required placeholder="urn:uuid:…" />
+        <button className="btn-secondary" type="submit" disabled={load.isPending}>Kiểm tra</button>
       </form>
-      {err && <div className="mt-4"><Alert tone="bad" title="Không tìm thấy">{err}</Alert></div>}
+      {err && <div className="mt-4" role="status" aria-live="polite"><Alert tone="bad" title="Không tìm thấy">{err}</Alert></div>}
       {o && n && (
-        <div className="mt-4 space-y-3 text-sm">
-          <p>Số hiệu <span className="mono">{o.on_chain_vc_id}</span> → <span className="mono">{n.on_chain_vc_id}</span>
-            {" · "}holder {o.holder_address === n.holder_address ? "giữ nguyên" : "đổi sang ví mới (DID cũ phải đã bị khoá/thu hồi)"}</p>
-          {problem
-            ? <Alert tone="warn" title="Không nối được">{problem}</Alert>
-            : <button className="btn-primary" type="button" disabled={tx.busy} onClick={link}>Ký &amp; nối liên kết</button>}
-          <TxProgress tx={tx} okTitle="Đã nối văn bằng thay thế" />
-        </div>
+        <SignSheet tx={tx} className="mt-5">
+          <div className="space-y-3">
+            <p>
+              Văn bằng số <span className="hex">{o.on_chain_vc_id}</span> được thay bằng văn bằng số{" "}
+              <span className="hex">{n.on_chain_vc_id}</span>.
+            </p>
+            <p className="text-muted">
+              {o.holder_address === n.holder_address
+                ? "Người học giữ nguyên ví."
+                : "Người học đổi sang ví mới (DID của ví cũ phải đã bị khoá hoặc thu hồi)."}
+            </p>
+            {problem
+              ? <Alert tone="warn" title="Không nối được">{problem}</Alert>
+              : <button className="btn-primary" type="button" disabled={tx.busy} onClick={link}>Ký và nối văn bằng thay thế</button>}
+            <TxProgress tx={tx} okTitle="Đã nối văn bằng thay thế" />
+          </div>
+        </SignSheet>
       )}
-    </Card>
+    </Section>
   );
 }

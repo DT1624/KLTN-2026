@@ -1,12 +1,15 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useWallet } from "../hooks/useWallet";
 import { useAuthorityRoot, useChainTx } from "../hooks/useChain";
+import { useTitle } from "../hooks/useTitle";
 import { ENTRY, bytesArg } from "../lib/chain";
-import { Card, Alert, Mono, Badge, Spinner, Empty, Field, Row } from "../components/ui";
-import TxProgress from "../components/ChainTx";
+import { Section, Alert, Mono, Spinner, Empty, Field, Row, RoleStatusBadge } from "../components/ui";
+import TxProgress, { SignSheet } from "../components/ChainTx";
 import GasPanel from "../components/GasPanel";
+import Rosette from "../components/Rosette";
 
 interface RoleRow {
   address: string;
@@ -14,6 +17,15 @@ interface RoleRow {
   label: string;
   createdAt: string;
   activeOnChain: boolean;
+}
+
+function PageHead({ children }: { children?: ReactNode }) {
+  return (
+    <header>
+      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Quản trị gốc</h1>
+      {children}
+    </header>
+  );
 }
 
 /**
@@ -29,50 +41,63 @@ interface RoleRow {
  * bước nên vẫn huỷ được đề cử (F-00).
  */
 export default function Root() {
+  useTitle("Quản trị gốc");
   const { wallet } = useWallet();
   const root = useAuthorityRoot();
 
-  if (root.isLoading) return <Spinner label="Đang đọc quyền gốc…" />;
+  if (root.isLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHead />
+        <Spinner label="Đang đọc quyền gốc…" />
+      </div>
+    );
+  }
 
   if (!root.data?.callerIsRoot) {
     return (
-      <Alert tone="bad" title="Trang này chỉ dành cho quản trị gốc">
-        Địa chỉ đang đăng nhập không phải <span className="mono">root_admin</span> trên chuỗi.
-        {root.data?.rootAdmin && (
-          <p className="mt-2">Root hiện tại: <Mono value={root.data.rootAdmin} /></p>
-        )}
-      </Alert>
+      <div className="space-y-6">
+        <PageHead />
+        <Alert tone="bad" title="Trang này chỉ dành cho quản trị gốc">
+          Ví đang mở không phải quản trị gốc trên chuỗi.
+          {root.data?.rootAdmin && (
+            <p className="mt-2">Quản trị gốc hiện tại: <Mono value={root.data.rootAdmin} /></p>
+          )}
+        </Alert>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-ink-900">Quản trị gốc</h1>
-        <p className="text-sm text-ink-600 mt-1">
+      <PageHead>
+        <p className="text-muted max-w-prose mt-2">
           Cấp và thu hồi quyền quản trị viên, chuyển quyền gốc. Mọi thao tác ở đây do chính ví của
           bạn ký.
         </p>
-      </header>
+      </PageHead>
 
-      <Card title="Quyền gốc hiện tại">
-        <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <Row label="Root trên chuỗi">
-            {root.data.rootAdmin ? <Mono value={root.data.rootAdmin} truncate={false} /> : "—"}
-          </Row>
-          <Row label="Ví đang dùng">
-            <Mono value={wallet?.address ?? ""} truncate={false} />
-          </Row>
-          <Row label="Đang đề cử">
-            {root.data.pendingRoot
-              ? <Mono value={root.data.pendingRoot} truncate={false} />
-              : <span className="text-ink-400">Không có</span>}
-          </Row>
-          <Row label="Nguồn dữ liệu">
-            {root.data.source === "chain" ? "Đọc trực tiếp từ chuỗi" : "Chỉ mục CSDL"}
-          </Row>
-        </dl>
-      </Card>
+      <Section title="Quyền gốc hiện tại">
+        <div className="flex flex-wrap items-start gap-5">
+          {root.data.rootAdmin && <Rosette seed={root.data.rootAdmin} size={64} />}
+          <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3 flex-1 min-w-0">
+            <Row label="Quản trị gốc trên chuỗi">
+              {root.data.rootAdmin ? <Mono value={root.data.rootAdmin} truncate={false} /> : "Chưa có"}
+            </Row>
+            <Row label="Ví đang dùng">
+              <Mono value={wallet?.address ?? ""} truncate={false} />
+            </Row>
+            <Row label="Đang đề cử">
+              {root.data.pendingRoot
+                ? <Mono value={root.data.pendingRoot} truncate={false} />
+                : <span className="text-muted">Không có</span>}
+            </Row>
+            <Row label="Nguồn dữ liệu">
+              {root.data.source === "chain" ? "Đọc trực tiếp từ chuỗi" : "Chỉ mục cơ sở dữ liệu"}
+            </Row>
+          </dl>
+        </div>
+      </Section>
 
       <GasPanel />
       <GrantAdminCard />
@@ -103,24 +128,29 @@ function GrantAdminCard() {
     });
 
   return (
-    <Card title="Cấp quyền quản trị viên"
-      subtitle="Admin phê duyệt được issuer và xử lý sự cố văn bằng, nhưng không cấp được admin khác.">
-      <Alert tone="info" title="Điều kiện của hợp đồng">
-        Địa chỉ được cấp phải <strong>đã đăng ký DID và DID còn hoạt động</strong>, và{" "}
-        <strong>không đang là issuer</strong> — một địa chỉ không thể vừa admin vừa issuer (F-11d).
-        Admin từng bị thu hồi thì cấp lại được, bản ghi cũ vẫn ở lại làm vết kiểm toán.
-      </Alert>
+    <Section title="Cấp quyền quản trị viên"
+      description="Quản trị viên phê duyệt được đơn vị cấp bằng và xử lý sự cố văn bằng, nhưng không cấp được quản trị viên khác.">
+      <SignSheet tx={tx}>
+        <div className="space-y-4">
+          <Alert tone="info" title="Điều kiện">
+            Địa chỉ được cấp phải <strong>đã đăng ký DID và DID còn hoạt động</strong>, và{" "}
+            <strong>không đang là đơn vị cấp bằng</strong>. Một địa chỉ không thể vừa là quản trị
+            viên vừa là đơn vị cấp bằng. Quản trị viên từng bị thu hồi thì cấp lại được, bản ghi cũ
+            vẫn ở lại làm vết kiểm toán.
+          </Alert>
 
-      <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-        <Field label="Địa chỉ ví" value={address} onChange={setAddress} mono required
-          placeholder="0x…" />
-        <button className="btn-primary" disabled={!address.trim() || tx.busy}>
-          {tx.busy ? tx.label : "Ký & cấp quyền admin"}
-        </button>
-      </form>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+            <Field label="Địa chỉ ví" value={address} onChange={setAddress} mono required
+              placeholder="0x…" />
+            <button className="btn-primary" disabled={!address.trim() || tx.busy}>
+              Ký và cấp quyền quản trị viên
+            </button>
+          </form>
 
-      <div className="mt-4"><TxProgress tx={tx} okTitle="Đã cấp quyền quản trị viên" /></div>
-    </Card>
+          <TxProgress tx={tx} okTitle="Đã cấp quyền quản trị viên" />
+        </div>
+      </SignSheet>
+    </Section>
   );
 }
 
@@ -151,30 +181,33 @@ function AdminListCard() {
     });
 
   return (
-    <Card title="Quản trị viên hiện có"
-      subtitle="Thu hồi quyền có hiệu lực ngay trên chuỗi; bản ghi cũ vẫn giữ để truy vết.">
+    <Section title="Quản trị viên hiện có"
+      description="Thu hồi quyền có hiệu lực ngay trên chuỗi; bản ghi cũ vẫn giữ để truy vết.">
       {admins.isLoading && <Spinner />}
-      {!admins.isLoading && !admins.data?.length && <Empty title="Chưa có quản trị viên nào" />}
+      {!admins.isLoading && !admins.data?.length && (
+        <Empty title="Chưa có quản trị viên nào"
+          hint="Cấp quyền cho quản trị viên đầu tiên bằng biểu mẫu ở trên." />
+      )}
 
       {!!admins.data?.length && (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-ink-400">
-              <tr><th className="py-2">Tên</th><th>Địa chỉ</th><th>Trên chuỗi</th><th></th></tr>
+          <table className="table">
+            <thead>
+              <tr><th>Tên</th><th>Địa chỉ</th><th>Trên chuỗi</th><th></th></tr>
             </thead>
-            <tbody className="divide-y divide-ink-100">
+            <tbody>
               {admins.data.map((r) => (
                 <tr key={r.address}>
-                  <td className="py-2.5 font-medium text-ink-800">{r.label}</td>
+                  <td className="font-semibold">{r.label}</td>
                   <td><Mono value={r.address} /></td>
                   <td>{r.activeOnChain
-                    ? <Badge tone="ok">Đang hoạt động</Badge>
-                    : <Badge tone="muted">Không còn quyền</Badge>}</td>
+                    ? <RoleStatusBadge status="active" />
+                    : <RoleStatusBadge status="revoked" />}</td>
                   <td className="text-right">
                     {r.activeOnChain && (
-                      <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs !text-rose-600"
+                      <button type="button" className="btn-quiet text-son"
                         onClick={() => setTarget(r.address)}>
-                        Chọn để thu hồi
+                        Thu hồi quyền
                       </button>
                     )}
                   </td>
@@ -185,27 +218,30 @@ function AdminListCard() {
         </div>
       )}
 
-      {target && (
-        <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50/50 p-4 space-y-4">
-          <p className="text-sm text-ink-700">
-            Thu hồi quyền admin của <Mono value={target} />
-          </p>
-          <Field label="Lý do (ghi vào nhật ký kiểm toán)" value={reason} onChange={setReason}
-            placeholder="Hết nhiệm kỳ" />
-          <div className="flex flex-wrap gap-3">
-            <button className="btn-danger" type="button"
-              disabled={reason.trim().length < 2 || tx.busy}
-              onClick={revoke}>
-              {tx.busy ? tx.label : "Ký & thu hồi quyền admin"}
-            </button>
-            <button className="btn-ghost" type="button"
-              onClick={() => { setTarget(""); setReason(""); tx.reset(); }}>Huỷ</button>
+      {(target || tx.step !== "idle") && (
+        <SignSheet tx={tx} className="mt-5">
+          <div className="space-y-4">
+            {target && (
+              <>
+                <p>Thu hồi quyền quản trị viên của <Mono value={target} /></p>
+                <Field label="Lý do (ghi vào nhật ký kiểm toán)" value={reason} onChange={setReason}
+                  placeholder="Hết nhiệm kỳ" />
+                <div className="flex flex-wrap gap-3">
+                  <button className="btn-danger" type="button"
+                    disabled={reason.trim().length < 2 || tx.busy}
+                    onClick={revoke}>
+                    Ký và thu hồi quyền quản trị viên
+                  </button>
+                  <button className="btn-secondary" type="button"
+                    onClick={() => { setTarget(""); setReason(""); tx.reset(); }}>Huỷ</button>
+                </div>
+              </>
+            )}
+            <TxProgress tx={tx} okTitle="Đã thu hồi quyền quản trị viên" />
           </div>
-        </div>
+        </SignSheet>
       )}
-
-      <div className="mt-4"><TxProgress tx={tx} okTitle="Đã thu hồi quyền admin" /></div>
-    </Card>
+    </Section>
   );
 }
 
@@ -248,40 +284,55 @@ function RootTransferCard({ pendingRoot }: { pendingRoot: string | null }) {
     });
 
   return (
-    <Card title="Chuyển quyền quản trị gốc"
-      subtitle="Root đề cử, người nhận tự ký chấp nhận. Quyền chưa đổi cho tới bước hai.">
-      {pendingRoot ? (
-        <Alert tone="warn" title="Đang có đề cử chờ ký nhận">
-          <Mono value={pendingRoot} truncate={false} />
-          <p className="mt-2">
-            Bạn <strong>vẫn là root</strong> cho tới khi chính địa chỉ này ký nhận. Đổi ý thì huỷ
-            đề cử bên dưới.
-          </p>
-        </Alert>
-      ) : (
-        <p className="text-sm text-ink-600">Không có đề cử nào đang chờ.</p>
-      )}
+    <Section title="Chuyển quyền quản trị gốc"
+      description="Quyền chưa đổi cho tới khi người được đề cử tự ký nhận.">
+      <SignSheet tx={proposeTx.step !== "idle" ? proposeTx : cancelTx}>
+        <div className="space-y-4">
+          <ol className="max-w-prose space-y-2">
+            <li className="flex items-center gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary text-sm font-semibold" aria-hidden="true">1</span>
+              <span>Bạn đề cử địa chỉ mới và ký.</span>
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary text-sm font-semibold" aria-hidden="true">2</span>
+              <span>Người được đề cử tự ký nhận ở trang Tài khoản của họ.</span>
+            </li>
+          </ol>
 
-      <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); propose(); }}>
-        <Field label="Địa chỉ được đề cử" value={address} onChange={setAddress} mono
-          placeholder="0x…"
-          hint="Nên là địa chỉ đã đăng ký trong hệ thống và bạn chắc chắn có người giữ khoá." />
-        <div className="flex flex-wrap gap-3">
-          <button className="btn-primary" disabled={!address.trim() || proposeTx.busy}>
-            {proposeTx.busy ? proposeTx.label : "Ký & đề cử root mới"}
-          </button>
-          {pendingRoot && (
-            <button className="btn-ghost" type="button" disabled={cancelTx.busy} onClick={cancel}>
-              {cancelTx.busy ? cancelTx.label : "Huỷ đề cử"}
-            </button>
+          {pendingRoot ? (
+            <Alert tone="warn" title="Đang có đề cử chờ ký nhận">
+              <Mono value={pendingRoot} truncate={false} />
+              <p className="mt-2">
+                Bạn <strong>vẫn là quản trị gốc</strong> cho tới khi chính địa chỉ này ký nhận. Đổi ý
+                thì huỷ đề cử bên dưới.
+              </p>
+            </Alert>
+          ) : (
+            <p className="text-muted">Không có đề cử nào đang chờ.</p>
           )}
-        </div>
-      </form>
 
-      <div className="mt-4 space-y-3">
-        <TxProgress tx={proposeTx} okTitle="Đã đề cử root mới" />
-        <TxProgress tx={cancelTx} okTitle="Đã huỷ đề cử" />
-      </div>
-    </Card>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); propose(); }}>
+            <Field label="Địa chỉ được đề cử" value={address} onChange={setAddress} mono
+              placeholder="0x…"
+              hint="Nên là địa chỉ đã đăng ký trong hệ thống và bạn chắc chắn có người giữ khoá." />
+            <div className="flex flex-wrap gap-3">
+              <button className="btn-danger" disabled={!address.trim() || proposeTx.busy}>
+                Ký và đề cử quản trị gốc mới
+              </button>
+              {pendingRoot && (
+                <button className="btn-secondary" type="button" disabled={cancelTx.busy} onClick={cancel}>
+                  Ký và huỷ đề cử
+                </button>
+              )}
+            </div>
+          </form>
+
+          <div className="space-y-3">
+            <TxProgress tx={proposeTx} okTitle="Đã đề cử quản trị gốc mới" />
+            <TxProgress tx={cancelTx} okTitle="Đã huỷ đề cử" />
+          </div>
+        </div>
+      </SignSheet>
+    </Section>
   );
 }

@@ -3,6 +3,7 @@ import { listKeystores, unlockWallet, updateKeystoreRole, type StoredKeystore, t
 import { login, logout as doLogout } from "../lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { session } from "../lib/api";
+import { keySession } from "../lib/session";
 
 /** Tự khoá ví sau khoảng thời gian không thao tác, để máy bỏ quên không bị lợi dụng. */
 const IDLE_LOCK_MS = 15 * 60_000;
@@ -26,6 +27,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [secondsUntilLock, setSeconds] = useState<number | null>(null);
   const lastActivity = useRef(Date.now());
+  const started = useRef(false);
+  const openedRef = useRef(false);
+  const lastTouched = useRef(0);
+  const lastTouchAt = useRef(0);
   // Bộ đệm truy vấn giữ dữ liệu của tài khoản trước; đổi danh tính là xoá sạch
   // để tài khoản sau tải lại từ máy chủ, không thấy văn bằng của người khác.
   const qc = useQueryClient();
@@ -38,11 +43,33 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     // Khoá riêng chỉ sống trong bộ nhớ tab nên tải lại trang là ví đã khoá —
     // token phiên còn trong sessionStorage thì xoá theo, kẻo phiên đăng nhập sống
     // tiếp khi không còn ai mở ví (W-06).
-    session.clear();
-    refreshKeystores().finally(() => setLoading(false));
+    // Từ 17/11: khôi phục có điều kiện qua src/lib/session.ts; không khôi phục được
+    // thì vẫn xoá JWT.
+    if (started.current) return;
+    started.current = true;
+    void (async () => {
+      try {
+        const r = await keySession.restore();
+        if (r && session.get() && !openedRef.current) {
+          openedRef.current = true;
+          setWallet(r.wallet);
+          lastActivity.current = r.expiresAt - IDLE_LOCK_MS;
+        } else if (!openedRef.current) {
+          session.clear();
+          await keySession.clear();
+        }
+        await keySession.purgeOrphans();
+      } catch {
+        if (!openedRef.current) session.clear();
+      }
+      await refreshKeystores().catch(() => undefined);
+      setLoading(false);
+    })();
   }, [refreshKeystores]);
 
   const lock = useCallback(() => {
+    // Xoá bản ghi phiên trước khi huỷ khoá trong RAM, để F5 không khôi phục lại.
+    void keySession.clear();
     // Ghi đè khoá riêng bằng 0 thay vì chỉ bỏ tham chiếu: closure nào còn giữ
     // đối tượng ví cũ (giao dịch đang dở) cũng không ký được nữa (W-06).
     setWallet((w) => { w?.keyPair.privateKey.fill(0); return null; });
@@ -65,8 +92,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const synced: UnlockedWallet = { ...rest, role };
     if (role !== w.role) await updateKeystoreRole(w.address, role);
     qc.clear();
+    openedRef.current = true;
     setWallet(synced);
     lastActivity.current = Date.now();
+    void keySession.save(synced, Date.now() + IDLE_LOCK_MS).catch(() => undefined);
     return synced;
   }, [qc]);
 
@@ -96,7 +125,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const timer = setInterval(() => {
       const left = IDLE_LOCK_MS - (Date.now() - lastActivity.current);
       setSeconds(Math.max(0, Math.ceil(left / 1000)));
-      if (left <= 0) lock();
+      if (left <= 0) { lock(); return; }
+      // Gia hạn bản ghi phiên theo hoạt động, tiết lưu ~30 s.
+      if (lastActivity.current !== lastTouched.current && Date.now() - lastTouchAt.current >= 30_000) {
+        lastTouched.current = lastActivity.current;
+        lastTouchAt.current = Date.now();
+        void keySession.touch(lastActivity.current + IDLE_LOCK_MS).catch(() => undefined);
+      }
     }, 1000);
 
     return () => {
