@@ -21,6 +21,8 @@ const OUT = process.env.OUT_DIR ?? "./.bench/eval";
 const DB = process.env.EVAL_DB ?? "vnu_trust_eval";
 const PG = process.env.PG_CONTAINER ?? "vnu_trust_postgres";
 const PGUSER = process.env.DB_USER ?? "vnu_trust";
+const BACKENDS = (process.env.BACKENDS ?? "TS,Go").split(",").map((x) => x.trim().toUpperCase());
+const useBe = (name) => BACKENDS.includes(name.toUpperCase());
 mkdirSync(OUT, { recursive: true });
 
 const hex = (b) => "0x" + Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -107,7 +109,7 @@ async function setup() {
     vps[k] = vp;
   }
   // Kiểm tra trước khi đo: một phép đo trên tuyến trả lỗi thì chỉ đo tốc độ trả lỗi.
-  for (const base of [TS, GO]) {
+  for (const base of [TS, GO].filter((_, i) => useBe(["TS", "GO"][i]))) {
     const rep = await call(base, "POST", `/verify/share/${shares[8]}`, { vp: vps[8] });
     if (rep.status !== 200 || !rep.data.data.overallValid) throw new Error(`xác minh k=8 ở ${base} không hợp lệ: ${JSON.stringify(rep.data).slice(0, 300)}`);
   }
@@ -160,7 +162,7 @@ async function isolation(label) {
   const s = state(); const R = routes(s); const token = await tokenFor(s);
   const REPEATS = Number(process.env.REPEATS ?? 10), N = Number(process.env.N ?? 1000), CONC = Number(process.env.CONC ?? 8);
   const rows = [];
-  for (const [be, base] of [["TS", TS], ["GO", GO]]) {
+  for (const [be, base] of [["TS", TS], ["GO", GO]].filter(([b]) => useBe(b))) {
     for (const name of ["/did/resolve", "/auth/me", "verify k=1"]) {
       await run(base, R[name], token, 200, CONC); // khởi động
       const reps = [];
@@ -216,7 +218,7 @@ function explain() {
 async function measure(level, tag, names) {
   const s = state(); const R = routes(s); const token = await tokenFor(s);
   const rows = [];
-  for (const [be, base] of [["TS", TS], ["GO", GO]]) {
+  for (const [be, base] of [["TS", TS], ["GO", GO]].filter(([b]) => useBe(b))) {
     for (const name of names) {
       const probe = await run(base, R[name], token, 10, 1);
       // Ngân sách khoảng 12 giây mỗi cấu hình, kẹp trong [40, 300] mẫu.
@@ -253,8 +255,37 @@ async function scale() {
   console.log(`  → ${OUT}/scale.json`);
 }
 
+// ============================================================ sweep: mức đồng thời x tuyến (chỉ TS)
+async function sweep() {
+  const s = state(); const R = routes(s); const token = await tokenFor(s);
+  const CONCS = (process.env.CONCS ?? "1,2,4,8,16,32,64").split(",").map(Number);
+  const REPEATS = Number(process.env.REPEATS ?? 5), N = Number(process.env.N ?? 1000);
+  const NAMES = ["/did/resolve", "/auth/me", "/holder/credentials", "verify k=1", "verify k=8"];
+  const st = (a) => ({ median: median(a), min: Math.min(...a), max: Math.max(...a) });
+  const data = [];
+  for (const name of NAMES) {
+    await run(TS, R[name], token, 200, 8); // khởi động, bỏ kết quả
+    for (const conc of CONCS) {
+      const runs = [];
+      for (let i = 0; i < REPEATS; i++) {
+        const r = await run(TS, R[name], token, N, conc);
+        runs.push({ rps: r.rps, p50: r.p50, p95: r.p95, p99: r.p99, mean: r.mean, bad: r.bad });
+        await sleep(200);
+      }
+      const row = { route: name, conc, runs, rps: st(runs.map((x) => x.rps)), p50: st(runs.map((x) => x.p50)),
+        p95: st(runs.map((x) => x.p95)), bad: runs.reduce((a, x) => a + x.bad, 0) };
+      data.push(row);
+      console.log(`   [sweep] ${name} c=${conc}: ${row.rps.median.toFixed(0)} yc/s, p95 ${row.p95.median.toFixed(1)} ms, lỗi ${row.bad}`);
+    }
+  }
+  writeFileSync(`${OUT}/sweep.json`, JSON.stringify({ meta: { at: new Date().toISOString(), repeats: REPEATS, n: N, concs: CONCS,
+    cpusetServices: process.env.CPUSET_SVC ?? "", cpusetLoad: process.env.CPUSET_LOAD ?? "", backend: "TS" }, data }, null, 2));
+  console.log(`  → ${OUT}/sweep.json`);
+}
+
 const [phase, arg] = process.argv.slice(2);
 if (phase === "setup") await setup();
 else if (phase === "isolation") await isolation(arg ?? "baseline");
+else if (phase === "sweep") await sweep();
 else if (phase === "scale") await scale();
-else { console.error("pha: setup | isolation <nhãn> | scale"); process.exit(2); }
+else { console.error("pha: setup | isolation <nhãn> | sweep | scale"); process.exit(2); }
